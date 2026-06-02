@@ -41,6 +41,7 @@ import SiteContentAdminPage from '../pages/admin/SiteContentAdminPage';
 import SiteSettingsAdminPage from '../pages/admin/SiteSettingsAdminPage';
 import AnnouncementsAdminPage from '../pages/admin/AnnouncementsAdminPage';
 import ComingSoonPage from '../pages/admin/ComingSoonPage';
+import JobPostingsAdminPage from '../pages/admin/JobPostingsAdminPage';
 
 import RequireEmployer from '../components/employer/RequireEmployer';
 import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
@@ -89,8 +90,8 @@ const ADMIN_ROUTES = {
   '/admin/committees': CommitteesAdminPage,
   '/admin/site-content': SiteContentAdminPage,
   '/admin/site-settings': SiteSettingsAdminPage,
-  '/admin/jobs': () => <ComingSoonPage title="Job postings" description="Moderate articleship vacancies and employment postings; review payments." />,
   '/admin/announcements': AnnouncementsAdminPage,
+  '/admin/jobs': JobPostingsAdminPage,
   '/admin/cabf': () => <ComingSoonPage title="CABF requests" description="Review CA Benevolent Fund assistance requests, approve disbursements, track audit trail." />,
   '/admin/payments': () => <ComingSoonPage title="Payments" description="Read-only view of payments with refunds, disputes, and invoices." />,
   '/admin/files': () => <ComingSoonPage title="Files" description="Browse uploaded banners, certificates, and other assets." />,
