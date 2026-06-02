@@ -7,6 +7,8 @@ import { IconArrowLeft } from '../icons';
 import { usePublicEvents } from '../hooks/usePublicEvents';
 import { usePublicCommittees, committeeColor } from '../hooks/usePublicCommittees';
 import { apiEventToCardEvent } from '../lib/eventAdapter';
+import { useSiteContent } from '../hooks/useSiteContent';
+import { renderMarkdown } from '../lib/markdown.jsx';
 
 // Single hero fallback when a committee row carries no admin-supplied image.
 // Replace with a `committees.hero_image_url` column if admins should pick.
@@ -17,6 +19,48 @@ const AUDIENCE_TABS = [
   { key: 'Members',  label: 'For Members' },
   { key: 'Students', label: 'For Students' },
 ];
+
+function CommitteeChairmanSection({ code }) {
+  const content = useSiteContent(`event_committee_${code.toLowerCase()}`);
+  if (!content.chairman_photo && !content.chairman_message && !content.chairman_name) return null;
+
+  return (
+    <>
+      {/* Blurred gradient divider inside the card */}
+      <div style={{
+        margin: '.875rem 0',
+        height: 1,
+        background: 'linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%)',
+        filter: 'blur(2px)',
+        opacity: 0.4,
+      }} />
+
+      <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
+        {content.chairman_photo && (
+          <img
+            src={content.chairman_photo}
+            alt="Committee Chairman"
+            style={{
+              width: 48, height: 48, borderRadius: '50%',
+              objectFit: 'cover', border: '2px solid var(--border)', flexShrink: 0,
+            }}
+          />
+        )}
+        <div style={{ flex: 1 }}>
+          <div className="tiny-eyebrow" style={{ marginBottom: '.2rem', fontSize: '.65rem' }}>From the Chairman</div>
+          {content.chairman_name && (
+            <div style={{ fontWeight: 600, fontSize: '.875rem', marginBottom: '.3rem' }}>{content.chairman_name}</div>
+          )}
+          {content.chairman_message && (
+            <div className="muted-text" style={{ fontSize: '.8125rem', lineHeight: 1.6 }}>
+              {renderMarkdown(content.chairman_message)}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
 
 // Adapts a DB committee row into the {short, fullName, color, description}
 // shape the CategoryCard and detail panel already expect.
@@ -83,10 +127,11 @@ export default function EventsPage() {
                 <span className="committee-panel-dot" aria-hidden="true" />
                 {events.length} upcoming event{events.length !== 1 ? 's' : ''}
               </div>
+              <CommitteeChairmanSection code={selectedCommittee} />
             </div>
           </div>
 
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '.5rem' }}>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '.5rem', marginTop: '1.5rem' }}>
             <div className="tiny-eyebrow">{info.short} · UPCOMING EVENTS</div>
             <div className="muted-text" style={{ fontSize: '.8125rem' }}>{events.length} event{events.length !== 1 ? 's' : ''}</div>
           </div>

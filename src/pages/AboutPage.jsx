@@ -25,10 +25,17 @@ function initials(name) {
 }
 
 export default function AboutPage() {
-  const vision  = useSiteContent('about_vision');
-  const mission = useSiteContent('about_mission');
-  const history = useSiteContent('about_history');
-  const { rows: roster } = useManagingCommittee();
+  const vision     = useSiteContent('about_vision');
+  const mission    = useSiteContent('about_mission');
+  const history    = useSiteContent('about_history');
+  const committee  = useSiteContent('about_committee_members');
+  const { rows: profileRoster } = useManagingCommittee();
+
+  // When manual members have been saved in the admin, prefer that list.
+  // Fall back to role-assignment roster (useManagingCommittee) otherwise.
+  const roster = Array.isArray(committee.members) && committee.members.length > 0
+    ? committee.members.map((m) => ({ user_id: m.user_id, name: m.name, avatar_url: m.photo_url, role_name: m.designation }))
+    : profileRoster;
 
   return (
     <>
@@ -64,7 +71,7 @@ export default function AboutPage() {
             The roster will appear here once committee members are assigned.
           </p>
         ) : (
-          <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+          <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
             {roster.map((p) => (
               <div key={p.user_id} className="card" style={{ textAlign: 'center' }}>
                 {p.avatar_url ? (

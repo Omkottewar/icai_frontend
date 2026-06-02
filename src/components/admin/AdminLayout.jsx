@@ -49,7 +49,7 @@ const NAV_GROUPS = [
   {
     label: 'Marketplace',
     items: [
-      { to: '/admin/jobs', label: 'Job postings', Icon: IconBriefcase, soon: true },
+      { to: '/admin/jobs', label: 'Job postings', Icon: IconBriefcase },
       { to: '/admin/cabf', label: 'CABF requests', Icon: IconHeart, soon: true },
     ],
   },

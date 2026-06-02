@@ -8,11 +8,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://icai-backend.onrender.com',
+        target: 'http://localhost:4000',
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'https://icai-backend.onrender.com',
+        target: 'http://localhost:4000',
         changeOrigin: true,
       },
     },
