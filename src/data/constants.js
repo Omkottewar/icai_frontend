@@ -19,7 +19,6 @@ export const NAV = [
   { to: '/', label: 'Home' },
   { to: '/about', label: 'About' },
   { to: '/events', label: 'Events' },
-  { to: '/community', label: 'Community' },
   { to: '/members', label: 'Members' },
   { to: '/students', label: 'Students' },
   { to: '/resources', label: 'Resources' },
@@ -45,13 +44,6 @@ export const ICAI_LINKS = [
   { label: 'ICAI Mobile App',      url: 'https://www.icai.org/mobile/' },
   { label: 'eSahaayataa',          url: 'https://www.icai.org/help/' },
   { label: 'ICAI TV',              url: 'http://icaitv.com/' },
-];
-
-export const ANNOUNCEMENTS = [
-  'CPE Seminar on Direct Tax Amendments — 18th May 2026',
-  'WICASA Mock Test Series for CA Foundation begins 25th May',
-  'Branch Newsletter (May Issue) is now available for download',
-  'Annual Conference registrations open — early-bird until 31st May',
 ];
 
 // audience: 'Members' | 'Students' | 'All'

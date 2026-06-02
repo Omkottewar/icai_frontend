@@ -31,10 +31,9 @@ const LEADERSHIP_SLIDES = [
     caption: 'Student community',
   },
 ];
-import {
-  ANNOUNCEMENTS, SERVICES,
-} from '../data/constants';
+import { SERVICES } from '../data/constants';
 import { usePublicEvents } from '../hooks/usePublicEvents';
+import { useAnnouncements } from '../hooks/useAnnouncements';
 import { usePublicCommittees, committeeColor } from '../hooks/usePublicCommittees';
 import { apiEventToCardEvent } from '../lib/eventAdapter';
 import { useMemo } from 'react';
@@ -58,6 +57,12 @@ export default function HomePage() {
   const upcoming = SORTED_EVENTS.slice(0, 5);
   const committees = committeesData?.rows ?? [];
 
+  // Live announcements from /api/announcements. When the list is empty
+  // (no active rows in the window) the entire ticker bar is hidden — see
+  // the conditional render below.
+  const { data: annData } = useAnnouncements();
+  const tickerItems = (annData?.items ?? []).map((a) => a.title);
+
   // Admin-editable site content (defaults baked in so a fresh DB still renders).
   const hero            = useSiteContent('home_hero');
   const heroStats       = useSiteContent('home_hero_stats');
@@ -67,19 +72,21 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Ticker */}
-      <div style={{ borderBottom: '1px solid var(--border)', background: 'oklch(0.85 0.16 90 / 0.4)' }}>
-        <div className="container row gap-3" style={{ padding: '.5rem 1rem', fontSize: '.875rem' }}>
-          <span className="badge badge-primary" style={{ flexShrink: 0 }}>LATEST</span>
-          <div style={{ overflow: 'hidden', flex: 1 }}>
-            <div className="ticker-track">
-              {[...ANNOUNCEMENTS, ...ANNOUNCEMENTS].map((a, i) => (
-                <span key={i} style={{ color: 'rgba(0,0,0,.7)' }}>• {a}</span>
-              ))}
+      {/* Ticker — only rendered when there is at least one active announcement */}
+      {tickerItems.length > 0 && (
+        <div style={{ borderBottom: '1px solid var(--border)', background: 'oklch(0.85 0.16 90 / 0.4)' }}>
+          <div className="container row gap-3" style={{ padding: '.5rem 1rem', fontSize: '.875rem' }}>
+            <span className="badge badge-primary" style={{ flexShrink: 0 }}>LATEST</span>
+            <div style={{ overflow: 'hidden', flex: 1 }}>
+              <div className="ticker-track">
+                {[...tickerItems, ...tickerItems].map((a, i) => (
+                  <span key={i} style={{ color: 'rgba(0,0,0,.7)' }}>• {a}</span>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Hero */}
       <section style={{

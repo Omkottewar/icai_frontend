@@ -19,7 +19,6 @@ import SearchPage from '../pages/SearchPage';
 import DashboardPage from '../pages/DashboardPage';
 import ChecklistsPage from '../pages/ChecklistsPage';
 import BranchMetricsPage from '../pages/BranchMetricsPage';
-import CommunityPage from '../pages/CommunityPage';
 import NotFound from '../pages/NotFound';
 
 import LoginPage from '../pages/auth/LoginPage';
@@ -40,7 +39,14 @@ import UsersAdminPage from '../pages/admin/UsersAdminPage';
 import CommitteesAdminPage from '../pages/admin/CommitteesAdminPage';
 import SiteContentAdminPage from '../pages/admin/SiteContentAdminPage';
 import SiteSettingsAdminPage from '../pages/admin/SiteSettingsAdminPage';
+import AnnouncementsAdminPage from '../pages/admin/AnnouncementsAdminPage';
 import ComingSoonPage from '../pages/admin/ComingSoonPage';
+
+import RequireEmployer from '../components/employer/RequireEmployer';
+import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
+import EmployerPostingsPage from '../pages/employer/EmployerPostingsPage';
+import EmployerPostingFormPage from '../pages/employer/EmployerPostingFormPage';
+import EmployerProfilePage from '../pages/employer/EmployerProfilePage';
 
 const ROUTES = {
   '/': HomePage,
@@ -59,7 +65,6 @@ const ROUTES = {
   '/dashboard': DashboardPage,
   '/checklists': ChecklistsPage,
   '/branch-insights': BranchMetricsPage,
-  '/community': CommunityPage,
   '/login': LoginPage,
   '/signup': SignupPage,
   '/forgot': ForgotPage,
@@ -85,6 +90,7 @@ const ADMIN_ROUTES = {
   '/admin/site-content': SiteContentAdminPage,
   '/admin/site-settings': SiteSettingsAdminPage,
   '/admin/jobs': () => <ComingSoonPage title="Job postings" description="Moderate articleship vacancies and employment postings; review payments." />,
+  '/admin/announcements': AnnouncementsAdminPage,
   '/admin/cabf': () => <ComingSoonPage title="CABF requests" description="Review CA Benevolent Fund assistance requests, approve disbursements, track audit trail." />,
   '/admin/payments': () => <ComingSoonPage title="Payments" description="Read-only view of payments with refunds, disputes, and invoices." />,
   '/admin/files': () => <ComingSoonPage title="Files" description="Browse uploaded banners, certificates, and other assets." />,
@@ -94,6 +100,21 @@ const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding'
 
 function isAdminPath(path) {
   return path === '/admin' || path.startsWith('/admin/');
+}
+
+function isEmployerPath(path) {
+  return path === '/employer' || path.startsWith('/employer/');
+}
+
+// Resolve any /employer/* path (including dynamic /:id/edit) to a component.
+// Returns null if no employer page matches → caller falls back to NotFound.
+function resolveEmployerPage(path) {
+  if (path === '/employer')              return EmployerDashboardPage;
+  if (path === '/employer/postings')     return EmployerPostingsPage;
+  if (path === '/employer/postings/new') return EmployerPostingFormPage;
+  if (path === '/employer/profile')      return EmployerProfilePage;
+  if (path.startsWith('/employer/postings/') && path.endsWith('/edit')) return EmployerPostingFormPage;
+  return null;
 }
 
 function ScrollToTop() {
@@ -115,6 +136,18 @@ export default function AppShell() {
         <RequireAdmin>
           <AdminPage />
         </RequireAdmin>
+      </>
+    );
+  }
+
+  if (isEmployerPath(route.path)) {
+    const EmployerPage = resolveEmployerPage(route.path) ?? NotFound;
+    return (
+      <>
+        <ScrollToTop />
+        <RequireEmployer>
+          <EmployerPage />
+        </RequireEmployer>
       </>
     );
   }

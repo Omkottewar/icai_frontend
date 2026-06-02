@@ -44,6 +44,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/site-content',  label: 'Site content',  Icon: IconFileText },
       { to: '/admin/site-settings', label: 'Site settings', Icon: IconSettings },
+      { to: '/admin/announcements', label: 'Announcements', Icon: IconBookOpen },
     ],
   },
   {

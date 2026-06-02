@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle } from '../../icons';
+import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle, IconMessageSquare } from '../../icons';
 import EventRegisterModal from '../events/EventRegisterModal';
+import EventChat from '../events/EventChat';
 import { useMyRegistrations } from '../../hooks/useMyRegistrations';
 
 function getMode(venue) {
@@ -39,27 +40,53 @@ function speakerImg(name) {
 export default function EventRow({ event: e, href = '#/events', detailed = false }) {
   const [open, setOpen] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
+  const [showChat, setShowChat] = useState(false);
   const mode = getMode(e.venue);
   const { eventIds, refresh: refreshMyRegistrations } = useMyRegistrations();
   const isRegistered = e.id && eventIds.has(e.id);
+
+  // Registered users: clicking the row jumps straight to the WhatsApp-style
+  // event chat. Unregistered users still get the accordion + Register CTA.
+  function handleHeaderClick() {
+    if (isRegistered) setShowChat(true);
+    else setOpen((o) => !o);
+  }
 
   return (
     <div className={'event-acc' + (open ? ' is-open' : '')}>
       <button
         type="button"
         className="event-acc-head"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
+        onClick={handleHeaderClick}
+        aria-expanded={isRegistered ? undefined : open}
       >
         <div className="event-acc-titleblock">
           <div className="event-acc-title">{e.title}</div>
           <div className="event-acc-committee">{e.committee}</div>
         </div>
         <div className="event-acc-right">
+          {isRegistered && (
+            <span
+              className="event-acc-chat-pill"
+              aria-hidden="true"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+                padding: '.25rem .65rem', borderRadius: 999,
+                background: 'oklch(0.95 0.08 145)',
+                color: 'oklch(0.32 0.16 145)',
+                fontSize: '.75rem', fontWeight: 600,
+                border: '1px solid oklch(0.82 0.13 145)',
+              }}
+            >
+              <IconMessageSquare size="sm" /> Chat
+            </span>
+          )}
           <span className="event-acc-date">{e.date}</span>
-          <span className="event-acc-chevron" aria-hidden="true">
-            <IconChevronDown size="sm" />
-          </span>
+          {!isRegistered && (
+            <span className="event-acc-chevron" aria-hidden="true">
+              <IconChevronDown size="sm" />
+            </span>
+          )}
         </div>
       </button>
 
@@ -107,17 +134,27 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
                   <div className="event-acc-actions">
                     {e.cpe > 0 && <span className="badge badge-accent">{e.cpe} CPE hrs</span>}
                     {isRegistered ? (
-                      <span
-                        className="badge"
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '.35rem',
-                          padding: '.45rem 1rem', borderRadius: '999px',
-                          background: 'oklch(0.95 0.08 145)', color: 'oklch(0.42 0.18 145)',
-                          fontWeight: 600, fontSize: '.8125rem',
-                        }}
-                      >
-                        <IconCheckCircle size="sm" /> Registered
-                      </span>
+                      <>
+                        <span
+                          className="badge"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+                            padding: '.45rem 1rem', borderRadius: '999px',
+                            background: 'oklch(0.95 0.08 145)', color: 'oklch(0.42 0.18 145)',
+                            fontWeight: 600, fontSize: '.8125rem',
+                          }}
+                        >
+                          <IconCheckCircle size="sm" /> Registered
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          style={{ padding: '.45rem 1.1rem' }}
+                          onClick={(ev) => { ev.stopPropagation(); setShowChat(true); }}
+                        >
+                          <IconMessageSquare size="sm" /> Open chat
+                        </button>
+                      </>
                     ) : (
                       <button
                         type="button"
@@ -154,6 +191,9 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
           onClose={() => setShowRegister(false)}
           onRegistered={refreshMyRegistrations}
         />
+      )}
+      {showChat && (
+        <EventChat event={e} onClose={() => setShowChat(false)} />
       )}
     </div>
   );

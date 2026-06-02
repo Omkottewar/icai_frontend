@@ -131,6 +131,11 @@ export default function Header() {
                       <IconShield size="sm" /> Admin console
                     </a>
                   )}
+                  {user.role === 'Employer' && (
+                    <a href="#/employer" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                      <IconShield size="sm" /> Employer dashboard
+                    </a>
+                  )}
                   <a href="#/members" className="menu-item" onClick={() => setMenuOpen(false)}><IconShield size="sm" /> Member services</a>
                   <a href="#/dashboard" className="menu-item" onClick={() => setMenuOpen(false)}><IconSettings size="sm" /> Settings</a>
                   <button className="menu-item" onClick={() => { setMenuOpen(false); logout(); }} style={{ color: 'var(--destructive)', width: '100%', textAlign: 'left' }}>

@@ -3,10 +3,13 @@ import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import { useChecklistList } from '../hooks/useChecklist';
 import { useRoleFlags } from '../hooks/useRoleFlags';
+import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
 import StatCard from '../components/ui/StatCard';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
+import InsightsStyles from '../components/dashboard/insights/insightsStyles';
+import Sparkline from '../components/dashboard/insights/Sparkline';
 import {
   IconAward, IconShield, IconCalendar, IconBookOpen, IconUsers,
   IconBot, IconArrowRight, IconUser, IconSettings, IconLogOut, IconBriefcase, IconHandshake,
@@ -288,33 +291,161 @@ function humanise(value) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Branch chairman entry point — links to the full insights page.
-// Visually distinct (gradient background) so it reads as a "go here" CTA.
+// Branch chairman entry point — a premium preview tile that doubles as a CTA
+// into the full /branch-insights dashboard. Shows 4 live KPIs with a mini
+// sparkline so the chairman gets a glanceable read without clicking through.
+// Reuses the shared insights tokens for visual cohesion with the deep page.
 function BranchInsightsCard() {
+  // Match the BranchMetricsPage default (this year) so the numbers shown
+  // here are identical to what the chairman sees after clicking through.
+  const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
+  const { data, loading } = useBranchMetrics({ from: yearStart });
+
+  const k = data?.kpis;
+  const eventsSpark = (data?.events_per_month || []).map((r) => Number(r.n || 0));
+
   return (
-    <a href="#/branch-insights" className="branch-insights-card">
-      <div>
-        <div style={{ fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.06em', opacity: .8, fontWeight: 700 }}>
-          Branch Chairman
+    <>
+      <InsightsStyles />
+      <a href="#/branch-insights" className="bic-card">
+        <div className="bic-glow" aria-hidden="true" />
+        <div className="bic-head">
+          <div className="bic-head-left">
+            <div className="bic-logo">CA</div>
+            <div>
+              <div className="bic-eyebrow">Branch Chairman · live</div>
+              <div className="bic-title">Branch insights</div>
+              <div className="bic-sub">Full filters, charts, drill-downs &amp; exports →</div>
+            </div>
+          </div>
+          <div className="bic-spark">
+            {eventsSpark.length > 1 && (
+              <Sparkline data={eventsSpark} color="#3622FF" width={140} height={36} />
+            )}
+            <span className="bic-cta">Open dashboard <IconArrowRight size="sm" /></span>
+          </div>
         </div>
-        <div style={{ fontSize: '1.0625rem', fontWeight: 700, marginTop: '.15rem' }}>Branch insights</div>
-        <div style={{ fontSize: '.8125rem', opacity: .85, marginTop: '.2rem' }}>
-          Events, registrations, approvals, members — full metrics & filters
+
+        <div className="bic-kpis">
+          <BicMiniKpi label="Events" value={loading ? '—' : k?.events.total ?? 0}
+                      sub={k ? `${k.events.this_month} this month` : ''} accent="primary" />
+          <BicMiniKpi label="Registrations" value={loading ? '—' : k?.registrations.total ?? 0}
+                      sub={k ? `${k.registrations.this_month} this month` : ''} accent="success" />
+          <BicMiniKpi label="Pending approvals" value={loading ? '—' : k?.approvals.pending ?? 0}
+                      sub={k ? `${k.approvals.avg_cycle_hours}h avg cycle` : ''}
+                      accent={k?.approvals.pending > 0 ? 'warning' : 'neutral'} highlight={k?.approvals.pending > 0} />
+          <BicMiniKpi label="Upcoming (30d)" value={loading ? '—' : k?.events.upcoming_30d ?? 0}
+                      sub="Published & ahead" accent="teal" />
         </div>
-      </div>
-      <span style={{ fontSize: '1.25rem' }}>→</span>
+      </a>
 
       <style>{`
-        .branch-insights-card {
-          display: flex; justify-content: space-between; align-items: center;
-          padding: 1rem 1.25rem; border-radius: .5rem; text-decoration: none;
-          background: linear-gradient(135deg, #1e293b, #0f172a);
-          color: white; border: 1px solid rgba(255,255,255,.08);
-          transition: transform .12s, box-shadow .12s;
+        .bic-card {
+          position: relative; display: block; overflow: hidden;
+          padding: 1.1rem 1.25rem 1.15rem;
+          border-radius: 16px; text-decoration: none;
+          background: var(--card);
+          color: var(--foreground);
+          border: 1px solid var(--border);
+          box-shadow: 0 2px 6px rgba(15,23,42,.04);
+          transition: transform .18s ease, box-shadow .18s ease, border-color .18s;
         }
-        .branch-insights-card:hover { transform: translateY(-1px); box-shadow: 0 10px 25px rgba(15,23,42,.2); }
+        .bic-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 14px 32px -16px rgba(15,23,42,.18), 0 2px 6px rgba(15,23,42,.06);
+          border-color: oklch(0.36 0.13 255 / .35);
+        }
+        .bic-glow {
+          position: absolute; inset: -30% -10% auto auto;
+          width: 360px; height: 360px;
+          background:
+            radial-gradient(closest-side, oklch(0.36 0.13 255 / .14), transparent 70%),
+            radial-gradient(closest-side at 60% 70%, oklch(0.50 0.16 145 / .12), transparent 70%);
+          filter: blur(24px); pointer-events: none;
+        }
+        .bic-head { position: relative; display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; }
+        .bic-head-left { display: flex; align-items: flex-start; gap: .75rem; min-width: 0; }
+        .bic-logo {
+          width: 38px; height: 38px; border-radius: 9px;
+          display: grid; place-items: center; color: white;
+          font-weight: 800; font-size: .9rem; letter-spacing: -.02em;
+          background: linear-gradient(135deg, var(--primary), var(--primary-darker));
+          box-shadow: 0 4px 12px -2px oklch(0.36 0.13 255 / .45);
+          flex-shrink: 0;
+        }
+        .bic-eyebrow {
+          font-size: .65rem; text-transform: uppercase; letter-spacing: .08em;
+          font-weight: 700; color: var(--muted-foreground);
+        }
+        .bic-title {
+          font-size: 1.15rem; font-weight: 700; margin-top: .1rem;
+          letter-spacing: -.01em;
+        }
+        .bic-sub { font-size: .8125rem; color: var(--muted-foreground); margin-top: .1rem; }
+        .bic-spark {
+          display: flex; flex-direction: column; align-items: flex-end; gap: .35rem;
+          flex-shrink: 0;
+        }
+        .bic-cta {
+          display: inline-flex; align-items: center; gap: .3rem;
+          padding: .35rem .7rem; border-radius: 999px;
+          background: linear-gradient(135deg, var(--primary), var(--primary-darker));
+          font-size: .75rem; font-weight: 700; color: white;
+          box-shadow: 0 4px 12px -3px oklch(0.36 0.13 255 / .4);
+        }
+        .bic-kpis {
+          position: relative;
+          margin-top: 1rem;
+          display: grid; gap: .65rem;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        }
+        .bic-mini {
+          position: relative; overflow: hidden;
+          padding: .65rem .8rem;
+          background: var(--background);
+          border: 1px solid var(--border);
+          border-radius: 11px;
+        }
+        .bic-mini[data-highlight="true"] {
+          border-color: rgba(245,158,11,.55);
+          box-shadow: 0 0 0 1px rgba(245,158,11,.18);
+        }
+        .bic-mini-strip {
+          position: absolute; top: 8px; bottom: 8px; left: 0; width: 3px;
+          background: var(--m-accent, var(--primary));
+          border-radius: 0 3px 3px 0;
+        }
+        .bic-mini-label {
+          font-size: .65rem; text-transform: uppercase; letter-spacing: .06em;
+          font-weight: 700; color: var(--muted-foreground);
+        }
+        .bic-mini-value {
+          font-size: 1.4rem; font-weight: 700; line-height: 1.05;
+          font-variant-numeric: tabular-nums;
+          letter-spacing: -.015em; margin-top: .15rem;
+          color: var(--foreground);
+        }
+        .bic-mini-sub {
+          font-size: .7rem; color: var(--muted-foreground); margin-top: .1rem;
+        }
       `}</style>
-    </a>
+    </>
+  );
+}
+
+function BicMiniKpi({ label, value, sub, accent = 'primary', highlight }) {
+  const colours = {
+    primary: '#3622FF', success: '#16A34A', warning: '#F59E0B',
+    teal: '#0891B2', violet: '#7C3AED', amber: '#D97706',
+    neutral: '#94A3B8',
+  };
+  return (
+    <div className="bic-mini" data-highlight={highlight ? 'true' : 'false'} style={{ '--m-accent': colours[accent] || colours.primary }}>
+      <span className="bic-mini-strip" />
+      <div className="bic-mini-label">{label}</div>
+      <div className="bic-mini-value">{value}</div>
+      {sub && <div className="bic-mini-sub">{sub}</div>}
+    </div>
   );
 }
 

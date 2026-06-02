@@ -1,6 +1,8 @@
 import { useChecklistList } from '../../hooks/useChecklist';
 import { navigate } from '../../hooks/useRoute';
 import { IconArrowRight } from '../../icons';
+import InsightsStyles from './insights/insightsStyles';
+import ChartFrame from './insights/ChartFrame';
 
 // Top widget for committee chairmen: surfaces checklists waiting for THEM to
 // fill in budgets/values. /api/checklists is scoped server-side to committees
@@ -11,46 +13,34 @@ export default function CommitteeChecklistsCard() {
   const top3 = pending.slice(0, 3);
 
   return (
-    <div className="card" style={{ padding: '1rem', borderRadius: '.5rem' }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '.75rem' }}>
-        <div className="row gap-2" style={{ alignItems: 'baseline' }}>
-          <h3 style={{ fontSize: '.9375rem', fontWeight: 700, margin: 0 }}>Your committee checklists</h3>
-          {pending.length > 0 && (
-            <span style={{
-              background: '#fef3c7', color: '#92400e',
-              padding: '.1rem .55rem', borderRadius: 999,
-              fontSize: '.7rem', fontWeight: 700,
-            }}>{pending.length}</span>
-          )}
-        </div>
-        {pending.length > 3 && (
-          <a href="#/checklists" style={{ fontSize: '.8125rem', color: 'var(--primary)', fontWeight: 600 }}>
-            See all →
-          </a>
-        )}
-      </div>
-
-      {loading && <p className="muted-text" style={{ fontSize: '.8125rem', margin: 0 }}>Loading…</p>}
-
-      {!loading && pending.length === 0 && (
-        <p className="muted-text" style={{ fontSize: '.8125rem', margin: 0 }}>
-          No checklists waiting for your input.
-        </p>
-      )}
-
-      {!loading && top3.length > 0 && (
+    <>
+      <InsightsStyles />
+      <ChartFrame
+        eyebrow="Your committees"
+        title="Checklists awaiting you"
+        subtitle={pending.length > 0 ? `${pending.length} need your input` : null}
+        loading={loading}
+        empty={!loading && pending.length === 0}
+        emptyText="No checklists waiting for your input."
+        actions={
+          pending.length > 3 ? (
+            <a href="#/checklists" className="iframe-btn">See all →</a>
+          ) : null
+        }
+        padding="1rem"
+      >
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
           {top3.map((c) => (
             <li key={c.id}>
               <button
                 onClick={() => navigate('/checklists?id=' + c.id)}
-                className="row gap-2"
+                className="row gap-2 committee-row"
                 style={{
                   width: '100%', textAlign: 'left',
-                  padding: '.625rem .75rem',
-                  border: '1px solid var(--border)', borderRadius: '.375rem',
-                  background: 'var(--background)', cursor: 'pointer',
-                  alignItems: 'center',
+                  padding: '.65rem .85rem',
+                  border: '1px solid rgba(0,0,0,.06)', borderRadius: 10,
+                  background: 'white', cursor: 'pointer', alignItems: 'center',
+                  transition: 'border-color .15s, transform .15s, box-shadow .15s',
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -61,15 +51,22 @@ export default function CommitteeChecklistsCard() {
                     {c.committee_name || c.committee_code || '—'} · idle {fmtAge(c.updated_at)}
                   </div>
                 </div>
-                <span style={{ color: 'var(--primary)', fontWeight: 600, fontSize: '.8125rem', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
+                <span style={{ color: '#16A34A', fontWeight: 600, fontSize: '.8125rem', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
                   Fill <IconArrowRight size="sm" />
                 </span>
               </button>
             </li>
           ))}
         </ul>
-      )}
-    </div>
+        <style>{`
+          .committee-row:hover {
+            border-color: #16A34A !important;
+            transform: translateX(2px);
+            box-shadow: 0 4px 14px -6px rgba(22,163,74,.35);
+          }
+        `}</style>
+      </ChartFrame>
+    </>
   );
 }
 
