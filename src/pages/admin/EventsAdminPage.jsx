@@ -3,7 +3,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import DataTable from '../../components/admin/DataTable';
 import Drawer from '../../components/admin/Drawer';
 import FormField from '../../components/admin/FormField';
-import { useAdminList, adminFetch } from '../../hooks/useAdminList';
+import { useAdminList, adminFetch, invalidate } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { Shimmer, ShimmerFormField } from '../../components/ui/Shimmer';
@@ -504,62 +504,251 @@ function DrawerFormSkeleton() {
   );
 }
 
-// Checklist column action. Either:
-//  - shows current approval status (clickable, jumps to /checklists?id=<id>)
-//  - shows "Create checklist" button (creates a new one, then jumps in)
+// Checklist column action. Three states:
+//   • No checklist yet      → "+ Create checklist" opens template picker
+//   • New-system instance   → status pill, jumps to /my-checklists?id=<id>
+//   • Legacy event_checklist → status pill, jumps to /checklists?id=<id>
+//
+// We keep both paths because in-flight legacy rows still need their UI; new
+// creates always go through the rich template/instance system.
 const CHECKLIST_STATUS_LABEL = {
+  // legacy
   awaiting_committee:     'With committee',
   awaiting_branch_review: 'With branch chair',
   approved:               'Approved',
+  // new instance system
+  draft:                  'Draft — release pending',
+  awaiting_fill:          'With committee chair',
+  awaiting_review:        'With branch chair',
+  rejected:               'Rejected — needs revisions',
 };
 const CHECKLIST_STATUS_STYLE = {
   awaiting_committee:     { bg: '#fef3c7', fg: '#92400e' },
   awaiting_branch_review: { bg: '#dbeafe', fg: '#1e40af' },
   approved:               { bg: '#dcfce7', fg: '#166534' },
+  draft:                  { bg: '#f1f5f9', fg: '#475569' },
+  awaiting_fill:          { bg: '#fef3c7', fg: '#92400e' },
+  awaiting_review:        { bg: '#dbeafe', fg: '#1e40af' },
+  rejected:               { bg: '#fee2e2', fg: '#991b1b' },
 };
 
 function ChecklistButton({ row, showToast, refresh }) {
-  const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
-  async function create(e) {
-    e.stopPropagation();
-    if (busy) return;
-    setBusy(true);
-    try {
-      const created = await adminFetch('/api/checklists', { method: 'POST', body: { event_id: row.id } });
-      showToast?.('Checklist created — add items', 'success');
-      refresh?.();
-      navigate('/checklists?id=' + created.id);
-    } catch (err) {
-      showToast?.(err.message, 'error');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function open(e) {
-    e.stopPropagation();
-    navigate('/checklists?id=' + row.checklist_id);
-  }
-
-  if (!row.checklist_id) {
+  // New-system instance takes precedence — that's the active flow now.
+  if (row.instance_id) {
+    const c = CHECKLIST_STATUS_STYLE[row.instance_status] || { bg: '#f1f5f9', fg: '#475569' };
     return (
-      <button type="button" className="btn btn-outline" onClick={create} disabled={busy}
-              style={{ padding: '.25rem .55rem', fontSize: '.75rem' }}>
-        {busy ? 'Creating…' : '+ Create checklist'}
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); navigate('/my-checklists?id=' + row.instance_id); }}
+        style={{
+          padding: '.2rem .55rem', fontSize: '.7rem', fontWeight: 600,
+          borderRadius: 999, border: 0, cursor: 'pointer',
+          background: c.bg, color: c.fg,
+        }}
+      >
+        {CHECKLIST_STATUS_LABEL[row.instance_status] ?? row.instance_status} →
       </button>
     );
   }
 
-  const c = CHECKLIST_STATUS_STYLE[row.checklist_status] || { bg: '#f1f5f9', fg: '#475569' };
+  // Legacy event_checklist row still in flight — keep using the old drawer.
+  if (row.checklist_id) {
+    const c = CHECKLIST_STATUS_STYLE[row.checklist_status] || { bg: '#f1f5f9', fg: '#475569' };
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); navigate('/checklists?id=' + row.checklist_id); }}
+        title="Legacy checklist (old format)"
+        style={{
+          padding: '.2rem .55rem', fontSize: '.7rem', fontWeight: 600,
+          borderRadius: 999, border: 0, cursor: 'pointer',
+          background: c.bg, color: c.fg, outline: '1px dashed var(--border)',
+        }}
+      >
+        {CHECKLIST_STATUS_LABEL[row.checklist_status] ?? row.checklist_status} →
+      </button>
+    );
+  }
+
   return (
-    <button type="button" onClick={open}
-            style={{
-              padding: '.2rem .55rem', fontSize: '.7rem', fontWeight: 600,
-              borderRadius: 999, border: 0, cursor: 'pointer',
-              background: c.bg, color: c.fg,
-            }}>
-      {CHECKLIST_STATUS_LABEL[row.checklist_status] ?? row.checklist_status} →
-    </button>
+    <>
+      <button
+        type="button"
+        className="btn btn-outline"
+        onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
+        style={{ padding: '.25rem .55rem', fontSize: '.75rem' }}
+      >
+        + Create checklist
+      </button>
+      {pickerOpen && (
+        <TemplatePickerModal
+          eventId={row.id}
+          eventTitle={row.title}
+          onClose={() => setPickerOpen(false)}
+          onCreated={(id) => {
+            setPickerOpen(false);
+            refresh?.();
+            navigate('/my-checklists?id=' + id);
+          }}
+          showToast={showToast}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Template picker (event approval flow) ──────────────────────────────
+//
+// Creates a checklist_instances row bound to the event. Backend auto-assigns
+// the current committee chairman (filler) and branch chairman (reviewer)
+// when the template's fill_role/review_role reference those role codes —
+// see findActiveRoleHolder() in routes/checklistInstances.ts.
+//
+// The fill UI is the new rich renderer (radio, dropdown, file, etc.). On
+// approval, a DB trigger auto-publishes the event (mirror of the legacy
+// trigger on event_checklists).
+
+function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToast }) {
+  const [templates, setTemplates] = useState(null);
+  const [err, setErr] = useState('');
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    adminFetch('/api/checklist-templates')
+      .then((j) => { if (!cancelled) setTemplates((j.rows || []).filter((t) => t.is_published)); })
+      .catch((e) => { if (!cancelled) setErr(e.message); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  async function pick(template) {
+    if (busyId) return;
+    setBusyId(template.id);
+    try {
+      const created = await adminFetch('/api/checklist-instances', {
+        method: 'POST',
+        body: {
+          template_id: template.id,
+          event_id: eventId,
+          title: `${template.name} — ${eventTitle}`,
+        },
+      });
+      // adminFetch only auto-invalidates by '/api/admin/...' prefix; bust the
+      // events list manually so the new instance_id column updates.
+      invalidate('/api/admin/events');
+      showToast?.(`Checklist created from "${template.name}"`, 'success');
+      onCreated(created.id);
+    } catch (e) {
+      showToast?.(e.message, 'error');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  return (
+    <div className="tp-root" onClick={onClose}>
+      <div className="tp-card" onClick={(e) => e.stopPropagation()}>
+        <header className="tp-head">
+          <div>
+            <h2 className="tp-title">Pick a checklist template</h2>
+            <p className="tp-sub">For event: <strong>{eventTitle}</strong></p>
+          </div>
+          <button className="tp-x" onClick={onClose} aria-label="Close">×</button>
+        </header>
+
+        <div className="tp-body">
+          {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
+
+          {templates === null && <p className="muted-text">Loading templates…</p>}
+          {templates && templates.length === 0 && (
+            <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+              <p className="muted-text" style={{ marginBottom: '.5rem' }}>
+                No published templates yet.
+              </p>
+              <a href="#/admin/checklist-templates" className="btn-primary" style={{ padding: '.375rem .75rem', display: 'inline-block', textDecoration: 'none', fontSize: '.8125rem' }}>
+                Build one →
+              </a>
+            </div>
+          )}
+          {templates?.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              className="tp-row"
+              onClick={() => pick(t)}
+              disabled={busyId !== null}
+            >
+              <div>
+                <strong>{t.name}</strong>{' '}
+                <span className="muted-text" style={{ fontSize: '.75rem' }}>v{t.version}</span>
+                {t.category && (
+                  <span className="tp-chip">{t.category}</span>
+                )}
+                {t.description && (
+                  <div className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.15rem' }}>
+                    {t.description}
+                  </div>
+                )}
+              </div>
+              <span className="tp-cta">{busyId === t.id ? 'Creating…' : 'Use →'}</span>
+            </button>
+          ))}
+        </div>
+
+        <style>{`
+          .tp-root {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(15,23,42,.45);
+            display: flex; align-items: flex-start; justify-content: center;
+            padding: 5vh 1rem; overflow-y: auto;
+          }
+          .tp-card {
+            width: 100%; max-width: 560px;
+            background: var(--card); border-radius: .5rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,.25);
+            display: flex; flex-direction: column; max-height: 90vh;
+          }
+          .tp-head {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+          }
+          .tp-title { margin: 0; font-size: 1rem; font-weight: 700; }
+          .tp-sub { margin: .15rem 0 0; font-size: .8125rem; color: var(--muted-foreground); }
+          .tp-x {
+            background: transparent; border: 0; font-size: 1.5rem; line-height: 1;
+            cursor: pointer; color: var(--muted-foreground); padding: 0 .5rem;
+          }
+          .tp-body { padding: 1rem 1.25rem; overflow-y: auto; }
+          .tp-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+            width: 100%; padding: .75rem .875rem;
+            background: var(--card); border: 1px solid var(--border); border-radius: .5rem;
+            cursor: pointer; margin-bottom: .5rem; text-align: left; font: inherit; color: inherit;
+            transition: border-color .12s, background .12s;
+          }
+          .tp-row:hover:not(:disabled) { border-color: var(--primary); background: var(--background); }
+          .tp-row:disabled { opacity: .5; cursor: wait; }
+          .tp-row-empty { background: var(--background); border-style: dashed; }
+          .tp-cta { font-size: .8125rem; font-weight: 600; color: var(--primary); white-space: nowrap; }
+          .tp-divider {
+            text-align: center; font-size: .7rem; color: var(--muted-foreground);
+            margin: .5rem 0; letter-spacing: .06em; text-transform: uppercase;
+          }
+          .tp-chip {
+            display: inline-block; margin-left: .5rem; padding: .05rem .4rem;
+            background: var(--background); border: 1px solid var(--border);
+            border-radius: 999px; font-size: .65rem; color: var(--muted-foreground);
+          }
+        `}</style>
+      </div>
+    </div>
   );
 }

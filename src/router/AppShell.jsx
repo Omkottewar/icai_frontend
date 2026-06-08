@@ -18,6 +18,7 @@ import CareerCounsellingPage from '../pages/CareerCounsellingPage';
 import SearchPage from '../pages/SearchPage';
 import DashboardPage from '../pages/DashboardPage';
 import ChecklistsPage from '../pages/ChecklistsPage';
+import ChecklistInstancesPage from '../pages/ChecklistInstancesPage';
 import BranchMetricsPage from '../pages/BranchMetricsPage';
 import NotFound from '../pages/NotFound';
 
@@ -42,6 +43,7 @@ import SiteSettingsAdminPage from '../pages/admin/SiteSettingsAdminPage';
 import AnnouncementsAdminPage from '../pages/admin/AnnouncementsAdminPage';
 import ComingSoonPage from '../pages/admin/ComingSoonPage';
 import JobPostingsAdminPage from '../pages/admin/JobPostingsAdminPage';
+import ChecklistTemplatesAdminPage from '../pages/admin/ChecklistTemplatesAdminPage';
 
 import RequireEmployer from '../components/employer/RequireEmployer';
 import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
@@ -65,6 +67,7 @@ const ROUTES = {
   '/search': SearchPage,
   '/dashboard': DashboardPage,
   '/checklists': ChecklistsPage,
+  '/my-checklists': ChecklistInstancesPage,
   '/branch-insights': BranchMetricsPage,
   '/login': LoginPage,
   '/signup': SignupPage,
@@ -91,6 +94,7 @@ const ADMIN_ROUTES = {
   '/admin/site-content': SiteContentAdminPage,
   '/admin/site-settings': SiteSettingsAdminPage,
   '/admin/announcements': AnnouncementsAdminPage,
+  '/admin/checklist-templates': ChecklistTemplatesAdminPage,
   '/admin/jobs': JobPostingsAdminPage,
   '/admin/cabf': () => <ComingSoonPage title="CABF requests" description="Review CA Benevolent Fund assistance requests, approve disbursements, track audit trail." />,
   '/admin/payments': () => <ComingSoonPage title="Payments" description="Read-only view of payments with refunds, disputes, and invoices." />,

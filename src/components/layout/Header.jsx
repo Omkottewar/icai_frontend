@@ -5,6 +5,7 @@ import Link from '../ui/Link';
 import { NAV, SOCIALS } from '../../data/constants';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import caIndiaLogo from '../../assets/CA India Logo.png';
+import NotificationsBell from './NotificationsBell';
 import {
   IconSearch, IconBot, IconChevronDown, IconUser, IconShield,
   IconSettings, IconLogOut, IconMenu, IconX,
@@ -110,6 +111,8 @@ export default function Header() {
           {/* <a href="#/praygyaan" className="row gap-1 praygyaan-pill" style={{ display: 'none', padding: '.375rem .75rem', background: 'rgba(255,255,255,.12)', color: 'white', borderRadius: '.375rem', fontSize: '.75rem', fontWeight: 600 }}>
             <IconBot size="sm" /> PrayGyaan AI
           </a> */}
+
+          {user && <NotificationsBell />}
 
           {user ? (
             <div ref={menuRef} style={{ position: 'relative' }}>

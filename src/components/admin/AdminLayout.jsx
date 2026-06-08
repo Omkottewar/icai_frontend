@@ -40,6 +40,12 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: 'Forms',
+    items: [
+      { to: '/admin/checklist-templates', label: 'Checklist templates', Icon: IconCheckCircle },
+    ],
+  },
+  {
     label: 'Site',
     items: [
       { to: '/admin/site-content',  label: 'Site content',  Icon: IconFileText },

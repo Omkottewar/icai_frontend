@@ -31,6 +31,13 @@ export const IconBookOpen = (p) => <I {...p}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 
 export const IconDownload = (p) => <I {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></I>;
 export const IconMenu = (p) => <I {...p}><path d="M3 12h18M3 6h18M3 18h18"/></I>;
 export const IconX = (p) => <I {...p}><path d="M18 6L6 18M6 6l12 12"/></I>;
+export const IconPlus = (p) => <I {...p}><path d="M12 5v14M5 12h14"/></I>;
+export const IconTrash = (p) => <I {...p}><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></I>;
+export const IconEdit = (p) => <I {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></I>;
+export const IconCopy = (p) => <I {...p}><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></I>;
+export const IconChevronUp = (p) => <I {...p}><path d="M18 15l-6-6-6 6"/></I>;
+export const IconChevronDownAlt = (p) => <I {...p}><path d="M6 9l6 6 6-6"/></I>;
+export const IconStar = (p) => <I {...p}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></I>;
 export const IconFacebook = (p) => <I {...p}><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></I>;
 export const IconTwitter = (p) => <I {...p}><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84 0 0 0 .497-3.753c0-.249 1.51-2.772 1.818-4.013z"/></I>;
 export const IconLinkedin = (p) => <I {...p}><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-4 0v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></I>;

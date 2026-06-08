@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import { useChecklistList } from '../hooks/useChecklist';
@@ -83,6 +83,7 @@ export default function DashboardPage() {
         </div>
         <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
           <PendingChecklistsBadge />
+          <PendingInstancesBadge />
           <a href="#/events" className="btn btn-outline">Browse events</a>
           <a href="#/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
         </div>
@@ -458,7 +459,33 @@ function PendingChecklistsBadge() {
   if (count === 0) return null;
   return (
     <a href="#/checklists" className="btn btn-outline" style={{ position: 'relative' }}>
-      Pending checklists
+      Legacy checklists
+      <span style={{
+        marginLeft: '.4rem',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        minWidth: '1.5rem', height: '1.4rem', padding: '0 .4rem',
+        background: 'var(--destructive)', color: 'white',
+        borderRadius: 999, fontSize: '.75rem', fontWeight: 700,
+      }}>{count}</span>
+    </a>
+  );
+}
+
+// New-system instance count. Same hide-when-zero behaviour.
+function PendingInstancesBadge() {
+  const [count, setCount] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/checklist-instances', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : { rows: [] })
+      .then((j) => { if (!cancelled) setCount((j.rows || []).filter((r) => r.status !== 'approved').length); })
+      .catch(() => { if (!cancelled) setCount(0); });
+    return () => { cancelled = true; };
+  }, []);
+  if (!count) return null;
+  return (
+    <a href="#/my-checklists" className="btn btn-outline" style={{ position: 'relative' }}>
+      My checklists
       <span style={{
         marginLeft: '.4rem',
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

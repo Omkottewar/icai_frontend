@@ -1,6 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cachedGet, revalidate, apiWrite, invalidate } from '../lib/apiCache';
 
+// List instances from the NEW generic engine. Same shape contract as
+// useChecklistList but hits /api/checklist-instances. Backend already
+// returns only what the user can act on (scoped by role + assignment +
+// drafts hidden from non-admins).
+export function useChecklistInstanceList() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true); setError(null);
+    cachedGet('/api/checklist-instances')
+      .then((j) => { if (!cancelled) setData(j); })
+      .catch((e) => { if (!cancelled) { setError(e); setData(null); } })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [tick]);
+
+  const refresh = useCallback(() => {
+    revalidate('/api/checklist-instances').catch(() => {});
+    setTick((t) => t + 1);
+  }, []);
+  return { data, loading, error, refresh };
+}
+
 // List checklists the current user can act on. Shared cache across the
 // dashboard widgets + /checklists page so they don't all re-fetch.
 export function useChecklistList() {

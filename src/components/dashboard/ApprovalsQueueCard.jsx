@@ -1,15 +1,50 @@
-import { useChecklistList } from '../../hooks/useChecklist';
+import { useChecklistList, useChecklistInstanceList } from '../../hooks/useChecklist';
 import { navigate } from '../../hooks/useRoute';
 import { IconArrowRight } from '../../icons';
 import InsightsStyles from './insights/insightsStyles';
 import ChartFrame from './insights/ChartFrame';
 
 // Top widget for branch chairmen: surfaces checklists waiting on THEIR review.
-// Uses /api/checklists which is already role-filtered server-side.
+//
+// Reads from BOTH systems and shows a unified list:
+//   • legacy /api/checklists (status awaiting_branch_review)
+//   • new /api/checklist-instances (status awaiting_review)
+//
+// Each row carries `system` so the click handler routes to the right drawer.
 export default function ApprovalsQueueCard() {
-  const { data, loading } = useChecklistList();
-  const pending = (data?.rows ?? []).filter((r) => r.status === 'awaiting_branch_review');
+  const legacy = useChecklistList();
+  const next   = useChecklistInstanceList();
+
+  const loading = legacy.loading || next.loading;
+
+  const legacyRows = (legacy.data?.rows ?? [])
+    .filter((r) => r.status === 'awaiting_branch_review')
+    .map((r) => ({
+      id: r.id,
+      title: r.event_title,
+      sub: r.committee_name || r.committee_code || '—',
+      updated_at: r.updated_at,
+      system: 'legacy',
+    }));
+
+  const instanceRows = (next.data?.rows ?? [])
+    .filter((r) => r.status === 'awaiting_review')
+    .map((r) => ({
+      id: r.id,
+      title: r.event_title || r.title,
+      sub: r.template_name + (r.template_version ? ` · v${r.template_version}` : ''),
+      updated_at: r.updated_at,
+      system: 'instance',
+    }));
+
+  const pending = [...legacyRows, ...instanceRows].sort((a, b) =>
+    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   const top3 = pending.slice(0, 3);
+
+  const open = (r) => {
+    if (r.system === 'instance') navigate('/my-checklists?id=' + r.id);
+    else                          navigate('/checklists?id=' + r.id);
+  };
 
   return (
     <>
@@ -23,16 +58,16 @@ export default function ApprovalsQueueCard() {
         emptyText="No checklists awaiting your review."
         actions={
           pending.length > 3 ? (
-            <a href="#/checklists" className="iframe-btn">See all →</a>
+            <a href="#/my-checklists" className="iframe-btn">See all →</a>
           ) : null
         }
         padding="1rem"
       >
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
           {top3.map((c) => (
-            <li key={c.id}>
+            <li key={c.system + ':' + c.id}>
               <button
-                onClick={() => navigate('/checklists?id=' + c.id)}
+                onClick={() => open(c)}
                 className="row gap-2 approval-row"
                 style={{
                   width: '100%', textAlign: 'left',
@@ -44,10 +79,10 @@ export default function ApprovalsQueueCard() {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: '.875rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {c.event_title}
+                    {c.title}
                   </div>
                   <div className="muted-text" style={{ fontSize: '.75rem' }}>
-                    {c.committee_name || c.committee_code || '—'} · waiting {fmtAge(c.updated_at)}
+                    {c.sub} · waiting {fmtAge(c.updated_at)}
                   </div>
                 </div>
                 <span style={{ color: '#5B5BD6', fontWeight: 600, fontSize: '.8125rem', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
