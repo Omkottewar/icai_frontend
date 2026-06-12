@@ -3,13 +3,35 @@ import { useAuth } from '../../context/AuthContext';
 import { navigate } from '../../hooks/useRoute';
 import { Shimmer, ShimmerStatTile, ShimmerStyles } from '../ui/Shimmer';
 
+// Roles that should be allowed to open the /admin shell at all. Each one
+// lands on a different home variant (see AdminDashboardPage's dispatcher),
+// but they all enter through this gate. 'admin' is the catch-all global
+// role (IT admin); the rest are office bearers who need their role-specific
+// homepage rather than the generic member dashboard.
+//
+// Kept in sync with backend/server/auth/landingPath.ts — anything that
+// redirects to /admin after login must also be allowed past this gate.
+const ADMIN_GATE_ROLES = new Set([
+  'admin',
+  'branch_chairman',
+  'branch_vice_chairman',
+  'branch_secretary',
+  'branch_treasurer',
+  'committee_chairman',
+  'accountant',
+  'branch_manager',
+]);
+
 // Wraps every admin page. Redirects unauthenticated users to /login and
-// non-admin users to /dashboard. The role check trusts `user.roles[].code`
-// — populated by /api/auth/me which queries user_role_assignments directly.
+// users without any office-bearer / admin role to /dashboard. The role
+// check trusts `user.roles[].code` — populated by /api/auth/me which
+// queries user_role_assignments directly.
 export default function RequireAdmin({ children }) {
   const { user, loading, showToast } = useAuth();
 
-  const isAdmin = !!user && Array.isArray(user.roles) && user.roles.some((r) => r.code === 'admin');
+  const isAllowed = !!user
+    && Array.isArray(user.roles)
+    && user.roles.some((r) => ADMIN_GATE_ROLES.has(r.code));
 
   useEffect(() => {
     if (loading) return;
@@ -17,13 +39,13 @@ export default function RequireAdmin({ children }) {
       navigate('/login');
       return;
     }
-    if (!isAdmin) {
+    if (!isAllowed) {
       showToast?.('Admin access required', 'error');
       navigate('/dashboard');
     }
-  }, [loading, user, isAdmin, showToast]);
+  }, [loading, user, isAllowed, showToast]);
 
-  if (loading || !user || !isAdmin) {
+  if (loading || !user || !isAllowed) {
     return <AdminBootSkeleton />;
   }
 

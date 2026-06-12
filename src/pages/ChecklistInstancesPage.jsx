@@ -3,23 +3,19 @@ import PageHeader from '../components/layout/PageHeader';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { useAuth } from '../context/AuthContext';
 import QuestionRenderer from '../components/checklists/QuestionRenderer';
-import { hasAnswer } from '../lib/checklistQuestions';
+import { hasAnswer, ROLE_OPTIONS } from '../lib/checklistQuestions';
 import { IconX } from '../icons';
+import { CHECKLIST_STATUS, toneStyle } from '../lib/eventStatus';
+import { useRoleFlags } from '../hooks/useRoleFlags';
 
-const STATUS_LABEL = {
-  draft:           'Draft (not released)',
-  awaiting_fill:   'Awaiting fill',
-  awaiting_review: 'Awaiting review',
-  approved:        'Approved',
-  rejected:        'Rejected',
-};
-const STATUS_PILL = {
-  draft:           { bg: '#f1f5f9', fg: '#475569' },
-  awaiting_fill:   { bg: '#fef3c7', fg: '#92400e' },
-  awaiting_review: { bg: '#dbeafe', fg: '#1e40af' },
-  approved:        { bg: '#dcfce7', fg: '#166534' },
-  rejected:        { bg: '#fee2e2', fg: '#991b1b' },
-};
+// Friendly label for an internal role code. Falls back to a prettified
+// version of the code if it's not in our known list.
+function roleLabel(code) {
+  if (!code) return '';
+  const match = ROLE_OPTIONS.find((r) => r.code === code);
+  if (match) return match.label;
+  return code.replace(/_/g, ' ');
+}
 
 function fmt(d) {
   if (!d) return '—';
@@ -54,13 +50,17 @@ export default function ChecklistInstancesPage() {
 }
 
 function StatusPill({ status }) {
-  const c = STATUS_PILL[status] || { bg: '#f1f5f9', fg: '#475569' };
+  const meta = CHECKLIST_STATUS[status];
+  const c = toneStyle(meta?.tone);
   return (
-    <span style={{
-      display: 'inline-block', padding: '.15rem .55rem', borderRadius: 999,
-      background: c.bg, color: c.fg, fontSize: '.7rem', fontWeight: 600,
-    }}>
-      {STATUS_LABEL[status] ?? status}
+    <span
+      title={meta?.long ?? status}
+      style={{
+        display: 'inline-block', padding: '.15rem .55rem', borderRadius: 999,
+        background: c.bg, color: c.fg, fontSize: '.7rem', fontWeight: 600,
+      }}
+    >
+      {meta?.short ?? status}
     </span>
   );
 }
@@ -117,10 +117,15 @@ function InstancesList({ onOpen }) {
 
 function InstanceDrawer({ id, onClose }) {
   const { showToast } = useAuth();
+  const roleFlags = useRoleFlags();
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
   const [draft, setDraft] = useState({});
   const [busy, setBusy] = useState(false);
+  // null = use computed defaults; Set<number> = user-controlled state.
+  // Reset when the instance id changes.
+  const [openSections, setOpenSections] = useState(null);
+  useEffect(() => { setOpenSections(null); }, [id]);
 
   const load = async () => {
     try {
@@ -134,10 +139,135 @@ function InstanceDrawer({ id, onClose }) {
   if (err) return <FullDrawer onClose={onClose}><p style={{ color: 'var(--destructive)' }}>{err}</p></FullDrawer>;
   if (!data) return <FullDrawer onClose={onClose}><p className="muted-text">Loading…</p></FullDrawer>;
 
-  const { instance, template, questions, reviews, perms, assignees } = data;
+  const { instance, template, questions, reviews, perms, assignees, stages = [], tasks: taskMap = {} } = data;
   const editable = perms.canFill && (instance.status === 'awaiting_fill' || instance.status === 'rejected');
   const reviewable = perms.canReview && instance.status === 'awaiting_review';
   const releaseable = perms.canRelease;  // admin + status='draft'
+  const isMultiStage = stages.length > 0;
+
+  // Compute per-question section owner: inherit from the closest preceding
+  // section_heading. NULL on questions before any heading (open to all
+  // users with fill rights). The fill UI uses this to lock sections to
+  // the right role; the backend enforces the same on PUT /responses.
+  const sortedQuestions = [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const sectionOwnerByQuestion = (() => {
+    const out = {};
+    let owner = null;
+    for (const q of sortedQuestions) {
+      if (q.type === 'section_heading') owner = q.section_owner_role ?? null;
+      out[q.id] = owner;
+    }
+    return out;
+  })();
+  const myRoles = roleFlags.codes;
+  const ownsSection = (q) => {
+    const owner = sectionOwnerByQuestion[q.id];
+    if (!owner) return true;
+    return myRoles.has('admin') || myRoles.has(owner);
+  };
+
+  // Group questions into accordion sections. Each section starts with a
+  // section_heading; questions before any heading go into a pre-section
+  // group with `heading: null` (always open, no owner badge).
+  const sectionGroups = (() => {
+    const groups = [];
+    let current = { heading: null, owner_role: null, questions: [] };
+    for (const q of sortedQuestions) {
+      if (q.type === 'section_heading') {
+        if (current.heading || current.questions.length > 0) groups.push(current);
+        current = { heading: q, owner_role: q.section_owner_role ?? null, questions: [] };
+      } else {
+        current.questions.push(q);
+      }
+    }
+    if (current.heading || current.questions.length > 0) groups.push(current);
+    return groups;
+  })();
+
+  // Default-open logic — picked once per (id, role, status) and overridden
+  // by user clicks afterwards. The rule:
+  //   - Pre-section groups (no heading) are always open
+  //   - Filler: open sections I own
+  //   - Approver in multi-stage: open sections whose owner matches a pending
+  //     stage I can decide. If none matched, open all (e.g. chairman whose
+  //     stage isn't section-bound)
+  //   - Single-reviewer / draft / view-only: open all
+  const computedOpenSet = (() => {
+    const set = new Set();
+    for (let i = 0; i < sectionGroups.length; i++) {
+      if (!sectionGroups[i].heading) set.add(i);
+    }
+    if (editable) {
+      for (let i = 0; i < sectionGroups.length; i++) {
+        const owner = sectionGroups[i].owner_role;
+        if (!owner || myRoles.has('admin') || myRoles.has(owner)) set.add(i);
+      }
+    } else if (reviewable && isMultiStage) {
+      const myPendingStageRoles = new Set();
+      for (const s of stages) {
+        if (s.status === 'pending' && (myRoles.has('admin') || myRoles.has(s.required_role_code))) {
+          myPendingStageRoles.add(s.required_role_code);
+        }
+      }
+      let matched = 0;
+      for (let i = 0; i < sectionGroups.length; i++) {
+        if (myPendingStageRoles.has(sectionGroups[i].owner_role)) { set.add(i); matched++; }
+      }
+      // Fallback — approver with no matching section (e.g. chairman whose
+      // role doesn't own any specific section). Show everything.
+      if (matched === 0) {
+        for (let i = 0; i < sectionGroups.length; i++) set.add(i);
+      }
+    } else {
+      for (let i = 0; i < sectionGroups.length; i++) set.add(i);
+    }
+    return set;
+  })();
+  const effectiveOpen = openSections ?? computedOpenSet;
+  const isOpen = (i) => effectiveOpen.has(i);
+  const toggleSection = (i) => {
+    setOpenSections((prev) => {
+      const base = prev ?? computedOpenSet;
+      const next = new Set(base);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
+  };
+  const expandAll = () => setOpenSections(new Set(sectionGroups.map((_, i) => i)));
+  const collapseAll = () => {
+    const next = new Set();
+    // Keep pre-section groups open — they have no header to click anyway.
+    for (let i = 0; i < sectionGroups.length; i++) {
+      if (!sectionGroups[i].heading) next.add(i);
+    }
+    setOpenSections(next);
+  };
+
+  // Per-section answer progress used by the accordion header pill.
+  function sectionProgress(group) {
+    const required = group.questions.filter((q) => q.required);
+    const answered = group.questions.filter((q) => hasAnswer(q.type, draft[q.id]));
+    const requiredAnswered = required.filter((q) => hasAnswer(q.type, draft[q.id]));
+    return {
+      total: group.questions.length,
+      answered: answered.length,
+      requiredTotal: required.length,
+      requiredAnswered: requiredAnswered.length,
+      complete: required.length > 0 && requiredAnswered.length === required.length,
+      anyAnswered: answered.length > 0,
+    };
+  }
+
+  // Task actions — call the per-task endpoints + reload to reflect new status.
+  const onTaskAction = async (taskId, action, body = {}) => {
+    setBusy(true);
+    try {
+      await api(`/api/checklist-tasks/${taskId}/${action}`, { method: 'POST', body });
+      showToast?.(`Task ${action}`, 'success');
+      await load();
+    } catch (e) { showToast?.(e.message, 'error'); }
+    finally { setBusy(false); }
+  };
 
   const setVal = (qid, v) => setDraft((d) => ({ ...d, [qid]: v }));
 
@@ -183,6 +313,61 @@ function InstanceDrawer({ id, onClose }) {
     try {
       await api(`/api/checklist-instances/${id}/reject`, { method: 'POST', body: { note } });
       showToast?.('Rejected', 'success');
+      await load();
+    } catch (e) { showToast?.(e.message, 'error'); }
+    finally { setBusy(false); }
+  };
+
+  // Multi-stage handlers — used when the instance has approval stages
+  // (event-bound). Each stage represents a parallel approver (chairman,
+  // treasurer, VC). The backend trigger cascades the instance status when
+  // all stages are decided.
+  const approveStage = async (stageCode) => {
+    if (!confirm(`Approve "${stageCode.replace(/_/g, ' ')}" stage?`)) return;
+    setBusy(true);
+    try {
+      await api(`/api/checklist-instances/${id}/approve-stage`, {
+        method: 'POST',
+        body: { stage_code: stageCode },
+      });
+      showToast?.('Stage approved', 'success');
+      await load();
+    } catch (e) { showToast?.(e.message, 'error'); }
+    finally { setBusy(false); }
+  };
+  const rejectStage = async (stageCode) => {
+    const note = prompt('Reason for sending this back?');
+    if (!note?.trim()) return;
+    setBusy(true);
+    try {
+      await api(`/api/checklist-instances/${id}/reject-stage`, {
+        method: 'POST',
+        body: { stage_code: stageCode, note },
+      });
+      showToast?.('Stage rejected — sent back to the committee', 'success');
+      await load();
+    } catch (e) { showToast?.(e.message, 'error'); }
+    finally { setBusy(false); }
+  };
+
+  // Terminal reject — closes the event for good. Triggers a stronger
+  // confirm than 'send back' because the action cancels the linked event.
+  const rejectFinal = async (stageCode) => {
+    const okay = confirm(
+      'Reject completely will CANCEL the linked event and the checklist permanently. ' +
+      'The committee chairman cannot re-fill or re-submit. ' +
+      'Use this only if the event is dead — not for "needs more work" cases. Continue?',
+    );
+    if (!okay) return;
+    const note = prompt('Reason for terminal rejection? (required, will be in the audit log)');
+    if (!note?.trim()) return;
+    setBusy(true);
+    try {
+      await api(`/api/checklist-instances/${id}/reject-final`, {
+        method: 'POST',
+        body: { stage_code: stageCode, note },
+      });
+      showToast?.('Rejected and event cancelled', 'success');
       await load();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
@@ -275,18 +460,173 @@ function InstanceDrawer({ id, onClose }) {
                 : 'You can view this record but cannot make changes.'}
           </div>
         )}
+
+        {isMultiStage && (
+          <ApprovalStagesPanel
+            stages={stages}
+            instanceStatus={instance.status}
+            onApprove={approveStage}
+            onReject={rejectStage}
+            onRejectFinal={rejectFinal}
+            busy={busy}
+          />
+        )}
       </header>
 
       <div>
-        {questions.map((q) => (
-          <QuestionRenderer
-            key={q.id}
-            question={q}
-            value={draft[q.id]}
-            onChange={(v) => setVal(q.id, v)}
-            mode={editable ? 'fill' : 'readonly'}
-          />
-        ))}
+        {/* Accordion controls — only shown when there are 2+ sections to
+            manage. Single-section checklists don't benefit from expand/collapse. */}
+        {sectionGroups.filter((g) => g.heading).length >= 2 && (
+          <div className="acc-toolbar">
+            <button type="button" className="acc-link" onClick={expandAll}>Expand all</button>
+            <span className="acc-sep">·</span>
+            <button type="button" className="acc-link" onClick={collapseAll}>Collapse all</button>
+          </div>
+        )}
+
+        {sectionGroups.map((group, gi) => {
+          const heading = group.heading;
+          const ownerRole = group.owner_role;
+          const iOwn = !ownerRole || myRoles.has('admin') || myRoles.has(ownerRole);
+          const prog = sectionProgress(group);
+          const open = isOpen(gi);
+          // Highlight the section the current approver is being asked to
+          // sign off on, even when other sections are collapsed.
+          const isMyApprovalTarget = reviewable && isMultiStage && ownerRole && stages.some(
+            (s) => s.status === 'pending' && s.required_role_code === ownerRole
+                   && (myRoles.has('admin') || myRoles.has(s.required_role_code)),
+          );
+
+          const body = group.questions.map((q) => {
+            const showAsReadonly = !editable || !iOwn;
+            return (
+              <QuestionRenderer
+                key={q.id}
+                question={q}
+                value={draft[q.id]}
+                onChange={(v) => setVal(q.id, v)}
+                mode={showAsReadonly ? 'readonly' : 'fill'}
+                tasks={q.type === 'task_list' ? taskMap[q.id] : undefined}
+                onTaskAction={q.type === 'task_list' ? onTaskAction : undefined}
+              />
+            );
+          });
+
+          // Pre-section group (questions before any heading) — no
+          // collapsible wrapper, just render inline.
+          if (!heading) {
+            return group.questions.length > 0 ? <div key={`pre-${gi}`}>{body}</div> : null;
+          }
+
+          return (
+            <section key={heading.id} className={'acc-section' + (isMyApprovalTarget ? ' acc-target' : '')}>
+              <button
+                type="button"
+                className="acc-head"
+                aria-expanded={open}
+                onClick={() => toggleSection(gi)}
+              >
+                <span className={'acc-chev' + (open ? ' open' : '')}>▸</span>
+                <span className="acc-title">{heading.label || 'Untitled section'}</span>
+                {ownerRole && (
+                  <span className={'acc-owner' + (iOwn ? ' mine' : ' readonly')}>
+                    {iOwn ? 'Your section' : `Owned by ${roleLabel(ownerRole)}`}
+                  </span>
+                )}
+                {isMyApprovalTarget && (
+                  <span className="acc-target-pill">Awaiting your approval</span>
+                )}
+                {prog.requiredTotal > 0 && (
+                  <span className={'acc-prog' + (prog.complete ? ' complete' : '')}>
+                    {prog.complete
+                      ? '✓ All required answered'
+                      : `${prog.requiredAnswered} of ${prog.requiredTotal} required`}
+                  </span>
+                )}
+              </button>
+              {open && (
+                <div className="acc-body">
+                  {body}
+                </div>
+              )}
+            </section>
+          );
+        })}
+
+        <style>{`
+          .acc-toolbar {
+            display: flex; align-items: center; gap: .35rem;
+            justify-content: flex-end;
+            font-size: .75rem; color: var(--muted-foreground);
+            margin-bottom: .5rem;
+          }
+          .acc-link {
+            background: transparent; border: 0; padding: 0;
+            color: var(--primary, #1e40af);
+            cursor: pointer; font-size: .75rem; font-weight: 600;
+          }
+          .acc-link:hover { text-decoration: underline; }
+          .acc-sep { color: var(--border); }
+
+          .acc-section {
+            border: 1px solid var(--border);
+            border-radius: .5rem;
+            background: var(--card, white);
+            margin: .625rem 0;
+            overflow: hidden;
+            transition: box-shadow .15s ease;
+          }
+          .acc-section.acc-target {
+            border-color: #f59e0b;
+            box-shadow: 0 0 0 2px rgba(245, 158, 11, .15);
+          }
+          .acc-head {
+            display: flex; align-items: center; gap: .55rem;
+            width: 100%;
+            padding: .65rem .75rem;
+            background: rgba(37, 99, 235, .04);
+            border: 0; border-bottom: 1px solid transparent;
+            text-align: left; cursor: pointer;
+            font: inherit;
+          }
+          .acc-head:hover { background: rgba(37, 99, 235, .08); }
+          .acc-section .acc-body + .acc-head,
+          .acc-section .acc-head[aria-expanded="true"] {
+            border-bottom-color: var(--border);
+          }
+          .acc-chev {
+            display: inline-block;
+            transition: transform .15s ease;
+            color: var(--muted-foreground);
+            font-size: .8rem;
+            width: 1rem;
+          }
+          .acc-chev.open { transform: rotate(90deg); }
+          .acc-title {
+            flex: 1; min-width: 0;
+            font-weight: 700; font-size: 1rem;
+            color: var(--primary, #1e40af);
+          }
+          .acc-owner {
+            display: inline-block;
+            padding: .1rem .5rem; border-radius: 999px;
+            font-size: .7rem; font-weight: 600;
+          }
+          .acc-owner.mine     { background: #dbeafe; color: #1e3a8a; }
+          .acc-owner.readonly { background: #f1f5f9; color: #475569; }
+          .acc-target-pill {
+            padding: .1rem .5rem; border-radius: 999px;
+            background: #fef3c7; color: #92400e;
+            font-size: .7rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .04em;
+          }
+          .acc-prog {
+            font-size: .72rem; font-weight: 600;
+            color: var(--muted-foreground);
+          }
+          .acc-prog.complete { color: #15803d; }
+          .acc-body { padding: .25rem 1rem 1rem; }
+        `}</style>
       </div>
 
       {reviews.length > 0 && (
@@ -317,7 +657,7 @@ function InstanceDrawer({ id, onClose }) {
             <button className="btn-primary" onClick={submit} disabled={busy || missing > 0}>Submit for review</button>
           </>
         )}
-        {reviewable && (
+        {reviewable && !isMultiStage && (
           <>
             <button onClick={reject} disabled={busy} style={{ color: 'var(--destructive)' }}>Reject</button>
             <button className="btn-primary" onClick={approve} disabled={busy}>Approve</button>
@@ -325,6 +665,133 @@ function InstanceDrawer({ id, onClose }) {
         )}
       </footer>
     </FullDrawer>
+  );
+}
+
+// ─── Approval stages panel ──────────────────────────────────────────────
+//
+// Renders the three parallel approval rows (branch chairman / treasurer /
+// VC) plus a per-row Approve / Send back action visible only to a holder
+// of the stage's required role. Branch chairman gets the override —
+// they can act on any row.
+function ApprovalStagesPanel({ stages, instanceStatus, onApprove, onReject, onRejectFinal, busy }) {
+  const { codes } = useRoleFlags();
+  // Strict per-role gate: each stage can only be decided by the role that
+  // owns it (or admin as a system-level escape hatch). The branch chairman
+  // signs off on the chairman stage, the treasurer on the treasurer stage,
+  // and the VC on the VC stage. Anything else is documented in R.5 as the
+  // "publish without checklist" override on the events row, not here.
+  const canDecide = (stage) => {
+    if (instanceStatus !== 'awaiting_review') return false;
+    if (stage.status !== 'pending') return false;
+    return codes.has('admin') || codes.has(stage.required_role_code);
+  };
+
+  const STATUS_LABEL = {
+    pending:  { text: 'Pending', bg: '#f1f5f9', fg: '#475569' },
+    approved: { text: 'Approved', bg: '#dcfce7', fg: '#166534' },
+    rejected: { text: 'Sent back', bg: '#fee2e2', fg: '#991b1b' },
+  };
+
+  // Human-readable hint for a stage the viewer cannot decide on — so the
+  // page doesn't feel "broken" when a chairman lands on a checklist and
+  // sees no buttons on the treasurer / VC stages.
+  const ROLE_LABEL = {
+    branch_chairman:      "branch chairman",
+    branch_vice_chairman: "vice-chairman",
+    branch_treasurer:     "treasurer",
+  };
+
+  function fmtDate(iso) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  return (
+    <section style={{
+      marginTop: '.75rem', padding: '.875rem 1rem',
+      background: '#f8fafc', border: '1px solid var(--border)',
+      borderRadius: '.5rem',
+    }}>
+      <div style={{
+        fontSize: '.7rem', fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '.04em', color: 'var(--muted-foreground)',
+        marginBottom: '.5rem',
+      }}>
+        Multi-stage approval — all three must approve to publish
+      </div>
+      <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+        {stages.map((s) => {
+          const label = STATUS_LABEL[s.status] ?? STATUS_LABEL.pending;
+          const showActions = canDecide(s);
+          return (
+            <li key={s.id} style={{
+              display: 'flex', alignItems: 'center', gap: '.75rem',
+              padding: '.5rem .625rem',
+              background: 'white', border: '1px solid var(--border)',
+              borderRadius: '.375rem',
+            }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: '.875rem', fontWeight: 600 }}>{s.stage_label}</div>
+                {(s.decider_name || s.note) && (
+                  <div style={{ fontSize: '.75rem', color: 'var(--muted-foreground)', marginTop: '.15rem' }}>
+                    {s.decider_name && <span>by {s.decider_name}</span>}
+                    {s.decided_at && <span> · {fmtDate(s.decided_at)}</span>}
+                    {s.note && <span> · "{s.note}"</span>}
+                  </div>
+                )}
+              </div>
+              <span style={{
+                padding: '.15rem .55rem', borderRadius: 999,
+                background: label.bg, color: label.fg,
+                fontSize: '.7rem', fontWeight: 600,
+              }}>{label.text}</span>
+              {showActions ? (
+                <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap' }}>
+                  {/* Terminal reject — destructive, kept furthest left so it's
+                      visually separate from the routine Send back / Approve. */}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onRejectFinal?.(s.stage_code)}
+                    title="Cancel the linked event permanently"
+                    style={{
+                      padding: '.25rem .55rem', fontSize: '.7rem', fontWeight: 600,
+                      background: '#991b1b', border: 0,
+                      color: 'white', borderRadius: '.25rem', cursor: 'pointer',
+                    }}
+                  >Reject completely</button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onReject(s.stage_code)}
+                    style={{
+                      padding: '.25rem .55rem', fontSize: '.7rem', fontWeight: 600,
+                      background: 'transparent', border: '1px solid #fecaca',
+                      color: '#b91c1c', borderRadius: '.25rem', cursor: 'pointer',
+                    }}
+                  >Send back</button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onApprove(s.stage_code)}
+                    style={{
+                      padding: '.25rem .55rem', fontSize: '.7rem', fontWeight: 700,
+                      background: '#16a34a', border: 0,
+                      color: 'white', borderRadius: '.25rem', cursor: 'pointer',
+                    }}
+                  >Approve</button>
+                </div>
+              ) : s.status === 'pending' && instanceStatus === 'awaiting_review' ? (
+                <span style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+                  Waiting for {ROLE_LABEL[s.required_role_code] ?? s.required_role_code.replace(/_/g, ' ')}
+                </span>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

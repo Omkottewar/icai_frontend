@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
-import { useChecklistList } from '../hooks/useChecklist';
 import { useRoleFlags } from '../hooks/useRoleFlags';
 import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
@@ -56,7 +55,21 @@ export default function DashboardPage() {
 
   const isMember  = user.role === 'Member';
   const isStudent = user.role === 'Student';
-  const { isAdmin, isBranchChairman, isCommitteeChairman } = roles;
+  const { isAdmin, isBranchChairman, isCommitteeChairman, isOfficeBearer, officeBearerCode } = roles;
+
+  // Context-aware copy for the "open the admin shell" entry-point card.
+  // Each office bearer sees a card that names their actual role + the work
+  // they'll find there — not a generic "Admin console".
+  const officeBearerCard = ({
+    branch_treasurer:     { title: 'Open treasurer dashboard',     desc: 'Approve refunds and bills, monitor revenue, export FY reports.' },
+    branch_chairman:      { title: 'Open chairman dashboard',      desc: 'Review pending approvals, publish events, update the homepage.' },
+    branch_vice_chairman: { title: 'Open Vice-Chairman dashboard', desc: 'Review pending approvals and branch operations.' },
+    branch_secretary:     { title: 'Open Secretary dashboard',     desc: 'Review pending approvals and branch operations.' },
+    committee_chairman:   { title: 'Open committee dashboard',     desc: 'Manage your committee\'s upcoming events and review checklists.' },
+    accountant:           { title: 'Open bills register',          desc: 'Record bills, attach scans, and send for treasurer approval.' },
+    branch_manager:       { title: 'Open branch console',          desc: 'Operate the branch portal and support office bearers.' },
+    admin:                { title: 'Open admin console',           desc: 'Create and publish events, manage registrations, and operate the branch portal.' },
+  })[officeBearerCode] ?? null;
 
   const profile        = data?.profile ?? null;
   const upcomingEvents = data?.upcomingEvents ?? [];
@@ -82,7 +95,6 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-          <PendingChecklistsBadge />
           <PendingInstancesBadge />
           <a href="#/events" className="btn btn-outline">Browse events</a>
           <a href="#/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
@@ -97,14 +109,14 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isAdmin && (
+      {isOfficeBearer && officeBearerCard && (
         <a href="#/admin" className="admin-cta-card">
           <div className="admin-cta-icon"><IconShield /></div>
           <div className="admin-cta-body">
-            <div className="admin-cta-eyebrow">Admin access</div>
-            <div className="admin-cta-title">Open admin console</div>
+            <div className="admin-cta-eyebrow">Your workspace</div>
+            <div className="admin-cta-title">{officeBearerCard.title}</div>
             <div className="admin-cta-desc">
-              Create and publish events, manage registrations, and operate the branch portal.
+              {officeBearerCard.desc}
             </div>
           </div>
           <span className="admin-cta-arrow"><IconArrowRight /></span>
@@ -452,26 +464,6 @@ function BicMiniKpi({ label, value, sub, accent = 'primary', highlight }) {
 
 // Surfaces the count of checklists the current user can act on. Hidden when
 // there are none, so non-chairmen don't see a noisy "0 pending" pill.
-function PendingChecklistsBadge() {
-  const { data, loading } = useChecklistList();
-  if (loading) return null;
-  const count = data?.rows?.length ?? 0;
-  if (count === 0) return null;
-  return (
-    <a href="#/checklists" className="btn btn-outline" style={{ position: 'relative' }}>
-      Legacy checklists
-      <span style={{
-        marginLeft: '.4rem',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        minWidth: '1.5rem', height: '1.4rem', padding: '0 .4rem',
-        background: 'var(--destructive)', color: 'white',
-        borderRadius: 999, fontSize: '.75rem', fontWeight: 700,
-      }}>{count}</span>
-    </a>
-  );
-}
-
-// New-system instance count. Same hide-when-zero behaviour.
 function PendingInstancesBadge() {
   const [count, setCount] = useState(null);
   useEffect(() => {

@@ -1,50 +1,26 @@
-import { useChecklistList, useChecklistInstanceList } from '../../hooks/useChecklist';
+import { useChecklistInstanceList } from '../../hooks/useChecklist';
 import { navigate } from '../../hooks/useRoute';
 import { IconArrowRight } from '../../icons';
 import InsightsStyles from './insights/insightsStyles';
 import ChartFrame from './insights/ChartFrame';
 
-// Top widget for branch chairmen: surfaces checklists waiting on THEIR review.
-//
-// Reads from BOTH systems and shows a unified list:
-//   • legacy /api/checklists (status awaiting_branch_review)
-//   • new /api/checklist-instances (status awaiting_review)
-//
-// Each row carries `system` so the click handler routes to the right drawer.
+// Top widget for branch chairmen: surfaces checklists waiting on their review.
+// Reads from /api/checklist-instances — the single source of truth since the
+// legacy event_checklists system was removed in migration 0024.
 export default function ApprovalsQueueCard() {
-  const legacy = useChecklistList();
-  const next   = useChecklistInstanceList();
+  const { data, loading } = useChecklistInstanceList();
 
-  const loading = legacy.loading || next.loading;
-
-  const legacyRows = (legacy.data?.rows ?? [])
-    .filter((r) => r.status === 'awaiting_branch_review')
-    .map((r) => ({
-      id: r.id,
-      title: r.event_title,
-      sub: r.committee_name || r.committee_code || '—',
-      updated_at: r.updated_at,
-      system: 'legacy',
-    }));
-
-  const instanceRows = (next.data?.rows ?? [])
+  const pending = (data?.rows ?? [])
     .filter((r) => r.status === 'awaiting_review')
     .map((r) => ({
       id: r.id,
       title: r.event_title || r.title,
       sub: r.template_name + (r.template_version ? ` · v${r.template_version}` : ''),
       updated_at: r.updated_at,
-      system: 'instance',
-    }));
+    }))
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
-  const pending = [...legacyRows, ...instanceRows].sort((a, b) =>
-    new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   const top3 = pending.slice(0, 3);
-
-  const open = (r) => {
-    if (r.system === 'instance') navigate('/my-checklists?id=' + r.id);
-    else                          navigate('/checklists?id=' + r.id);
-  };
 
   return (
     <>
@@ -65,9 +41,9 @@ export default function ApprovalsQueueCard() {
       >
         <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
           {top3.map((c) => (
-            <li key={c.system + ':' + c.id}>
+            <li key={c.id}>
               <button
-                onClick={() => open(c)}
+                onClick={() => navigate('/my-checklists?id=' + c.id)}
                 className="row gap-2 approval-row"
                 style={{
                   width: '100%', textAlign: 'left',

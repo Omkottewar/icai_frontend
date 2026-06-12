@@ -17,7 +17,6 @@ import InvestorAwarenessPage from '../pages/InvestorAwarenessPage';
 import CareerCounsellingPage from '../pages/CareerCounsellingPage';
 import SearchPage from '../pages/SearchPage';
 import DashboardPage from '../pages/DashboardPage';
-import ChecklistsPage from '../pages/ChecklistsPage';
 import ChecklistInstancesPage from '../pages/ChecklistInstancesPage';
 import BranchMetricsPage from '../pages/BranchMetricsPage';
 import NotFound from '../pages/NotFound';
@@ -44,6 +43,7 @@ import AnnouncementsAdminPage from '../pages/admin/AnnouncementsAdminPage';
 import ComingSoonPage from '../pages/admin/ComingSoonPage';
 import JobPostingsAdminPage from '../pages/admin/JobPostingsAdminPage';
 import ChecklistTemplatesAdminPage from '../pages/admin/ChecklistTemplatesAdminPage';
+import ApprovalsAdminPage from '../pages/admin/ApprovalsAdminPage';
 
 import RequireEmployer from '../components/employer/RequireEmployer';
 import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
@@ -66,7 +66,6 @@ const ROUTES = {
   '/career-counselling': CareerCounsellingPage,
   '/search': SearchPage,
   '/dashboard': DashboardPage,
-  '/checklists': ChecklistsPage,
   '/my-checklists': ChecklistInstancesPage,
   '/branch-insights': BranchMetricsPage,
   '/login': LoginPage,
@@ -87,7 +86,7 @@ const ADMIN_ROUTES = {
   '/admin/registrations': EventRegistrationsAdminPage,
   '/admin/users': UsersAdminPage,
   '/admin/cpe': () => <ComingSoonPage title="CPE credits" description="Issue structured/unstructured CPE credits, bulk-issue from event attendees, audit member compliance." />,
-  '/admin/approvals': () => <ComingSoonPage title="Approvals inbox" description="Unified MCM → Chairman approval queue across events, newsletters, circulars, gallery albums, and more." />,
+  '/admin/approvals': ApprovalsAdminPage,
   '/admin/rooms': () => <ComingSoonPage title="Rooms" description="Manage seminar halls, reading room, library — capacity and hourly fees." />,
   '/admin/bookings': () => <ComingSoonPage title="Room bookings" description="Approve or reject incoming room booking requests; resolve slot conflicts." />,
   '/admin/committees': CommitteesAdminPage,

@@ -1,10 +1,48 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // Proxy /api/* to the Express server so the browser sees a single origin.
 // This means session cookies "just work" without cross-origin / SameSite drama.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Installable-shell PWA.
+    //   - Auto-updates the SW when a new build ships (registerType:'autoUpdate').
+    //   - Precaches the Vite-built static assets so the shell launches even
+    //     on a flaky connection; API responses are NOT cached (NetworkOnly)
+    //     because almost everything in this app — auth, payments, registrations
+    //     — needs fresh data.
+    //   - PWA disabled in dev so the SW doesn't interfere with HMR. Enable
+    //     with `devOptions.enabled: true` if you ever need to debug it locally.
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.png', 'apple-touch-icon.png'],
+      manifest: {
+        name: 'ICAI Nagpur Branch',
+        short_name: 'ICAI Nagpur',
+        description: 'Official portal of the Nagpur Branch of WIRC of ICAI — events, CPE, members, and committees.',
+        theme_color: '#1e40af',
+        background_color: '#ffffff',
+        display: 'standalone',
+        orientation: 'portrait',
+        scope: '/',
+        start_url: '/',
+        lang: 'en-IN',
+        icons: [
+          { src: 'pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        ],
+      },
+      workbox: {
+        // Don't cache /api or /uploads — they need to hit the network.
+        // The shell (HTML/JS/CSS/icons) is precached automatically.
+        navigateFallbackDenylist: [/^\/api/, /^\/uploads/, /^\/ws/],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      },
+    }),
+  ],
   server: {
     // Pin Vite's HMR socket explicitly. When a `ws: true` proxy entry is
     // present (see /ws below), Vite's default HMR auto-detection can fall

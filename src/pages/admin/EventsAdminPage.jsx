@@ -5,8 +5,13 @@ import Drawer from '../../components/admin/Drawer';
 import FormField from '../../components/admin/FormField';
 import { useAdminList, adminFetch, invalidate } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
+import { useRoleFlags } from '../../hooks/useRoleFlags';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { Shimmer, ShimmerFormField } from '../../components/ui/Shimmer';
+import { eventLabel, EVENT_STATUS, toneStyle } from '../../lib/eventStatus';
+import EventTimeline from '../../components/admin/EventTimeline';
+import ComparableEventsPanel from '../../components/admin/ComparableEventsPanel';
+import EventQuickActions from '../../components/admin/EventQuickActions';
 
 const EMPTY_FORM = {
   title: '',
@@ -43,7 +48,20 @@ function fmtDate(iso) {
 }
 
 function fmtPill(status) {
-  return <span className={'admin-pill admin-pill-' + status}>{status.replace('_', ' ')}</span>;
+  const meta = EVENT_STATUS[status];
+  const tone = meta?.tone ?? 'muted';
+  const c = toneStyle(tone);
+  return (
+    <span
+      title={meta?.long ?? status}
+      style={{
+        display: 'inline-block', padding: '.15rem .55rem', borderRadius: 999,
+        background: c.bg, color: c.fg, fontSize: '.7rem', fontWeight: 600,
+      }}
+    >
+      {eventLabel(status)}
+    </span>
+  );
 }
 
 export default function EventsAdminPage() {
@@ -83,7 +101,9 @@ export default function EventsAdminPage() {
       <span>{r.registered_count}{r.capacity ? <span className="muted-text"> / {r.capacity}</span> : ''}</span>
     ), width: 80 },
     { key: 'status', header: 'Status', render: (r) => fmtPill(r.status), width: 130 },
+    { key: 'timeline', header: 'Progress', render: (r) => <EventTimeline event={r} compact />, width: 140 },
     { key: 'checklist', header: 'Approval', render: (r) => <ChecklistButton row={r} showToast={showToast} refresh={refresh} />, width: 220 },
+    { key: 'actions',  header: '', render: (r) => <EventQuickActions row={r} showToast={showToast} onChanged={refresh} />, width: 100 },
   ], [showToast, refresh]);
 
   return (
@@ -159,6 +179,17 @@ export default function EventsAdminPage() {
   );
 }
 
+// ─── Wizard step definitions ─────────────────────────────────────────────
+// Editing reuses the same step layout but the user can jump freely. New-event
+// creation enforces sequential progression so non-tech committee chairs are
+// guided through the fields.
+const WIZARD_STEPS = [
+  { key: 'basics',    label: 'What & when',   hint: 'Title, committee, date, mode' },
+  { key: 'audience',  label: 'Who & how much', hint: 'Audience, CPE, fee, capacity' },
+  { key: 'promote',   label: 'Promote it',     hint: 'Banner, description, highlights' },
+  { key: 'review',    label: 'Review',         hint: 'Confirm and submit' },
+];
+
 function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
   const isNew = id === 'new';
   const [form, setForm] = useState(EMPTY_FORM);
@@ -166,6 +197,19 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [stepIdx, setStepIdx] = useState(0);
+
+  // Publish / cancel are branch-leadership only. Hides the in-drawer
+  // buttons for committee chairmen, treasurers, etc. — they can still see
+  // the drawer (and edit if it's their committee's event), but they can't
+  // skip the checklist approval path.
+  const { codes } = useRoleFlags();
+  const canPublishCancel = codes.has('admin')
+    || codes.has('branch_chairman')
+    || codes.has('branch_vice_chairman');
+
+  // Reset to first step whenever the drawer opens (new or edit).
+  useEffect(() => { if (open) setStepIdx(0); }, [open, id]);
 
   // Load existing event when editing.
   useEffect(() => {
@@ -280,12 +324,39 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
   };
 
   const onPublish = async () => {
+    // Two-step flow: first try without override. If the backend rejects
+    // with "checklist not approved", offer the override path with a strong
+    // confirm + reason capture (recorded in event_override_log).
     try {
       await adminFetch(`/api/admin/events/${id}/publish`, { method: 'POST' });
       showToast?.('Event published — visible on the public site', 'success');
       onSaved?.();
       onClose?.();
-    } catch (e) { showToast?.(e.message, 'error'); }
+    } catch (e) {
+      const msg = e?.message || '';
+      if (msg.includes('not fully approved') || msg.includes('override')) {
+        const okay = confirm(
+          "This event's checklist isn't fully approved.\n\n" +
+          'Publishing now will be logged as a chairman override and shown in ' +
+          'the audit trail. Continue?',
+        );
+        if (!okay) return;
+        const reason = prompt('Reason for override? (recorded in the audit log)') || '';
+        try {
+          await adminFetch(
+            `/api/admin/events/${id}/publish?override=true`,
+            { method: 'POST', body: { reason: reason.trim() || null } },
+          );
+          showToast?.('Published with override — recorded in audit log', 'success');
+          onSaved?.();
+          onClose?.();
+        } catch (e2) {
+          showToast?.(e2.message || 'Override publish failed', 'error');
+        }
+        return;
+      }
+      showToast?.(msg, 'error');
+    }
   };
 
   const onCancel = async () => {
@@ -308,6 +379,31 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
     } catch (e) { showToast?.(e.message, 'error'); }
   };
 
+  // Per-step validation for the wizard's Next button. Returns null when the
+  // step is valid, or a sentence explaining what's missing.
+  const stepError = (() => {
+    if (stepIdx === 0) {
+      if (!form.title?.trim()) return 'Please enter a title.';
+      if (!form.committee_id)  return 'Please pick a committee.';
+      if (!form.starts_at)     return 'Please pick a start date and time.';
+      if (!form.ends_at)       return 'Please pick an end date and time.';
+      if (form.mode !== 'online'    && !form.venue?.trim())      return 'In-person events need a venue.';
+      if (form.mode !== 'in_person' && !form.online_url?.trim()) return 'Online / hybrid events need a joining URL.';
+    }
+    return null;
+  })();
+
+  const isLast = stepIdx === WIZARD_STEPS.length - 1;
+
+  const onNext = () => {
+    if (stepError) {
+      showToast?.(stepError, 'error');
+      return;
+    }
+    if (!isLast) setStepIdx((i) => i + 1);
+  };
+  const onBack = () => setStepIdx((i) => Math.max(0, i - 1));
+
   return (
     <Drawer
       open={open}
@@ -315,19 +411,29 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
       title={isNew ? 'Create event' : 'Edit event'}
       footer={
         <>
-          {!isNew && form.status && form.status !== 'published' && form.status !== 'cancelled' && (
+          {canPublishCancel && !isNew && form.status && form.status !== 'published' && form.status !== 'cancelled' && (
             <button type="button" className="btn btn-outline" onClick={onPublish} style={{ padding: '.5rem 1rem' }}>Publish</button>
           )}
-          {!isNew && form.status && form.status !== 'cancelled' && (
+          {canPublishCancel && !isNew && form.status && form.status !== 'cancelled' && (
             <button type="button" className="btn btn-outline" onClick={onCancel} style={{ padding: '.5rem 1rem', color: '#b91c1c' }}>Cancel event</button>
           )}
-          {!isNew && (
+          {canPublishCancel && !isNew && (
             <button type="button" className="btn btn-outline" onClick={onDelete} style={{ padding: '.5rem 1rem', color: '#b91c1c' }}>Delete</button>
           )}
-          <button type="button" className="btn btn-outline" onClick={onClose} style={{ padding: '.5rem 1rem' }}>Close</button>
-          <button type="submit" form="event-form" disabled={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
-            {saving ? 'Saving…' : (isNew ? 'Create' : 'Save')}
-          </button>
+
+          {stepIdx > 0 && (
+            <button type="button" className="btn btn-outline" onClick={onBack} style={{ padding: '.5rem 1rem' }}>← Back</button>
+          )}
+          {!isLast && (
+            <button type="button" className="btn btn-primary" onClick={onNext} style={{ padding: '.5rem 1rem' }}>
+              Next →
+            </button>
+          )}
+          {isLast && (
+            <button type="submit" form="event-form" disabled={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
+              {saving ? 'Saving…' : (isNew ? 'Create event' : 'Save changes')}
+            </button>
+          )}
         </>
       }
     >
@@ -341,6 +447,9 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
             </div>
           )}
 
+          <WizardStepper steps={WIZARD_STEPS} activeIdx={stepIdx} onJump={isNew ? null : setStepIdx} />
+
+          {stepIdx === 0 && (<>
           <Section title="Basics">
             <Grid>
               <FormField label="Title" required span={2}>
@@ -409,7 +518,9 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
               )}
             </Grid>
           </Section>
+          </>)}
 
+          {stepIdx === 1 && (<>
           <Section title="Pricing & capacity">
             <Grid>
               <FormField label="CPE hours">
@@ -424,6 +535,9 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
             </Grid>
           </Section>
 
+          </>)}
+
+          {stepIdx === 2 && (<>
           <Section title="Banner">
             <div className="row gap-3" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
               {form.banner_url && (
@@ -456,9 +570,156 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
               <input className="input-base" value={form.recurrence_rrule} onChange={(e) => set('recurrence_rrule', e.target.value)} />
             </FormField>
           </Section>
+          </>)}
+
+          {stepIdx === 3 && (
+            <>
+              <WizardReview form={form} lookups={lookups} onJumpToStep={setStepIdx} />
+              {!isNew && (
+                <div style={{ marginTop: '1.25rem' }}>
+                  <ComparableEventsPanel
+                    eventId={id}
+                    currentFeePaise={Math.round(Number(form.fee_rupees || 0) * 100)}
+                    currentCapacity={form.capacity ? Number(form.capacity) : null}
+                  />
+                </div>
+              )}
+            </>
+          )}
         </form>
       )}
     </Drawer>
+  );
+}
+
+// ─── Wizard stepper UI ───────────────────────────────────────────────────────
+function WizardStepper({ steps, activeIdx, onJump }) {
+  return (
+    <div className="event-wiz-stepper">
+      {steps.map((s, i) => {
+        const past = i < activeIdx;
+        const active = i === activeIdx;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            disabled={!onJump}
+            onClick={() => onJump?.(i)}
+            className={
+              'event-wiz-step' +
+              (active ? ' is-active' : '') +
+              (past ? ' is-past' : '')
+            }
+            style={onJump ? { cursor: 'pointer' } : { cursor: 'default' }}
+          >
+            <span className="event-wiz-step-index">{past ? '✓' : i + 1}</span>
+            <span className="event-wiz-step-text">
+              <span className="event-wiz-step-label">{s.label}</span>
+              <span className="event-wiz-step-hint">{s.hint}</span>
+            </span>
+          </button>
+        );
+      })}
+
+      <style>{`
+        .event-wiz-stepper {
+          display: grid;
+          grid-template-columns: repeat(${steps.length}, 1fr);
+          gap: .5rem;
+          margin-bottom: 1.25rem;
+        }
+        .event-wiz-step {
+          display: flex; align-items: center; gap: .5rem;
+          padding: .5rem .625rem;
+          background: var(--muted, #f8fafc);
+          border: 1px solid var(--border);
+          border-radius: .375rem;
+          text-align: left; width: 100%; min-width: 0;
+        }
+        .event-wiz-step.is-active {
+          background: white;
+          border-color: var(--primary, #1e40af);
+          box-shadow: 0 0 0 2px rgba(30,64,175,.08);
+        }
+        .event-wiz-step.is-past .event-wiz-step-index {
+          background: #16a34a; color: white;
+        }
+        .event-wiz-step.is-active .event-wiz-step-index {
+          background: var(--primary, #1e40af); color: white;
+        }
+        .event-wiz-step-index {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 1.5rem; height: 1.5rem; border-radius: 999px;
+          background: #cbd5e1; color: #475569;
+          font-size: .75rem; font-weight: 700; flex-shrink: 0;
+        }
+        .event-wiz-step-text { display: flex; flex-direction: column; min-width: 0; }
+        .event-wiz-step-label {
+          font-size: .8125rem; font-weight: 600;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .event-wiz-step-hint {
+          font-size: .6875rem; color: var(--muted-foreground);
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        @media (max-width: 700px) {
+          .event-wiz-step-hint { display: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Step 4: Review pane ─────────────────────────────────────────────────────
+function WizardReview({ form, lookups, onJumpToStep }) {
+  const committee = lookups?.committees?.find((c) => c.id === form.committee_id);
+  const branch    = lookups?.branches?.find((b) => b.id === form.branch_id);
+  const rows = [
+    { label: 'Title',         value: form.title || '—',                   step: 0 },
+    { label: 'Committee',     value: committee?.name || '—',              step: 0 },
+    { label: 'Branch',        value: branch?.name || 'Not branch-specific', step: 0 },
+    { label: 'When',          value: form.starts_at && form.ends_at ? `${fmtDate(form.starts_at)} → ${fmtDate(form.ends_at)}` : '—', step: 0 },
+    { label: 'Mode',          value: form.mode?.replace('_', ' '),        step: 0 },
+    { label: 'Venue / URL',   value: form.mode === 'online' ? (form.online_url || '—') : (form.venue || '—'), step: 0 },
+    { label: 'Audience',      value: form.audience,                       step: 1 },
+    { label: 'CPE hours',     value: form.cpe_hours || '0',                step: 1 },
+    { label: 'Fee',           value: form.fee_rupees && Number(form.fee_rupees) > 0 ? `₹${form.fee_rupees}` : 'Free', step: 1 },
+    { label: 'Capacity',      value: form.capacity || 'Unlimited',         step: 1 },
+    { label: 'Banner',        value: form.banner_url ? 'Uploaded' : 'No banner',  step: 2 },
+    { label: 'Highlights',    value: form.highlights ? `${form.highlights.split('\n').filter(Boolean).length} points` : 'None', step: 2 },
+  ];
+
+  return (
+    <div className="event-wiz-review">
+      <p style={{ fontSize: '.875rem', color: 'var(--muted-foreground)', margin: '0 0 1rem' }}>
+        Confirm the details below. Click any row to jump back and edit.
+      </p>
+      <dl style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: '.5rem 1rem', margin: 0 }}>
+        {rows.map((r, i) => (
+          <div key={i} style={{ display: 'contents' }}>
+            <dt style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>
+              {r.label}
+            </dt>
+            <dd style={{ margin: 0, fontSize: '.875rem' }}>
+              <button
+                type="button"
+                onClick={() => onJumpToStep(r.step)}
+                style={{
+                  background: 'transparent', border: 0, padding: 0,
+                  color: 'inherit', textAlign: 'left', cursor: 'pointer',
+                  textDecoration: 'underline dotted', textDecorationColor: 'transparent',
+                  transition: 'text-decoration-color .15s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.textDecorationColor = 'var(--muted-foreground)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.textDecorationColor = 'transparent'; }}
+              >
+                {r.value}
+              </button>
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -504,38 +765,27 @@ function DrawerFormSkeleton() {
   );
 }
 
-// Checklist column action. Three states:
-//   • No checklist yet      → "+ Create checklist" opens template picker
-//   • New-system instance   → status pill, jumps to /my-checklists?id=<id>
-//   • Legacy event_checklist → status pill, jumps to /checklists?id=<id>
-//
-// We keep both paths because in-flight legacy rows still need their UI; new
-// creates always go through the rich template/instance system.
+// Checklist column action. Two states:
+//   • No checklist yet     → "+ Create checklist" opens template picker
+//   • Instance exists      → status pill, jumps to /my-checklists?id=<id>
 const CHECKLIST_STATUS_LABEL = {
-  // legacy
-  awaiting_committee:     'With committee',
-  awaiting_branch_review: 'With branch chair',
-  approved:               'Approved',
-  // new instance system
-  draft:                  'Draft — release pending',
-  awaiting_fill:          'With committee chair',
-  awaiting_review:        'With branch chair',
-  rejected:               'Rejected — needs revisions',
+  draft:           'Draft — release pending',
+  awaiting_fill:   'With committee chair',
+  awaiting_review: 'With branch chair',
+  approved:        'Approved',
+  rejected:        'Rejected — needs revisions',
 };
 const CHECKLIST_STATUS_STYLE = {
-  awaiting_committee:     { bg: '#fef3c7', fg: '#92400e' },
-  awaiting_branch_review: { bg: '#dbeafe', fg: '#1e40af' },
-  approved:               { bg: '#dcfce7', fg: '#166534' },
-  draft:                  { bg: '#f1f5f9', fg: '#475569' },
-  awaiting_fill:          { bg: '#fef3c7', fg: '#92400e' },
-  awaiting_review:        { bg: '#dbeafe', fg: '#1e40af' },
-  rejected:               { bg: '#fee2e2', fg: '#991b1b' },
+  draft:           { bg: '#f1f5f9', fg: '#475569' },
+  awaiting_fill:   { bg: '#fef3c7', fg: '#92400e' },
+  awaiting_review: { bg: '#dbeafe', fg: '#1e40af' },
+  approved:        { bg: '#dcfce7', fg: '#166534' },
+  rejected:        { bg: '#fee2e2', fg: '#991b1b' },
 };
 
 function ChecklistButton({ row, showToast, refresh }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  // New-system instance takes precedence — that's the active flow now.
   if (row.instance_id) {
     const c = CHECKLIST_STATUS_STYLE[row.instance_status] || { bg: '#f1f5f9', fg: '#475569' };
     return (
@@ -549,25 +799,6 @@ function ChecklistButton({ row, showToast, refresh }) {
         }}
       >
         {CHECKLIST_STATUS_LABEL[row.instance_status] ?? row.instance_status} →
-      </button>
-    );
-  }
-
-  // Legacy event_checklist row still in flight — keep using the old drawer.
-  if (row.checklist_id) {
-    const c = CHECKLIST_STATUS_STYLE[row.checklist_status] || { bg: '#f1f5f9', fg: '#475569' };
-    return (
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); navigate('/checklists?id=' + row.checklist_id); }}
-        title="Legacy checklist (old format)"
-        style={{
-          padding: '.2rem .55rem', fontSize: '.7rem', fontWeight: 600,
-          borderRadius: 999, border: 0, cursor: 'pointer',
-          background: c.bg, color: c.fg, outline: '1px dashed var(--border)',
-        }}
-      >
-        {CHECKLIST_STATUS_LABEL[row.checklist_status] ?? row.checklist_status} →
       </button>
     );
   }

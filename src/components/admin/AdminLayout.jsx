@@ -1,73 +1,123 @@
 import { useState } from 'react';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
+import { useAdminHome } from '../../hooks/useAdminHome';
 import { ShimmerStyles } from '../ui/Shimmer';
 import {
   IconCalendar, IconUsers, IconAward, IconShield, IconBriefcase, IconHeart,
   IconFileText, IconSettings, IconArrowLeft, IconLogOut, IconMenu, IconX,
-  IconCheckCircle, IconBookOpen, IconMapPin,
+  IconCheckCircle, IconBookOpen, IconMapPin, IconGraduationCap, IconHandshake,
 } from '../../icons';
 import caIndiaLogo from '../../assets/CA India Logo.png';
+
+// Each nav item carries a `roles` array — the persona codes that should see
+// it. 'admin' is implicitly added everywhere (IT admin sees the kitchen sink).
+// Empty / missing `roles` means "visible to all admins".
+const ROLE_ADMIN     = 'admin';
+const ROLE_CHAIRMAN  = 'chairman';
+const ROLE_TREASURER = 'treasurer';
+const ROLE_COMMITTEE = 'committee_chairman';
+const ROLE_WICASA    = 'wicasa';
+const ROLE_ACCOUNTANT = 'accountant';
 
 const NAV_GROUPS = [
   {
     label: 'Overview',
     items: [
-      { to: '/admin', label: 'Dashboard', Icon: IconShield, exact: true },
+      { to: '/admin', label: 'Dashboard', Icon: IconShield, exact: true }, // everyone
     ],
   },
   {
-    label: 'Content',
+    label: 'Programmes',
     items: [
-      { to: '/admin/events', label: 'Events', Icon: IconCalendar },
-      { to: '/admin/registrations', label: 'Registrations', Icon: IconCheckCircle },
+      { to: '/admin/events',        label: 'Events',        Icon: IconCalendar,     roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
+      { to: '/admin/registrations', label: 'Registrations', Icon: IconCheckCircle,  roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_TREASURER, ROLE_WICASA] },
+      { to: '/admin/cpe',           label: 'CPE credits',   Icon: IconAward, soon: true,                  roles: [ROLE_CHAIRMAN] },
     ],
   },
   {
-    label: 'People',
+    label: 'Student wing',
     items: [
-      { to: '/admin/users', label: 'Users', Icon: IconUsers },
-      { to: '/admin/cpe', label: 'CPE credits', Icon: IconAward, soon: true },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { to: '/admin/approvals', label: 'Approvals', Icon: IconCheckCircle, soon: true },
-      { to: '/admin/rooms', label: 'Rooms', Icon: IconMapPin, soon: true },
-      { to: '/admin/bookings', label: 'Room bookings', Icon: IconBookOpen, soon: true },
-      { to: '/admin/committees', label: 'Committees', Icon: IconShield },
-    ],
-  },
-  {
-    label: 'Forms',
-    items: [
-      { to: '/admin/checklist-templates', label: 'Checklist templates', Icon: IconCheckCircle },
-    ],
-  },
-  {
-    label: 'Site',
-    items: [
-      { to: '/admin/site-content',  label: 'Site content',  Icon: IconFileText },
-      { to: '/admin/site-settings', label: 'Site settings', Icon: IconSettings },
-      { to: '/admin/announcements', label: 'Announcements', Icon: IconBookOpen },
-    ],
-  },
-  {
-    label: 'Marketplace',
-    items: [
-      { to: '/admin/jobs', label: 'Job postings', Icon: IconBriefcase },
-      { to: '/admin/cabf', label: 'CABF requests', Icon: IconHeart, soon: true },
+      { to: '/admin/mock-tests',            label: 'Mock tests',    Icon: IconGraduationCap, roles: [ROLE_WICASA] },
+      { to: '/admin/mentorship',            label: 'Mentorship',    Icon: IconHandshake,     roles: [ROLE_WICASA] },
+      { to: '/admin/articleship-matches',   label: 'Articleship matching', Icon: IconHandshake, roles: [ROLE_WICASA] },
     ],
   },
   {
     label: 'Finance',
     items: [
-      { to: '/admin/payments', label: 'Payments', Icon: IconFileText, soon: true },
-      { to: '/admin/files', label: 'Files', Icon: IconFileText, soon: true },
+      { to: '/admin/bills',          label: 'Bills',           Icon: IconFileText, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
+      { to: '/admin/refunds',        label: 'Refunds',         Icon: IconFileText, roles: [ROLE_TREASURER] },
+      { to: '/admin/iut-transfers',  label: 'IUT transfers',   Icon: IconFileText, roles: [ROLE_TREASURER] },
+      { to: '/admin/payments',       label: 'Payments',        Icon: IconFileText, soon: true, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
+      { to: '/admin/cabf',           label: 'CABF requests',   Icon: IconHeart,    soon: true, roles: [ROLE_TREASURER] },
+    ],
+  },
+  {
+    label: 'People',
+    items: [
+      { to: '/admin/users',         label: 'Users',       Icon: IconUsers, roles: [] /* admin-only */ },
+      { to: '/admin/committees',    label: 'Committees',  Icon: IconShield, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      { to: '/admin/approvals',  label: 'Approvals',     Icon: IconCheckCircle, soon: true, roles: [ROLE_CHAIRMAN, ROLE_TREASURER] },
+      { to: '/admin/rooms',      label: 'Rooms',         Icon: IconMapPin,      soon: true, roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/bookings',   label: 'Room bookings', Icon: IconBookOpen,    soon: true, roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/checklist-templates', label: 'Checklist templates', Icon: IconCheckCircle, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { to: '/admin/site-content',  label: 'Site content',  Icon: IconFileText, roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/announcements', label: 'Announcements', Icon: IconBookOpen, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
+      { to: '/admin/site-settings', label: 'Site settings', Icon: IconSettings, roles: [] /* admin-only */ },
+    ],
+  },
+  {
+    label: 'Marketplace',
+    items: [
+      { to: '/admin/jobs', label: 'Job postings', Icon: IconBriefcase, roles: [] /* admin-only */ },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      { to: '/admin/files',                  label: 'Files',                  Icon: IconFileText, soon: true, roles: [] /* admin-only */ },
+      { to: '/admin/notification-templates', label: 'Notification templates', Icon: IconBookOpen, roles: [] /* admin-only */ },
     ],
   },
 ];
+
+// Decide which role-keys to use for filtering the sidebar. The home endpoint
+// returns explicit flags — we map them onto the ROLE_* constants used above.
+function activeRoles(homeData) {
+  const r = homeData?.roles ?? {};
+  const out = new Set();
+  if (r.is_admin)              out.add(ROLE_ADMIN);
+  if (r.is_branch_chairman)    out.add(ROLE_CHAIRMAN);
+  if (r.is_vice_chairman)      out.add(ROLE_CHAIRMAN);   // VC sees chairman's nav
+  if (r.is_secretary)          out.add(ROLE_CHAIRMAN);
+  if (r.is_treasurer)          out.add(ROLE_TREASURER);
+  if (r.is_accountant)         out.add(ROLE_ACCOUNTANT);
+  if (r.is_wicasa)             out.add(ROLE_WICASA);
+  if ((r.committee_chairman_of ?? []).length > 0) out.add(ROLE_COMMITTEE);
+  return out;
+}
+
+// An item is visible if:
+//   - the user has the `admin` role (everything visible), OR
+//   - the item has no `roles` array (visible to everyone), OR
+//   - the user's active roles intersect with the item's `roles`.
+function isVisible(item, userRoles) {
+  if (userRoles.has(ROLE_ADMIN)) return true;
+  if (!item.roles) return true;
+  if (item.roles.length === 0) return false;  // admin-only
+  return item.roles.some((r) => userRoles.has(r));
+}
 
 function isActive(routePath, to, exact) {
   if (exact) return routePath === to;
@@ -78,6 +128,18 @@ export default function AdminLayout({ title, subtitle, actions, children }) {
   const route = useRoute();
   const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Pull the role flags from the home endpoint so we can filter the nav.
+  // The hook is cached + polled, so AdminLayout doesn't trigger duplicate
+  // fetches — the dashboard page is reading the same data.
+  const { data: homeData } = useAdminHome();
+  const userRoles = activeRoles(homeData);
+
+  // Hide entire groups whose items are all filtered out. Keeps the sidebar
+  // tidy for users with only a few roles.
+  const visibleGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((it) => isVisible(it, userRoles)) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div className="admin-shell">
@@ -95,7 +157,7 @@ export default function AdminLayout({ title, subtitle, actions, children }) {
         </div>
 
         <nav className="admin-sidebar-nav">
-          {NAV_GROUPS.map((g) => (
+          {visibleGroups.map((g) => (
             <div key={g.label} className="admin-nav-group">
               <div className="admin-nav-group-label">{g.label}</div>
               {g.items.map((it) => {

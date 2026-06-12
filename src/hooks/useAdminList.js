@@ -51,20 +51,20 @@ export function useAdminList(endpoint, params, enabled = true, ttl) {
 //   adminFetch('/api/admin/users/<id>', { method: 'PATCH', body })
 //     → wipes every '/api/admin/users' key (list views + details).
 //   adminFetch('/api/admin/events/<id>/publish', { method: 'POST' })
-//     → wipes '/api/admin/events' AND '/api/checklists' (publish may have
-//        affected the checklist's row).
+//     → wipes '/api/admin/events' AND '/api/checklist-instances' (publish
+//        may have affected the instance's row via the auto-publish trigger).
 export async function adminFetch(endpoint, opts = {}) {
   const method = (opts.method || 'GET').toUpperCase();
   if (method === 'GET') return cachedGet(endpoint);
 
   // Derive an invalidation prefix from the endpoint:
   //   /api/admin/users/<id>/roles → /api/admin/users
-  //   /api/admin/events/<id>/publish → /api/admin/events  (and /api/checklists)
+  //   /api/admin/events/<id>/publish → /api/admin/events (+ checklist-instances)
   const match = endpoint.match(/^(\/api\/admin\/[a-z_]+)/);
   const prefix = match ? match[1] : '/api';
   const extra = [];
   if (endpoint.includes('/publish') || endpoint.includes('/cancel')) {
-    extra.push('/api/checklists');
+    extra.push('/api/checklist-instances');
   }
   return apiWrite(endpoint, {
     method,
@@ -74,5 +74,5 @@ export async function adminFetch(endpoint, opts = {}) {
 }
 
 // Re-export the raw invalidator for callers that need finer control
-// (e.g. invalidating /api/checklists after creating one from /admin/events).
+// (e.g. invalidating /api/checklist-instances after creating one from /admin/events).
 export { invalidate };

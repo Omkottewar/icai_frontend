@@ -129,11 +129,30 @@ export default function Header() {
                     <span className="badge badge-secondary" style={{ marginTop: '.375rem' }}>{user.role}</span>
                   </div>
                   <a href="#/dashboard" className="menu-item" onClick={() => setMenuOpen(false)}><IconUser size="sm" /> Dashboard</a>
-                  {user.roles?.some((r) => r.code === 'admin') && (
-                    <a href="#/admin" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                      <IconShield size="sm" /> Admin console
-                    </a>
-                  )}
+                  {(() => {
+                    // Office bearers get a prominent shortcut into the role-aware
+                    // /admin home (chairman → ChairmanHome, treasurer → TreasurerHome,
+                    // etc.). The label changes based on the most-specific role we
+                    // can identify so the menu reads as "your" workspace, not a
+                    // generic "Admin console".
+                    const codes = new Set((user.roles ?? []).map((r) => r.code));
+                    const label =
+                      codes.has('admin')                  ? 'Admin console' :
+                      codes.has('branch_treasurer')        ? 'Treasurer dashboard' :
+                      codes.has('branch_chairman')         ? 'Chairman dashboard' :
+                      codes.has('branch_vice_chairman')    ? 'Vice-Chairman dashboard' :
+                      codes.has('branch_secretary')        ? 'Secretary dashboard' :
+                      codes.has('committee_chairman')      ? 'Committee dashboard' :
+                      codes.has('accountant')              ? 'Bills register' :
+                      codes.has('branch_manager')          ? 'Branch console' :
+                      null;
+                    if (!label) return null;
+                    return (
+                      <a href="#/admin" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                        <IconShield size="sm" /> {label}
+                      </a>
+                    );
+                  })()}
                   {user.role === 'Employer' && (
                     <a href="#/employer" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
                       <IconShield size="sm" /> Employer dashboard
@@ -170,6 +189,21 @@ export default function Header() {
               </a>
             ))}
             <a href="#/praygyaan" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--secondary)' }}>PrayGyaan AI</a>
+            {user && (() => {
+              // Office bearers get a direct mobile link into /admin too — the
+              // chairman approving from her phone during a meeting shouldn't
+              // have to dig into the avatar dropdown to find it.
+              const codes = new Set((user.roles ?? []).map((r) => r.code));
+              const officeBearer = ['admin','branch_chairman','branch_vice_chairman',
+                'branch_secretary','branch_treasurer','committee_chairman',
+                'accountant','branch_manager'].some((c) => codes.has(c));
+              if (!officeBearer) return null;
+              return (
+                <a href="#/admin" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)' }}>
+                  Open your dashboard →
+                </a>
+              );
+            })()}
             {!user && (
               <a href="#/signup" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)' }}>Create account →</a>
             )}

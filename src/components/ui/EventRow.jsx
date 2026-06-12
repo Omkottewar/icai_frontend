@@ -45,6 +45,13 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
   const { eventIds, refresh: refreshMyRegistrations } = useMyRegistrations();
   const isRegistered = e.id && eventIds.has(e.id);
 
+  // Capacity awareness — drives the seats-left meta and the waitlist UX.
+  const cap = Number(e.capacity ?? 0);
+  const reg = Number(e.registered_count ?? 0);
+  const seatsLeft = cap > 0 ? Math.max(0, cap - reg) : null;
+  const isFull = cap > 0 && reg >= cap;
+  const isAlmostFull = cap > 0 && seatsLeft !== null && seatsLeft <= Math.max(5, Math.floor(cap * 0.1));
+
   // Registered users: clicking the row jumps straight to the WhatsApp-style
   // event chat. Unregistered users still get the accordion + Register CTA.
   function handleHeaderClick() {
@@ -62,10 +69,23 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
       >
         <div className="event-acc-titleblock">
           <div className="event-acc-title">{e.title}</div>
-          <div className="event-acc-committee">{e.committee}</div>
+          <div className="event-acc-committee">
+            {e.committee}
+            {e.cpe > 0 && (
+              <span className="event-cpe-chip" title={`${e.cpe} CPE hours`}>
+                {e.cpe} CPE hr{e.cpe === 1 ? '' : 's'}
+              </span>
+            )}
+            {isFull && !isRegistered && (
+              <span className="event-cap-chip event-cap-full">Waitlist only</span>
+            )}
+            {isAlmostFull && !isFull && !isRegistered && (
+              <span className="event-cap-chip event-cap-almost">{seatsLeft} seats left</span>
+            )}
+          </div>
         </div>
         <div className="event-acc-right">
-          {isRegistered && (
+          {isRegistered ? (
             <span
               className="event-acc-chat-pill"
               aria-hidden="true"
@@ -78,9 +98,9 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
                 border: '1px solid oklch(0.82 0.13 145)',
               }}
             >
-              <IconMessageSquare size="sm" /> Chat
+              <IconCheckCircle size="sm" /> Registered
             </span>
-          )}
+          ) : null}
           <span className="event-acc-date">{e.date}</span>
           {!isRegistered && (
             <span className="event-acc-chevron" aria-hidden="true">
@@ -159,11 +179,15 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
                       <button
                         type="button"
                         className="btn btn-primary"
-                        style={{ padding: '.45rem 1.1rem' }}
+                        style={{
+                          padding: '.45rem 1.1rem',
+                          background: isFull ? 'var(--muted-foreground, #64748b)' : undefined,
+                        }}
                         onClick={(ev) => { ev.stopPropagation(); setShowRegister(true); }}
                         disabled={!e.slug}
+                        title={isFull ? "We'll email you if a seat opens up" : undefined}
                       >
-                        Register
+                        {isFull ? 'Join waitlist' : 'Register'}
                       </button>
                     )}
                   </div>
@@ -195,6 +219,30 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
       {showChat && (
         <EventChat event={e} onClose={() => setShowChat(false)} />
       )}
+
+      <style>{`
+        .event-cpe-chip {
+          display: inline-block;
+          margin-left: .5rem;
+          padding: .05rem .4rem;
+          border-radius: 999px;
+          background: oklch(0.92 0.08 250);
+          color: oklch(0.32 0.18 250);
+          font-size: .65rem; font-weight: 700;
+          vertical-align: middle;
+          letter-spacing: .02em;
+        }
+        .event-cap-chip {
+          display: inline-block;
+          margin-left: .35rem;
+          padding: .05rem .4rem;
+          border-radius: 999px;
+          font-size: .65rem; font-weight: 600;
+          vertical-align: middle;
+        }
+        .event-cap-almost { background: #fef3c7; color: #92400e; }
+        .event-cap-full   { background: #fee2e2; color: #991b1b; }
+      `}</style>
     </div>
   );
 }

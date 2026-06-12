@@ -3,7 +3,12 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import Drawer from '../../components/admin/Drawer';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute, navigate } from '../../hooks/useRoute';
-import { QUESTION_TYPES, newQuestion } from '../../lib/checklistQuestions';
+import {
+  QUESTION_TYPES, QUESTION_TYPE_MAP, POPULAR_TYPES,
+  QUESTION_LIBRARY, ROLE_OPTIONS, CATEGORY_OPTIONS,
+  SECTION_PRESETS,
+  newQuestion, defaultConfig,
+} from '../../lib/checklistQuestions';
 import QuestionEditor from '../../components/checklists/QuestionEditor';
 import QuestionRenderer from '../../components/checklists/QuestionRenderer';
 import { IconPlus, IconCopy, IconTrash, IconCheckCircle, IconEdit, IconEye } from '../../icons';
@@ -33,7 +38,7 @@ export default function ChecklistTemplatesAdminPage() {
   return (
     <AdminLayout
       title="Checklist templates"
-      subtitle="Build reusable forms — radio, dropdown, text, files, and more."
+      subtitle="Build reusable forms — text, numbers, choices, files, and more."
       actions={<NewButton />}
     >
       <TemplateList onEdit={(id) => navigate('/admin/checklist-templates?edit=' + id)}
@@ -183,6 +188,12 @@ function PublishedPill({ v }) {
 }
 
 // ─── Builder drawer ────────────────────────────────────────────────────────
+//
+// Layout philosophy: tabbed instead of side-by-side.
+// Tab 1 ("Build") gives the questions full width; tab 2 ("Preview") shows
+// what the filler will actually see. The old 1fr/360px split forced the
+// question editors into a narrow column which made every label-input feel
+// cramped on a 1280 viewport.
 function BuilderDrawer({ id, onClose }) {
   const { showToast } = useAuth();
   const isNew = !id;
@@ -191,6 +202,7 @@ function BuilderDrawer({ id, onClose }) {
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [tab, setTab] = useState('build'); // 'build' | 'preview'
 
   useEffect(() => {
     if (isNew) {
@@ -217,6 +229,7 @@ function BuilderDrawer({ id, onClose }) {
           help_text: q.help_text || '',
           required: q.required,
           config: q.config || {},
+          section_owner_role: q.section_owner_role ?? null,
         })));
       } catch (e) {
         if (!cancelled) setErr(e.message);
@@ -244,7 +257,69 @@ function BuilderDrawer({ id, onClose }) {
     const src = qs[idx];
     return [...qs.slice(0, idx + 1), { ...src, _draftId: `q_${Math.random().toString(36).slice(2, 9)}`, id: undefined, label: src.label + ' (copy)' }, ...qs.slice(idx + 1)];
   });
-  const add = (type) => setQuestions((qs) => [...qs, newQuestion(type)]);
+  // insertAt(i) inserts BEFORE index i (-1 means append to end)
+  const insertAt = (i, type, overrides = {}) => setQuestions((qs) => {
+    const q = newQuestion(type, overrides);
+    if (i < 0 || i >= qs.length) return [...qs, q];
+    return [...qs.slice(0, i), q, ...qs.slice(i)];
+  });
+
+  // Append a brand-new section heading at the end. Returns the index of
+  // the inserted heading so the caller can scroll/focus it.
+  const appendSection = (title = 'New section', ownerRole = '') => {
+    setQuestions((qs) => [...qs, newQuestion('section_heading', {
+      label: title,
+      required: false,
+      section_owner_role: ownerRole || null,
+    })]);
+  };
+
+  // Drop in a whole preset section (heading + N pre-configured questions).
+  // The killer feature for non-tech users.
+  const appendPreset = (preset) => {
+    setQuestions((qs) => [
+      ...qs,
+      newQuestion('section_heading', {
+        label: preset.title,
+        required: false,
+        section_owner_role: preset.owner_role || null,
+      }),
+      ...preset.questions.map((q) => newQuestion(q.type, q.overrides ?? {})),
+    ]);
+  };
+
+  // Append a question to the END of the section whose heading is at
+  // questionIdx. If no next section, appends to the global end.
+  const appendQuestionToSection = (sectionIdx, type, overrides = {}) => {
+    setQuestions((qs) => {
+      // Find the next section_heading after sectionIdx (or end of list)
+      let nextSectionIdx = qs.length;
+      for (let i = sectionIdx + 1; i < qs.length; i++) {
+        if (qs[i].type === 'section_heading') { nextSectionIdx = i; break; }
+      }
+      const q = newQuestion(type, overrides);
+      return [...qs.slice(0, nextSectionIdx), q, ...qs.slice(nextSectionIdx)];
+    });
+  };
+
+  // Group the flat questions array by section_heading. Returns:
+  //   { headingIdx: number | null, heading: q | null, items: q[] }[]
+  // Questions before any section_heading land in a group with headingIdx=null.
+  const groups = (() => {
+    const out = [];
+    let current = { headingIdx: null, heading: null, items: [] };
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (q.type === 'section_heading') {
+        if (current.heading || current.items.length > 0) out.push(current);
+        current = { headingIdx: i, heading: q, items: [] };
+      } else {
+        current.items.push({ q, idx: i });
+      }
+    }
+    if (current.heading || current.items.length > 0) out.push(current);
+    return out;
+  })();
 
   const save = async () => {
     setSaving(true); setErr('');
@@ -257,6 +332,9 @@ function BuilderDrawer({ id, onClose }) {
         required: q.required,
         config: q.config || {},
         sort_order: i,
+        // Only meaningful on section_heading; null elsewhere to keep the
+        // column clean.
+        section_owner_role: q.type === 'section_heading' ? (q.section_owner_role || null) : null,
       }));
       if (!meta.name.trim()) throw new Error('Template name is required');
       if (payloadQuestions.length === 0) throw new Error('Add at least one question');
@@ -278,7 +356,7 @@ function BuilderDrawer({ id, onClose }) {
       open
       onClose={onClose}
       title={isNew ? 'New template' : 'Edit template'}
-      width={920}
+      width={880}
       footer={
         <>
           {err && <span style={{ color: 'var(--destructive)', marginRight: 'auto', fontSize: '.875rem' }}>{err}</span>}
@@ -290,74 +368,141 @@ function BuilderDrawer({ id, onClose }) {
       }
     >
       {loading ? <p className="muted-text">Loading…</p> : (
-        <div className="bld-grid">
-          <section>
-            <h3 className="bld-section">Details</h3>
-            <Field label="Name *">
-              <input type="text" className="bld-input" value={meta.name} onChange={(e) => setMeta((m) => ({ ...m, name: e.target.value }))} />
-            </Field>
-            <Field label="Description">
-              <textarea className="bld-input" value={meta.description} rows={2} onChange={(e) => setMeta((m) => ({ ...m, description: e.target.value }))} />
-            </Field>
-            <Field label="Category">
-              <input type="text" className="bld-input" placeholder="e.g. Events, Compliance" value={meta.category} onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value }))} />
-            </Field>
-            <div className="bld-row">
-              <Field label="Fill role (optional)">
-                <input type="text" className="bld-input" placeholder="e.g. committee_chairman" value={meta.fill_role} onChange={(e) => setMeta((m) => ({ ...m, fill_role: e.target.value }))} />
-              </Field>
-              <Field label="Review role (optional)">
-                <input type="text" className="bld-input" placeholder="e.g. branch_chairman" value={meta.review_role} onChange={(e) => setMeta((m) => ({ ...m, review_role: e.target.value }))} />
-              </Field>
+        <div className="bld">
+          <TemplateMetaForm meta={meta} setMeta={setMeta} />
+
+          <div className="bld-tabs" role="tablist" aria-label="Builder sections">
+            <button
+              role="tab"
+              aria-selected={tab === 'build'}
+              className={'bld-tab' + (tab === 'build' ? ' is-active' : '')}
+              onClick={() => setTab('build')}
+            >Build</button>
+            <button
+              role="tab"
+              aria-selected={tab === 'preview'}
+              className={'bld-tab' + (tab === 'preview' ? ' is-active' : '')}
+              onClick={() => setTab('preview')}
+            >Preview ({questions.length})</button>
+          </div>
+
+          {tab === 'build' && (
+            <div className="bld-build">
+              {/* Empty state — only when truly empty. Big, helpful, links to
+                  the section preset library as the primary path. */}
+              {questions.length === 0 ? (
+                <EmptyBuildState onPreset={appendPreset} onBlank={() => appendSection('Section 1')} />
+              ) : (
+                <>
+                  <SectionPresetBar onPreset={appendPreset} />
+
+                  {groups.map((g, gi) => (
+                    <SectionCard
+                      key={g.heading?._draftId ?? `pre_${gi}`}
+                      group={g}
+                      totalCount={questions.length}
+                      onPatchQuestion={(idx, patch) => setQ(idx, patch)}
+                      onPatchQuestionConfig={(idx, patch) => setCfg(idx, patch)}
+                      onMoveQuestion={(idx, dir) => move(idx, dir)}
+                      onRemoveQuestion={(idx) => remove(idx)}
+                      onDuplicateQuestion={(idx) => duplicate(idx)}
+                      onAddQuestion={(type) => {
+                        if (g.headingIdx == null) {
+                          // pre-section group — append before the next section heading or at end
+                          insertAt(-1, type);
+                        } else {
+                          appendQuestionToSection(g.headingIdx, type);
+                        }
+                      }}
+                      onRemoveSection={() => {
+                        if (g.headingIdx == null) return;
+                        if (!confirm('Remove this section AND every question inside it?')) return;
+                        // Remove from heading index through (next-section - 1).
+                        setQuestions((qs) => {
+                          let end = qs.length;
+                          for (let i = g.headingIdx + 1; i < qs.length; i++) {
+                            if (qs[i].type === 'section_heading') { end = i; break; }
+                          }
+                          return [...qs.slice(0, g.headingIdx), ...qs.slice(end)];
+                        });
+                      }}
+                    />
+                  ))}
+
+                  {/* Primary action: add a section. Sections are first-class
+                      in the new UI. Questions live inside sections. */}
+                  <button type="button" className="bld-add-section" onClick={() => appendSection('New section')}>
+                    + Add another section
+                  </button>
+                </>
+              )}
             </div>
+          )}
 
-            <h3 className="bld-section" style={{ marginTop: '1.25rem' }}>Questions</h3>
-            {questions.map((q, i) => (
-              <QuestionEditor
-                key={q._draftId}
-                question={q}
-                index={i}
-                count={questions.length}
-                onPatch={(p) => setQ(i, p)}
-                onPatchConfig={(p) => setCfg(i, p)}
-                onMove={(d) => move(i, d)}
-                onRemove={() => remove(i)}
-                onDuplicate={() => duplicate(i)}
-              />
-            ))}
-
-            <AddQuestionMenu onAdd={add} />
-          </section>
-
-          <aside>
-            <h3 className="bld-section">Live preview</h3>
+          {tab === 'preview' && (
             <div className="bld-preview">
+              <div className="bld-preview-head">
+                <strong style={{ fontSize: '.95rem' }}>{meta.name || 'Untitled template'}</strong>
+                {meta.description && <div className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.15rem' }}>{meta.description}</div>}
+              </div>
               {questions.length === 0
-                ? <p className="muted-text">Add a question to see the preview.</p>
+                ? <p className="muted-text" style={{ padding: '1.5rem' }}>Add a question on the Build tab to see the preview.</p>
                 : questions.map((q) => (
                     <QuestionRenderer key={q._draftId} question={q} value={null} onChange={() => {}} />
                   ))
               }
             </div>
-          </aside>
+          )}
 
           <style>{`
-            .bld-grid { display: grid; grid-template-columns: 1fr 360px; gap: 1.25rem; align-items: start; }
-            .bld-section { font-size: .8125rem; font-weight: 700; color: var(--muted-foreground);
-                           text-transform: uppercase; letter-spacing: .06em; margin: 0 0 .625rem; }
-            .bld-input {
-              width: 100%; padding: .45rem .6rem; border: 1px solid var(--border);
-              border-radius: .375rem; background: var(--card); font: inherit; color: inherit;
+            .bld { display: flex; flex-direction: column; gap: 1rem; }
+            .bld-tabs {
+              display: flex; gap: .25rem;
+              border-bottom: 1px solid var(--border);
+              margin-bottom: .25rem;
             }
-            .bld-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
-            .bld-row { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+            .bld-tab {
+              padding: .5rem .875rem;
+              background: transparent; border: 0;
+              border-bottom: 2px solid transparent;
+              font-size: .875rem; font-weight: 600;
+              color: var(--muted-foreground);
+              cursor: pointer;
+              margin-bottom: -1px;
+            }
+            .bld-tab:hover { color: var(--foreground); }
+            .bld-tab.is-active {
+              color: var(--primary, #1e40af);
+              border-bottom-color: var(--primary, #1e40af);
+            }
+            .bld-build { display: flex; flex-direction: column; gap: .75rem; }
+            .bld-empty {
+              padding: 1.5rem; text-align: center;
+              background: var(--muted, #f8fafc);
+              border: 1px dashed var(--border);
+              border-radius: .5rem;
+              font-size: .875rem; color: var(--muted-foreground);
+              margin-bottom: .75rem;
+            }
+            .bld-add-section {
+              align-self: stretch;
+              padding: .75rem 1rem;
+              font-size: .875rem; font-weight: 600;
+              background: white;
+              border: 2px dashed var(--primary, #1e40af);
+              color: var(--primary, #1e40af);
+              border-radius: .5rem;
+              cursor: pointer;
+              margin-top: .25rem;
+            }
+            .bld-add-section:hover { background: rgba(37, 99, 235, .04); }
             .bld-preview {
               border: 1px solid var(--border); border-radius: .5rem;
               background: var(--background); padding: 1rem;
-              position: sticky; top: 0; max-height: 80vh; overflow: auto;
             }
-            @media (max-width: 1024px) {
-              .bld-grid { grid-template-columns: 1fr; }
+            .bld-preview-head {
+              padding-bottom: .75rem; margin-bottom: .75rem;
+              border-bottom: 1px solid var(--border);
             }
           `}</style>
         </div>
@@ -366,10 +511,102 @@ function BuilderDrawer({ id, onClose }) {
   );
 }
 
+// ─── Template metadata (name, description, category, roles) ───────────────
+function TemplateMetaForm({ meta, setMeta }) {
+  const [showCustomCategory, setShowCustomCategory] = useState(
+    meta.category ? !CATEGORY_OPTIONS.includes(meta.category) : false,
+  );
+
+  return (
+    <div className="meta">
+      <Field label="Name *">
+        <input type="text" className="meta-input"
+          placeholder="e.g. Event approval checklist"
+          value={meta.name}
+          onChange={(e) => setMeta((m) => ({ ...m, name: e.target.value }))} />
+      </Field>
+
+      <Field label="Description">
+        <input type="text" className="meta-input"
+          placeholder="What is this checklist for?"
+          value={meta.description}
+          onChange={(e) => setMeta((m) => ({ ...m, description: e.target.value }))} />
+      </Field>
+
+      <div className="meta-grid">
+        <Field label="Category">
+          {showCustomCategory ? (
+            <input type="text" className="meta-input"
+              placeholder="Custom category"
+              value={meta.category}
+              onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value }))} />
+          ) : (
+            <select className="meta-input"
+              value={CATEGORY_OPTIONS.includes(meta.category) ? meta.category : ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === 'Other') {
+                  setShowCustomCategory(true);
+                  setMeta((m) => ({ ...m, category: '' }));
+                } else {
+                  setMeta((m) => ({ ...m, category: v }));
+                }
+              }}>
+              <option value="">— Pick a category —</option>
+              {CATEGORY_OPTIONS.filter((c) => c !== '').map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          )}
+        </Field>
+
+        <Field label="Who fills this in?">
+          <select className="meta-input"
+            value={meta.fill_role}
+            onChange={(e) => setMeta((m) => ({ ...m, fill_role: e.target.value }))}>
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r.code} value={r.code}>{r.label}</option>
+            ))}
+          </select>
+        </Field>
+
+        <Field label="Who reviews and approves?">
+          <select className="meta-input"
+            value={meta.review_role}
+            onChange={(e) => setMeta((m) => ({ ...m, review_role: e.target.value }))}>
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r.code} value={r.code}>{r.label}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <style>{`
+        .meta {
+          display: flex; flex-direction: column; gap: .625rem;
+          padding-bottom: .25rem;
+        }
+        .meta-input {
+          width: 100%; padding: .45rem .6rem; border: 1px solid var(--border);
+          border-radius: .375rem; background: var(--card);
+          font: inherit; color: inherit;
+        }
+        .meta-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+        .meta-grid {
+          display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem;
+        }
+        @media (max-width: 700px) {
+          .meta-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function Field({ label, children }) {
   return (
-    <div style={{ marginBottom: '.625rem' }}>
-      <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: '.25rem' }}>
+    <div>
+      <label style={{ display: 'block', fontSize: '.75rem', fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: '.2rem' }}>
         {label}
       </label>
       {children}
@@ -377,64 +614,515 @@ function Field({ label, children }) {
   );
 }
 
-function AddQuestionMenu({ onAdd }) {
+// ─── Quick library — one-click pre-configured questions ─────────────────────
+function QuickLibrary({ onAdd }) {
   const [open, setOpen] = useState(false);
-  const groups = useMemo(() => {
-    const g = {};
-    for (const t of QUESTION_TYPES) {
-      (g[t.group] = g[t.group] || []).push(t);
-    }
-    return g;
-  }, []);
   return (
-    <div style={{ marginTop: '.5rem' }}>
-      {!open ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: '.4rem',
-            padding: '.5rem .9rem', border: '1px dashed var(--primary)',
-            color: 'var(--primary)', background: 'transparent', borderRadius: '.375rem', cursor: 'pointer',
-          }}
-        >
-          <IconPlus size="sm" /> Add question
-        </button>
-      ) : (
-        <div className="add-menu">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '.5rem' }}>
-            <strong style={{ fontSize: '.875rem' }}>Pick a question type</strong>
-            <button onClick={() => setOpen(false)} style={{ background: 'transparent', border: 0, cursor: 'pointer' }}>Cancel</button>
-          </div>
-          {Object.entries(groups).map(([group, items]) => (
-            <div key={group} style={{ marginBottom: '.5rem' }}>
-              <div style={{ fontSize: '.6875rem', fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{group}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '.375rem', marginTop: '.25rem' }}>
-                {items.map((t) => (
-                  <button key={t.type} onClick={() => { onAdd(t.type); setOpen(false); }} className="add-menu-btn">
-                    <strong>{t.label}</strong>
-                    <span className="muted-text" style={{ fontSize: '.75rem' }}>{t.hint}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+    <div className="lib-wrap">
+      <button type="button" className="lib-toggle" onClick={() => setOpen((o) => !o)}>
+        ⚡ Quick library — common branch questions
+        <span style={{ marginLeft: '.4rem', fontSize: '.7rem', color: 'var(--muted-foreground)' }}>
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open && (
+        <div className="lib-grid">
+          {QUESTION_LIBRARY.map((it) => (
+            <button
+              key={it.key} type="button"
+              className="lib-tile"
+              onClick={() => onAdd(it.type, it.overrides)}
+              title={`Add a ${QUESTION_TYPE_MAP[it.type]?.label.toLowerCase()} question`}
+            >
+              <span className="lib-icon">{it.icon}</span>
+              <span className="lib-label">{it.label}</span>
+            </button>
           ))}
-
-          <style>{`
-            .add-menu {
-              border: 1px solid var(--border); border-radius: .5rem;
-              padding: .75rem; background: var(--card);
-            }
-            .add-menu-btn {
-              text-align: left; padding: .5rem .625rem;
-              background: var(--background); border: 1px solid var(--border);
-              border-radius: .375rem; cursor: pointer;
-              display: flex; flex-direction: column; gap: .15rem;
-            }
-            .add-menu-btn:hover { border-color: var(--primary); }
-          `}</style>
         </div>
       )}
+      <style>{`
+        .lib-wrap { margin-bottom: .75rem; }
+        .lib-toggle {
+          width: 100%; text-align: left;
+          padding: .5rem .75rem;
+          background: var(--muted, #f8fafc);
+          border: 1px solid var(--border); border-radius: .375rem;
+          font-size: .8125rem; font-weight: 600;
+          cursor: pointer;
+        }
+        .lib-toggle:hover { background: white; border-color: var(--primary); }
+        .lib-grid {
+          display: grid; gap: .375rem;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+          padding: .625rem; margin-top: .25rem;
+          background: var(--card); border: 1px solid var(--border);
+          border-radius: .375rem;
+        }
+        .lib-tile {
+          display: flex; flex-direction: column; align-items: flex-start; gap: .15rem;
+          padding: .5rem .625rem; background: var(--muted, #f8fafc);
+          border: 1px solid var(--border); border-radius: .375rem;
+          cursor: pointer; text-align: left;
+        }
+        .lib-tile:hover { background: white; border-color: var(--primary); }
+        .lib-icon { font-size: 1.05rem; line-height: 1; }
+        .lib-label { font-size: .8125rem; font-weight: 500; }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Insert-between-rows — subtle + button between questions ───────────────
+// Hidden by default, fades in on hover so users see WHERE they can add a
+// question without us shouting "+ ADD" between every row.
+function InsertBetween({ onInsert }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ib-wrap">
+      {open ? (
+        <AddQuestion onAdd={(type) => { onInsert(type); setOpen(false); }} onCancel={() => setOpen(false)} mode="inline" />
+      ) : (
+        <button type="button" className="ib-trigger" onClick={() => setOpen(true)} title="Insert question here">
+          <span className="ib-line" />
+          <span className="ib-plus">+</span>
+          <span className="ib-line" />
+        </button>
+      )}
+      <style>{`
+        .ib-wrap { margin: 0; }
+        .ib-trigger {
+          display: flex; align-items: center;
+          width: 100%; padding: .15rem 0;
+          background: transparent; border: 0; cursor: pointer;
+          color: var(--muted-foreground);
+          opacity: 0; transition: opacity .12s;
+        }
+        .ib-trigger:hover, .ib-trigger:focus { opacity: 1; }
+        .ib-line { flex: 1; height: 1px; background: var(--border); }
+        .ib-plus {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 1.25rem; height: 1.25rem; margin: 0 .375rem;
+          background: var(--primary, #1e40af); color: white;
+          border-radius: 999px; font-size: .8rem; font-weight: 700;
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Add-question chooser ─────────────────────────────────────────────────
+// Two modes:
+//   'inline'   — used by InsertBetween. Starts opened; closes after pick.
+//   'trailing' — sits at the bottom of the question list. Collapsed until
+//                clicked; opens the picker inline.
+function AddQuestion({ onAdd, onCancel, mode }) {
+  const [open, setOpen] = useState(mode === 'inline');
+  const [showAll, setShowAll] = useState(false);
+
+  const popularItems = useMemo(
+    () => POPULAR_TYPES.map((t) => QUESTION_TYPE_MAP[t]).filter(Boolean),
+    [],
+  );
+  const otherItems = useMemo(
+    () => QUESTION_TYPES.filter((t) => !POPULAR_TYPES.includes(t.type)),
+    [],
+  );
+
+  if (!open && mode !== 'inline') {
+    return (
+      <button type="button" className="aq-trigger" onClick={() => setOpen(true)}>
+        + Add a blank question
+        <style>{`
+          .aq-trigger {
+            align-self: flex-start;
+            padding: .5rem 1rem;
+            background: transparent;
+            border: 1px dashed var(--primary, #1e40af);
+            color: var(--primary, #1e40af);
+            border-radius: .375rem; cursor: pointer;
+            font-size: .8125rem; font-weight: 600;
+            margin-top: .5rem;
+          }
+          .aq-trigger:hover { background: rgba(37, 99, 235, .06); }
+        `}</style>
+      </button>
+    );
+  }
+
+  return (
+    <div className="aq-card">
+      <div className="aq-card-head">
+        <strong style={{ fontSize: '.8125rem' }}>Pick a question type</strong>
+        <button type="button" className="aq-cancel"
+          onClick={() => { setOpen(false); onCancel?.(); }}>
+          Cancel
+        </button>
+      </div>
+
+      <div className="aq-grid">
+        {popularItems.map((t) => (
+          <button key={t.type} type="button" className="aq-tile"
+            onClick={() => { onAdd(t.type); if (mode !== 'inline') setOpen(false); }}>
+            <strong>{t.label}</strong>
+            <span style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', marginTop: '.1rem' }}>{t.hint}</span>
+          </button>
+        ))}
+      </div>
+
+      {!showAll ? (
+        <button type="button" className="aq-more" onClick={() => setShowAll(true)}>
+          More types ({otherItems.length}) →
+        </button>
+      ) : (
+        <div className="aq-grid" style={{ marginTop: '.5rem' }}>
+          {otherItems.map((t) => (
+            <button key={t.type} type="button" className="aq-tile"
+              onClick={() => { onAdd(t.type); if (mode !== 'inline') setOpen(false); }}>
+              <strong>{t.label}</strong>
+              <span style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', marginTop: '.1rem' }}>{t.hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <style>{`
+        .aq-card {
+          border: 1px solid var(--border); border-radius: .5rem;
+          background: var(--card); padding: .75rem; margin: .25rem 0;
+        }
+        .aq-card-head {
+          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: .5rem;
+        }
+        .aq-cancel {
+          background: transparent; border: 0; cursor: pointer;
+          font-size: .75rem; color: var(--muted-foreground);
+        }
+        .aq-cancel:hover { color: var(--foreground); }
+        .aq-grid {
+          display: grid; gap: .375rem;
+          grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        }
+        .aq-tile {
+          text-align: left; padding: .5rem .625rem;
+          background: var(--background); border: 1px solid var(--border);
+          border-radius: .375rem; cursor: pointer;
+          display: flex; flex-direction: column;
+        }
+        .aq-tile:hover { border-color: var(--primary); background: white; }
+        .aq-more {
+          margin-top: .5rem;
+          background: transparent; border: 0; cursor: pointer;
+          font-size: .75rem; font-weight: 600; color: var(--primary, #1e40af);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Empty state for the Build tab ─────────────────────────────────────────
+// First thing the user sees when they create a new template. Pushes them
+// toward the preset gallery so they don't have to design a section from
+// scratch.
+function EmptyBuildState({ onPreset, onBlank }) {
+  return (
+    <div className="bld-empty-state">
+      <div className="bld-empty-head">
+        <h3>Start your checklist</h3>
+        <p className="muted-text">Pick a ready-made section, or start blank.</p>
+      </div>
+
+      <div className="bld-empty-presets">
+        {SECTION_PRESETS.slice(0, 6).map((p) => (
+          <button key={p.key} type="button" className="bld-preset-tile"
+            onClick={() => onPreset(p)}>
+            <span className="bld-preset-icon">{p.icon}</span>
+            <strong>{p.title}</strong>
+            <span className="bld-preset-desc">{p.description}</span>
+          </button>
+        ))}
+      </div>
+
+      <button type="button" className="bld-empty-blank" onClick={onBlank}>
+        Or, start with a blank section →
+      </button>
+
+      <style>{`
+        .bld-empty-state {
+          padding: 1.5rem;
+          background: var(--muted, #f8fafc);
+          border: 1px dashed var(--border);
+          border-radius: .5rem;
+        }
+        .bld-empty-head { text-align: center; margin-bottom: 1rem; }
+        .bld-empty-head h3 { margin: 0; font-size: 1rem; }
+        .bld-empty-head p { margin: .25rem 0 0; font-size: .8125rem; }
+        .bld-empty-presets {
+          display: grid; gap: .5rem;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        }
+        .bld-preset-tile {
+          display: flex; flex-direction: column; gap: .15rem;
+          padding: .625rem .75rem;
+          background: white; border: 1px solid var(--border);
+          border-radius: .375rem; text-align: left; cursor: pointer;
+          transition: border-color .12s, transform .12s;
+        }
+        .bld-preset-tile:hover {
+          border-color: var(--primary, #1e40af);
+          transform: translateY(-1px);
+        }
+        .bld-preset-icon { font-size: 1.1rem; line-height: 1; }
+        .bld-preset-tile strong { font-size: .8125rem; }
+        .bld-preset-desc { font-size: .7rem; color: var(--muted-foreground); }
+        .bld-empty-blank {
+          align-self: flex-start; margin-top: .75rem;
+          padding: .4rem .8rem; font-size: .8125rem; font-weight: 600;
+          background: transparent; color: var(--primary, #1e40af);
+          border: 0; cursor: pointer;
+        }
+        .bld-empty-blank:hover { text-decoration: underline; }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Preset bar at the top of the build tab (when not empty) ──────────────
+// Compact "add one of these" strip the user can click any time to drop in
+// another preset section.
+function SectionPresetBar({ onPreset }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="bld-preset-bar">
+      <button type="button" className="bld-preset-bar-toggle" onClick={() => setOpen((o) => !o)}>
+        ⚡ Add a ready-made section
+        <span style={{ marginLeft: '.4rem', fontSize: '.7rem', color: 'var(--muted-foreground)' }}>
+          {open ? '▾' : '▸'}
+        </span>
+      </button>
+      {open && (
+        <div className="bld-preset-bar-grid">
+          {SECTION_PRESETS.map((p) => (
+            <button key={p.key} type="button" className="bld-preset-tile"
+              onClick={() => { onPreset(p); setOpen(false); }}>
+              <span className="bld-preset-icon">{p.icon}</span>
+              <strong>{p.title}</strong>
+              <span className="bld-preset-desc">{p.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <style>{`
+        .bld-preset-bar {
+          padding: .5rem .625rem;
+          background: var(--muted, #f8fafc);
+          border: 1px solid var(--border); border-radius: .375rem;
+          margin-bottom: .5rem;
+        }
+        .bld-preset-bar-toggle {
+          width: 100%; text-align: left;
+          background: transparent; border: 0; cursor: pointer;
+          font-size: .8125rem; font-weight: 600;
+        }
+        .bld-preset-bar-grid {
+          display: grid; gap: .375rem; margin-top: .5rem;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── SectionCard — visual container for a section + its questions ────────
+// Replaces the old flat-list rendering. The section heading lives at the
+// top of the card with its owner picker prominently exposed; questions
+// live inside; a small "+ Add question" button at the bottom adds a new
+// question to this specific section.
+function SectionCard({
+  group,
+  onPatchQuestion,
+  onPatchQuestionConfig,
+  onMoveQuestion,
+  onRemoveQuestion,
+  onDuplicateQuestion,
+  onAddQuestion,
+  onRemoveSection,
+  totalCount,
+}) {
+  const heading = group.heading;
+  const items = group.items;
+  const [adding, setAdding] = useState(false);
+  // Sections start expanded — authors need to see what they're working on.
+  // The collapse chevron is for managing long templates with 8+ sections.
+  // The pre-section group (no heading) is never collapsible.
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div className="sc-card">
+      {/* Section header — only shown when there IS a section heading. The
+          "pre-section" group (questions before any heading) skips this. */}
+      {heading && (
+        <div className="sc-head">
+          {/* Collapse chevron — clicking it toggles the section body.
+              Kept separate from the title input so typing in the title
+              doesn't accidentally collapse the section. */}
+          <button
+            type="button"
+            className="sc-chev-btn"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-expanded={!collapsed}
+            title={collapsed ? 'Expand section' : 'Collapse section'}
+          >
+            <span className={'sc-chev' + (collapsed ? '' : ' open')}>▸</span>
+          </button>
+          <div className="sc-head-inputs">
+            <input
+              type="text"
+              className="sc-title-input"
+              value={heading.label || ''}
+              placeholder="Section name (e.g. Event basics)"
+              onChange={(e) => onPatchQuestion(group.headingIdx, { label: e.target.value })}
+            />
+            <select
+              className="sc-owner-select"
+              value={heading.section_owner_role ?? ''}
+              onChange={(e) => onPatchQuestion(group.headingIdx, { section_owner_role: e.target.value || null })}
+            >
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r.code || 'any'} value={r.code}>👤 {r.label}</option>
+              ))}
+            </select>
+          </div>
+          {collapsed && (
+            <span className="sc-count">{items.length} question{items.length === 1 ? '' : 's'}</span>
+          )}
+          <button type="button" className="sc-remove" onClick={onRemoveSection} title="Remove this section">
+            Remove section
+          </button>
+        </div>
+      )}
+
+      {/* Section body — questions inside */}
+      {!collapsed && (
+      <div className="sc-body">
+        {items.length === 0 && (
+          <div className="sc-empty">No questions yet. Add one below.</div>
+        )}
+        {items.map(({ q, idx }, i) => (
+          <QuestionEditor
+            key={q._draftId}
+            question={q}
+            index={idx}
+            count={totalCount}
+            onPatch={(p) => onPatchQuestion(idx, p)}
+            onPatchConfig={(p) => onPatchQuestionConfig(idx, p)}
+            onMove={(d) => onMoveQuestion(idx, d)}
+            onRemove={() => onRemoveQuestion(idx)}
+            onDuplicate={() => onDuplicateQuestion(idx)}
+          />
+        ))}
+
+        {/* Inline add-question — opens type picker without leaving the
+            section card. */}
+        {adding ? (
+          <AddQuestion
+            mode="inline"
+            onAdd={(type) => { onAddQuestion(type); setAdding(false); }}
+            onCancel={() => setAdding(false)}
+          />
+        ) : (
+          <button type="button" className="sc-add-q" onClick={() => setAdding(true)}>
+            + Add a question to this section
+          </button>
+        )}
+      </div>
+      )}
+
+      <style>{`
+        .sc-card {
+          background: var(--card, white);
+          border: 1px solid var(--border);
+          border-radius: .5rem;
+          overflow: hidden;
+        }
+        .sc-head {
+          display: flex; gap: .5rem; align-items: center;
+          padding: .625rem .75rem;
+          background: rgba(37, 99, 235, .05);
+          border-bottom: 1px solid var(--border);
+        }
+        .sc-chev-btn {
+          padding: .25rem .35rem; background: transparent; border: 0;
+          cursor: pointer; color: var(--muted-foreground);
+          border-radius: .25rem;
+        }
+        .sc-chev-btn:hover { background: rgba(37, 99, 235, .08); }
+        .sc-chev {
+          display: inline-block;
+          transition: transform .15s ease;
+          font-size: .85rem;
+        }
+        .sc-chev.open { transform: rotate(90deg); }
+        .sc-count {
+          padding: .15rem .55rem; border-radius: 999px;
+          background: white; border: 1px solid var(--border);
+          font-size: .7rem; font-weight: 600;
+          color: var(--muted-foreground);
+        }
+        .sc-head-inputs {
+          flex: 1; display: grid;
+          grid-template-columns: 1.6fr 1fr; gap: .375rem;
+          min-width: 0;
+        }
+        .sc-title-input {
+          padding: .4rem .55rem;
+          border: 1px solid transparent; background: transparent;
+          font-size: 1rem; font-weight: 700; color: var(--primary, #1e40af);
+          border-radius: .25rem;
+        }
+        .sc-title-input:hover, .sc-title-input:focus {
+          background: white; border-color: var(--border); outline: 0;
+        }
+        .sc-owner-select {
+          padding: .4rem .5rem;
+          border: 1px solid var(--border);
+          background: white;
+          border-radius: .25rem;
+          font-size: .8125rem; font-weight: 600;
+          color: var(--foreground);
+        }
+        .sc-remove {
+          padding: .3rem .55rem;
+          background: transparent; border: 1px solid transparent;
+          color: var(--muted-foreground);
+          font-size: .7rem; font-weight: 600;
+          border-radius: .25rem; cursor: pointer;
+        }
+        .sc-remove:hover {
+          color: var(--destructive, #b91c1c);
+          border-color: #fecaca;
+          background: #fef2f2;
+        }
+        .sc-body { padding: .75rem; display: flex; flex-direction: column; gap: 0; }
+        .sc-empty {
+          padding: .875rem; text-align: center;
+          background: var(--muted, #f8fafc);
+          border: 1px dashed var(--border); border-radius: .375rem;
+          font-size: .8rem; color: var(--muted-foreground);
+          margin-bottom: .5rem;
+        }
+        .sc-add-q {
+          align-self: flex-start;
+          padding: .4rem .8rem;
+          background: transparent;
+          border: 1px dashed var(--primary, #1e40af);
+          color: var(--primary, #1e40af);
+          font-size: .8125rem; font-weight: 600;
+          border-radius: .25rem; cursor: pointer;
+          margin-top: .25rem;
+        }
+        .sc-add-q:hover { background: rgba(37, 99, 235, .06); }
+      `}</style>
     </div>
   );
 }

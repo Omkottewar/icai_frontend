@@ -179,6 +179,45 @@ export default function InsightsStyles() {
       }
       .filter-reset:hover { filter: brightness(1.06); transform: translateY(-1px); }
 
+      /* ─── Tabbed sections (view mode) ───────────────────────────────── */
+      .insights-tabbed { display: flex; flex-direction: column; gap: 1rem; }
+      .insights-tabs {
+        position: sticky; top: 72px; z-index: 30;
+        display: flex; gap: .25rem;
+        padding: .25rem;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(15,23,42,.03);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .insights-tabs::-webkit-scrollbar { display: none; }
+      .insights-tab {
+        display: inline-flex; align-items: center; gap: .4rem;
+        white-space: nowrap; cursor: pointer;
+        height: 34px; padding: 0 .85rem;
+        border: 0; border-radius: 9px;
+        background: transparent;
+        color: var(--muted-foreground);
+        font-size: 13px; font-weight: 600;
+        transition: background .15s, color .15s;
+      }
+      .insights-tab:hover { color: var(--foreground); background: var(--muted); }
+      .insights-tab.is-active {
+        background: oklch(0.36 0.13 255 / .10);
+        color: var(--primary);
+      }
+      .insights-tab-count {
+        font-size: 10px; font-weight: 700; line-height: 1;
+        padding: .15rem .4rem; border-radius: 999px;
+        background: var(--muted); color: var(--muted-foreground);
+        font-variant-numeric: tabular-nums;
+      }
+      .insights-tab.is-active .insights-tab-count {
+        background: oklch(0.36 0.13 255 / .16); color: var(--primary);
+      }
+
       /* ─── Section header (numbered, dashed bottom border) ───────────── */
       .insights-section {
         display: flex; align-items: center; justify-content: space-between;
@@ -543,9 +582,297 @@ export default function InsightsStyles() {
         text-align: left;
       }
 
+      /* ─── Customizable widget grid ─────────────────────────────────── */
+      .widget-grid {
+        display: grid; gap: .75rem;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        align-items: stretch;
+      }
+      .widget-cell {
+        position: relative; min-width: 0;
+        display: flex; flex-direction: column;
+        grid-column: span 12;
+        transition: transform .2s ease, opacity .2s ease, box-shadow .2s ease;
+      }
+      .widget-cell.is-sm { grid-column: span 6; }   /* 2-up on small */
+      .widget-cell.is-md { grid-column: span 12; }
+      .widget-cell.is-lg { grid-column: span 12; }
+      @media (min-width: 760px) {
+        .widget-cell.is-sm { grid-column: span 4; }  /* 3-up on tablet */
+        .widget-cell.is-md { grid-column: span 6; }
+      }
+      @media (min-width: 1100px) {
+        .widget-cell.is-sm { grid-column: span 3; }  /* 4-up on desktop */
+        .widget-cell.is-md { grid-column: span 6; }
+        .widget-cell.is-lg { grid-column: span 12; }
+      }
+      .widget-cell .widget-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      .widget-cell .widget-body > * { flex: 1; }
+
+      /* In edit mode every widget gets dashed chrome to signal it's draggable */
+      .widget-grid[data-editing="true"] .widget-cell {
+        cursor: grab;
+        outline: 2px dashed transparent;
+        outline-offset: 4px;
+        border-radius: 14px;
+      }
+      .widget-grid[data-editing="true"] .widget-cell:hover {
+        outline-color: oklch(0.36 0.13 255 / .35);
+      }
+      .widget-cell.is-dragging {
+        opacity: .35; cursor: grabbing;
+      }
+      .widget-cell.is-drop-target::before {
+        content: ''; position: absolute; inset: -6px;
+        border-radius: 16px;
+        background: oklch(0.36 0.13 255 / .08);
+        outline: 2px solid var(--primary);
+        outline-offset: 0;
+        pointer-events: none;
+        z-index: 0;
+      }
+      /* Disable child interactivity while dragging so dropping doesn't accidentally
+         trigger a click on a chart or KPI tile. */
+      .widget-grid[data-editing="true"] .widget-cell .widget-body { pointer-events: none; }
+      .widget-grid[data-editing="true"] .widget-cell .widget-body * { user-select: none; }
+
+      .widget-chrome {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: .5rem;
+        padding: .35rem .5rem .5rem;
+        margin-bottom: -.25rem;
+        font-size: 11px;
+      }
+      .widget-chrome-left {
+        display: inline-flex; align-items: center; gap: .4rem; min-width: 0;
+      }
+      .widget-handle {
+        display: inline-grid; place-items: center;
+        width: 18px; height: 18px; border-radius: 5px;
+        background: oklch(0.36 0.13 255 / .12);
+        color: var(--primary);
+        font-size: 13px; line-height: 1; cursor: grab;
+      }
+      .widget-chrome-title {
+        font-size: 10.5px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .07em;
+        color: var(--muted-foreground);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .widget-chrome-right {
+        display: inline-flex; align-items: center; gap: .35rem;
+      }
+      .size-toggle {
+        display: inline-flex; align-items: center;
+        background: var(--muted);
+        border-radius: 7px;
+        padding: 2px;
+      }
+      .size-toggle-btn {
+        appearance: none; border: 0;
+        background: transparent;
+        height: 20px; padding: 0 .4rem;
+        font-size: 10px; font-weight: 700;
+        letter-spacing: .06em;
+        color: var(--muted-foreground);
+        cursor: pointer;
+        border-radius: 5px;
+        transition: background .15s, color .15s;
+      }
+      .size-toggle-btn:hover { color: var(--foreground); }
+      .size-toggle-btn.is-active {
+        background: #fff;
+        color: var(--primary);
+        box-shadow: 0 1px 2px rgba(15,23,42,.08);
+      }
+      .widget-remove {
+        appearance: none; border: 0; cursor: pointer;
+        width: 22px; height: 22px; border-radius: 6px;
+        display: grid; place-items: center;
+        background: transparent;
+        color: var(--muted-foreground);
+        font-size: 13px; line-height: 1;
+        transition: background .15s, color .15s;
+      }
+      .widget-remove:hover {
+        background: oklch(0.577 0.245 27.325 / .10);
+        color: var(--destructive);
+      }
+
+      /* ─── Edit-mode toolbar (floats at viewport bottom — Notion/Linear
+             pattern; avoids fighting with the site Header for top:0) ────── */
+      .edit-toolbar {
+        position: fixed; left: 50%; bottom: 1.25rem;
+        transform: translateX(-50%);
+        z-index: 55;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 1rem;
+        max-width: calc(100vw - 2rem); width: min(960px, calc(100vw - 2rem));
+        padding: .55rem .8rem .55rem 1rem;
+        background: linear-gradient(135deg, oklch(0.36 0.13 255 / .98), oklch(0.30 0.16 260 / .98));
+        color: #fff;
+        border-radius: 999px;
+        box-shadow: 0 20px 40px -12px rgba(15,23,42,.45),
+                    0 4px 12px -4px rgba(15,23,42,.25);
+        animation: editToolbarIn .3s cubic-bezier(.32,.72,0,1);
+      }
+      @keyframes editToolbarIn {
+        from { opacity: 0; transform: translate(-50%, 20px); }
+        to   { opacity: 1; transform: translate(-50%, 0); }
+      }
+      /* Add breathing room at the bottom of the page so the floating bar
+         doesn't sit on top of the footer text. */
+      .insights-page[data-editing="true"] .insights-footer { margin-bottom: 5rem; }
+      .edit-toolbar-left { display: inline-flex; flex-direction: column; gap: .15rem; min-width: 0; }
+      .edit-toolbar-eyebrow {
+        font-size: 10px; font-weight: 800; letter-spacing: .08em;
+      }
+      .edit-toolbar-hint {
+        font-size: 11px; color: rgba(255,255,255,.78);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      }
+      .edit-toolbar-right { display: inline-flex; align-items: center; gap: .4rem; }
+      .edit-toolbar .d-btn {
+        background: rgba(255,255,255,.14);
+        color: #fff;
+        border-color: rgba(255,255,255,.18);
+      }
+      .edit-toolbar .d-btn:hover {
+        background: rgba(255,255,255,.22);
+        border-color: rgba(255,255,255,.32);
+      }
+      .edit-toolbar .d-btn-ghost {
+        background: transparent; border-color: rgba(255,255,255,.18);
+      }
+      .edit-toolbar .d-btn-primary {
+        background: #fff; color: var(--primary);
+        border-color: transparent;
+        font-weight: 700;
+      }
+      .edit-toolbar .d-btn-primary:hover { background: oklch(0.96 0.01 240); }
+      .edit-toolbar .d-btn-primary:disabled {
+        background: rgba(255,255,255,.55); color: rgba(255,255,255,.85);
+      }
+      .edit-toolbar-pill {
+        margin-left: .25rem;
+        display: inline-flex; align-items: center; justify-content: center;
+        min-width: 18px; height: 18px; padding: 0 .35rem;
+        background: rgba(255,255,255,.22);
+        border-radius: 999px;
+        font-size: 10px; font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      @media (max-width: 720px) {
+        .edit-toolbar-hint { display: none; }
+        .edit-toolbar {
+          padding: .55rem .75rem;
+          width: calc(100vw - 1rem);
+          bottom: .75rem;
+          border-radius: 14px;
+          gap: .5rem;
+        }
+        .edit-toolbar-eyebrow { font-size: 9px; }
+      }
+
+      /* ─── Add-widget picker overlay ────────────────────────────────── */
+      .picker-overlay {
+        position: fixed; inset: 0; z-index: 60;
+        background: rgba(15,23,42,.45);
+        backdrop-filter: blur(4px);
+        display: flex; align-items: flex-start; justify-content: center;
+        padding: 4rem 1rem 1rem;
+        animation: pickerFadeIn .2s ease;
+      }
+      @keyframes pickerFadeIn { from { opacity: 0; } to { opacity: 1; } }
+      .picker-panel {
+        width: 100%; max-width: 760px;
+        background: var(--card);
+        border-radius: 16px;
+        box-shadow: 0 30px 60px -20px rgba(15,23,42,.4);
+        overflow: hidden;
+        animation: pickerSlideIn .25s cubic-bezier(.32,.72,0,1);
+      }
+      @keyframes pickerSlideIn {
+        from { opacity: 0; transform: translateY(-12px) scale(.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .picker-head {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 1rem;
+        padding: 1.1rem 1.25rem .8rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .picker-eyebrow {
+        font-size: 10px; font-weight: 800; letter-spacing: .08em;
+        color: var(--primary); text-transform: uppercase;
+      }
+      .picker-title { margin: .25rem 0 .15rem; font-size: 17px; font-weight: 700; }
+      .picker-sub { margin: 0; font-size: 12px; color: var(--muted-foreground); }
+      .picker-close {
+        appearance: none; border: 0; cursor: pointer;
+        width: 32px; height: 32px; border-radius: 999px;
+        background: var(--muted);
+        color: var(--muted-foreground);
+        font-size: 14px; line-height: 1;
+        display: grid; place-items: center;
+        transition: background .15s, color .15s;
+      }
+      .picker-close:hover { background: oklch(0.577 0.245 27.325 / .10); color: var(--destructive); }
+      .picker-empty {
+        padding: 2rem; text-align: center;
+        font-size: 13px; color: var(--muted-foreground);
+        margin: 0;
+      }
+      .picker-groups {
+        max-height: 60vh; overflow-y: auto;
+        padding: 1rem 1.25rem 1.25rem;
+        display: flex; flex-direction: column; gap: 1.25rem;
+      }
+      .picker-group-title {
+        margin: 0 0 .5rem;
+        font-size: 10px; font-weight: 800; letter-spacing: .08em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+      }
+      .picker-grid {
+        display: grid; gap: .6rem;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      }
+      .picker-card {
+        text-align: left; cursor: pointer;
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: .65rem .75rem;
+        display: flex; flex-direction: column; gap: .25rem;
+        transition: transform .18s, border-color .18s, box-shadow .18s;
+        color: var(--foreground);
+      }
+      .picker-card:hover {
+        transform: translateY(-2px);
+        border-color: oklch(0.36 0.13 255 / .40);
+        box-shadow: 0 8px 18px -10px rgba(54,34,255,.35);
+      }
+      .picker-card-head {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: .5rem;
+      }
+      .picker-card-title { font-size: 13px; font-weight: 700; }
+      .picker-card-size {
+        font-size: 9.5px; font-weight: 800; letter-spacing: .07em;
+        padding: .1rem .35rem; border-radius: 999px;
+        background: oklch(0.36 0.13 255 / .10);
+        color: var(--primary);
+      }
+      .picker-card-desc {
+        font-size: 11.5px; color: var(--muted-foreground);
+        line-height: 1.35;
+      }
+
       /* ─── Reduced motion ───────────────────────────────────────────── */
       @media (prefers-reduced-motion: reduce) {
-        .kpi-tile, .insights-drill, .filter-reset, .insights-live .dot, .d-btn .spin, .approval-row {
+        .kpi-tile, .insights-drill, .filter-reset, .insights-live .dot, .d-btn .spin, .approval-row,
+        .picker-panel, .picker-overlay, .widget-cell {
           transition: none !important; animation: none !important;
         }
       }
