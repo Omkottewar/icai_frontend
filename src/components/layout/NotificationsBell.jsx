@@ -21,7 +21,9 @@ function relativeTime(iso) {
 export default function NotificationsBell() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [panelTop, setPanelTop] = useState(60); // px, used only when fixed-positioned on mobile
   const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
 
   // Hook is enabled only when the user is signed in — anonymous visitors
   // shouldn't be hitting /api/notifications.
@@ -34,6 +36,24 @@ export default function NotificationsBell() {
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  // When opening on a narrow viewport the panel is fixed-positioned (see
+  // CSS below). Anchor its top to the bottom of the bell trigger so it
+  // hugs the sticky header regardless of how tall the header has rendered.
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const r = triggerRef.current?.getBoundingClientRect();
+      if (r) setPanelTop(Math.max(8, Math.round(r.bottom + 8)));
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
   }, [open]);
 
   if (!user) return null;
@@ -50,6 +70,7 @@ export default function NotificationsBell() {
   return (
     <div ref={wrapRef} style={{ position: 'relative' }}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notifications${unread > 0 ? ` (${unread} unread)` : ''}`}
@@ -62,7 +83,7 @@ export default function NotificationsBell() {
       </button>
 
       {open && (
-        <div className="bell-panel">
+        <div className="bell-panel" style={{ '--bell-panel-top': `${panelTop}px` }}>
           <div className="bell-panel-head">
             <strong style={{ fontSize: '.875rem' }}>Notifications</strong>
             {unread > 0 && (
@@ -120,6 +141,21 @@ export default function NotificationsBell() {
           border: 1px solid var(--border, rgba(0,0,0,.1));
           border-radius: .5rem; box-shadow: 0 8px 32px rgba(0,0,0,.18);
           display: flex; flex-direction: column; z-index: 60;
+        }
+        /* On phones the bell isn't at the viewport edge (avatar + hamburger
+           sit to its right), so anchoring the 22rem panel to the bell's
+           right would clip off-screen on the left. Pin it to the viewport
+           instead and let it span almost edge-to-edge. */
+        @media (max-width: 640px) {
+          .bell-panel {
+            position: fixed;
+            top: var(--bell-panel-top, 3.75rem);
+            left: .5rem;
+            right: .5rem;
+            width: auto;
+            max-width: none;
+            max-height: 70vh;
+          }
         }
         .bell-panel-head {
           display: flex; justify-content: space-between; align-items: center;
