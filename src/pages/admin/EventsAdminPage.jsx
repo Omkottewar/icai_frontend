@@ -48,6 +48,14 @@ const EMPTY_FORM = {
   banner_url: '',
 };
 
+// Banner uploads can be image OR video. The file endpoint stores the
+// original extension, so detecting from the URL is reliable enough to
+// pick between <img> and <video>. We accept the same MIMEs server-side.
+function isVideoUrl(url) {
+  if (typeof url !== 'string') return false;
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
+}
+
 function toLocalInput(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -284,8 +292,13 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
 
   const onUpload = async (file) => {
     if (!file) return;
-    if (file.size > 6 * 1024 * 1024) {
-      showToast?.('File too large (max 6 MB)', 'error');
+    // Per-type size cap mirrors the backend (admin/files.ts): images 6 MB,
+    // videos 30 MB. Catching it client-side avoids a slow base64 + upload
+    // round-trip just to be rejected.
+    const isVideo = (file.type || '').startsWith('video/');
+    const cap = isVideo ? 30 * 1024 * 1024 : 6 * 1024 * 1024;
+    if (file.size > cap) {
+      showToast?.(`File too large (max ${isVideo ? 30 : 6} MB)`, 'error');
       return;
     }
     setUploading(true);
@@ -302,7 +315,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
       });
       set('banner_id', r.id);
       set('banner_url', r.url);
-      showToast?.('Banner uploaded', 'success');
+      showToast?.(isVideo ? 'Video uploaded' : 'Image uploaded', 'success');
     } catch (e) {
       showToast?.(e.message || 'Upload failed', 'error');
     } finally {
@@ -573,13 +586,22 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
           {stepIdx === 2 && (<>
           <Section title="Banner">
             <div className="row gap-3" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
-              {form.banner_url && (
+              {form.banner_url && (isVideoUrl(form.banner_url) ? (
+                <video
+                  src={form.banner_url}
+                  controls
+                  muted
+                  playsInline
+                  style={{ width: 240, height: 135, objectFit: 'cover', borderRadius: '.375rem', border: '1px solid var(--border)', background: '#000' }}
+                />
+              ) : (
                 <img src={form.banner_url} alt="banner" style={{ width: 160, height: 100, objectFit: 'cover', borderRadius: '.375rem', border: '1px solid var(--border)' }} />
-              )}
+              ))}
               <label className="btn btn-outline" style={{ padding: '.5rem 1rem', cursor: uploading ? 'wait' : 'pointer' }}>
-                {uploading ? 'Uploading…' : (form.banner_url ? 'Replace banner' : 'Upload banner')}
+                {uploading ? 'Uploading…' : (form.banner_url ? 'Replace' : 'Upload image or video')}
                 <input
-                  type="file" accept="image/jpeg,image/png,image/webp"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
                   style={{ display: 'none' }}
                   disabled={uploading}
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ''; }}
@@ -589,7 +611,9 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
                 <button type="button" className="btn btn-outline" onClick={() => { set('banner_id', ''); set('banner_url', ''); }} style={{ padding: '.5rem 1rem' }}>Remove</button>
               )}
             </div>
-            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>JPEG / PNG / WebP. Max 6 MB.</div>
+            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
+              Images (JPEG / PNG / WebP / GIF) up to 6 MB · Videos (MP4 / WebM / MOV) up to 30 MB.
+            </div>
           </Section>
 
           <Section title="Highlights">
