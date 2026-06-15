@@ -193,7 +193,7 @@ export default function EventsPage() {
         <div className="row" style={{ marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>
             <div className="tiny-eyebrow">EVENTS</div>
-            <h2 style={{ marginTop: '.25rem', fontSize: '1.875rem', fontWeight: 700 }}>Upcoming programmes and committees</h2>
+            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.375rem, 4.5vw, 1.875rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>Upcoming programmes and committees</h2>
           </div>
           <div className="muted-text" style={{ fontSize: '.8125rem' }}>{audienceFiltered.length} programme{audienceFiltered.length !== 1 ? 's' : ''} scheduled</div>
         </div>
@@ -212,7 +212,7 @@ export default function EventsPage() {
       <section className="container" style={{ padding: '0 1rem 4rem', borderTop: '1px solid var(--border)', marginTop: '1rem', paddingTop: '3rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
           <div className="tiny-eyebrow">BROWSE BY COMMITTEE</div>
-          <h2 style={{ marginTop: '.25rem', fontSize: '1.875rem', fontWeight: 700 }}>Committee categories</h2>
+          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.375rem, 4.5vw, 1.875rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>Committee categories</h2>
           <p className="muted-text" style={{ marginTop: '.5rem', maxWidth: '40rem' }}>
             Select a committee to open its dedicated page with every upcoming event.
           </p>

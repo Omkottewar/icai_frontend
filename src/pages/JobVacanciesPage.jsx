@@ -64,7 +64,7 @@ export default function JobVacanciesPage() {
 
         <div style={{ marginBottom: '1.5rem' }}>
           <div className="tiny-eyebrow">{isArticleship ? 'For CA Students' : 'For CA Members'}</div>
-          <h2 style={{ marginTop: '.25rem', fontSize: '1.5rem', fontWeight: 700 }}>
+          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
             {isArticleship ? 'Articleship Vacancies' : 'Member Job Vacancies'}
           </h2>
           <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>

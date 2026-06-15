@@ -16,6 +16,12 @@ export default defineConfig({
     //   - PWA disabled in dev so the SW doesn't interfere with HMR. Enable
     //     with `devOptions.enabled: true` if you ever need to debug it locally.
     VitePWA({
+      // injectManifest lets us own the service worker (src/sw.js) so we can
+      // add `push` + `notificationclick` listeners alongside Workbox's
+      // precaching. The default 'generateSW' strategy doesn't expose those.
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
@@ -35,10 +41,8 @@ export default defineConfig({
           { src: 'pwa-512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        // Don't cache /api or /uploads — they need to hit the network.
-        // The shell (HTML/JS/CSS/icons) is precached automatically.
-        navigateFallbackDenylist: [/^\/api/, /^\/uploads/, /^\/ws/],
+      injectManifest: {
+        // Don't bother precaching /api or /uploads — they need to hit network.
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
     }),

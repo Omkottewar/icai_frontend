@@ -27,6 +27,30 @@
 
 * { box-sizing: border-box; }
 
+/* Root font-size scales with viewport so every rem-based size (headings,
+   padding, gaps, button heights) shrinks proportionally on phones. This is
+   the load-bearing piece of the mobile-responsive design — keep it.
+   Scale is intentionally gentle so .875rem body copy stays ≥12px even on
+   the smallest screens, while big inline headings shrink visibly. */
+html {
+  font-size: 16px;
+}
+@media (max-width: 900px) {
+  html { font-size: 15.5px; }
+}
+@media (max-width: 768px) {
+  html { font-size: 15px; }
+}
+@media (max-width: 640px) {
+  html { font-size: 14.5px; }
+}
+@media (max-width: 480px) {
+  html { font-size: 14px; }
+}
+@media (max-width: 380px) {
+  html { font-size: 13.5px; }
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
@@ -36,7 +60,16 @@ html, body, #root {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Prevent iOS zoom-on-focus from inflating form fields */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
+
+/* Block horizontal scroll caused by any rogue full-width element on mobile */
+html, body { overflow-x: hidden; }
+
+/* Media defaults — keep images/videos from blowing out narrow viewports */
+img, video, svg { max-width: 100%; height: auto; }
 
 a { color: inherit; text-decoration: none; }
 button { font-family: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
@@ -1154,4 +1187,147 @@ input, select, textarea { font-family: inherit; }
 .hero-carousel-dot.is-active {
   background: white;
   width: 1.4rem;
+}
+
+/* ============================================================
+   Mobile responsive overrides (≤640px)
+   Keeps shared components readable and proportioned on phones.
+   NOTE: This runs on top of the html { font-size } scaling above,
+   so most rem-based sizes already shrink automatically — these
+   rules just trim a few spots where uniform scaling isn't enough.
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Tighter page gutters */
+  .container { padding-inline: .875rem; }
+
+  /* Cards: less generous padding so content isn't crushed */
+  .card { padding: 1.125rem; border-radius: .625rem; }
+
+  /* Buttons: keep tap target but a touch tighter horizontally */
+  .btn { padding: .55rem .9rem; font-size: .8125rem; }
+
+  /* Dashboard stat cards */
+  .stat-card { padding: 1rem; }
+  .stat-num { font-size: 1.5rem; }
+  .stat-label { font-size: .75rem; }
+
+  /* Section eyebrow stays at .75rem — fine on mobile */
+
+  /* Feature cards (Services, Knowledge Hub on Home) */
+  .feature-card { padding: 1.25rem !important; }
+  .feature-card h3 { font-size: 1.0625rem !important; line-height: 1.3; }
+  .feature-card .icon-tile { width: 2.4rem; height: 2.4rem; }
+
+  /* Committee category cards */
+  .cat-card {
+    min-height: 9.25rem;
+    padding: 1.05rem 1rem .95rem;
+    gap: .35rem;
+  }
+  .cat-card-title { font-size: 1rem; }
+  .cat-card-next { font-size: .75rem; }
+  .cat-card-cta { font-size: .8125rem; }
+
+  /* Event accordion */
+  .event-acc-head { padding: .85rem 1rem; gap: .65rem; }
+  .event-acc-title { font-size: .9375rem; line-height: 1.3; }
+  .event-acc-committee { font-size: .75rem; }
+  .event-acc-date { font-size: .8125rem; }
+  .event-acc-right { gap: .55rem; }
+  .event-acc-chevron { width: 1.65rem; height: 1.65rem; }
+  .event-acc-meta { margin: 0 1rem; font-size: .75rem; gap: .45rem 1rem; }
+  .event-acc-cta { margin: 0 1rem 1rem; font-size: .75rem; }
+  .event-acc-detail { padding: 1rem; gap: 1rem; }
+  .event-acc-highlights li { font-size: .8125rem; line-height: 1.45; }
+  .event-acc-footer { gap: .75rem; margin-top: .85rem; padding-top: .85rem; }
+  .event-acc-speaker img { width: 2.25rem; height: 2.25rem; }
+  .event-acc-speaker-name { font-size: .8125rem; }
+
+  /* Committee panel (detail page header) */
+  .committee-panel { border-radius: .75rem; margin-bottom: 1.5rem; }
+  .committee-panel-img { min-height: 160px; aspect-ratio: 16/9; }
+  .committee-panel-body { padding: 1.125rem; }
+  .committee-panel-title { margin-top: .5rem; line-height: 1.2; }
+  .committee-panel-desc { font-size: .875rem; line-height: 1.55; }
+  .committee-panel-stat { font-size: .75rem; margin-top: .85rem; }
+
+  /* Hero carousel — caption + arrows scale down */
+  .hero-carousel-caption {
+    left: .65rem;
+    bottom: 2rem;
+    padding: .3rem .55rem;
+    font-size: .75rem;
+  }
+  .hero-carousel-arrow {
+    width: 1.85rem;
+    height: 1.85rem;
+  }
+  .hero-carousel-arrow-prev { left: .5rem; }
+  .hero-carousel-arrow-next { right: .5rem; }
+
+  /* Wicasa student-wing card */
+  .wicasa-subhead { margin-top: 1.1rem; margin-bottom: .65rem; font-size: .6875rem; }
+  .wicasa-updates li { font-size: .8125rem; }
+  .wicasa-suggestions li { padding: .55rem .55rem .55rem .75rem; gap: .55rem; }
+  .wicasa-sugg-text { font-size: .75rem; }
+  .wicasa-upvote-pill { padding: .3rem .6rem .3rem .5rem; font-size: .75rem; }
+  .wicasa-resources { margin-top: 1.1rem; font-size: .75rem; }
+
+  /* Room booking page */
+  .room-card { padding: .9rem; }
+  .room-grid { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .65rem; }
+  .slot-grid { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .55rem; }
+  .slot-chip { padding: .65rem .75rem; font-size: .8125rem; }
+  .date-chip { min-width: 3.5rem; padding: .5rem .4rem; }
+  .booking-summary { position: static; }
+
+  /* Auth */
+  .auth-form-wrap { padding: 1.25rem 1rem; }
+  .auth-tabs { margin-bottom: 1.1rem; }
+  .auth-side { padding: 1.5rem; }
+
+  /* OTP cells a bit smaller on narrow screens */
+  .otp-grid { gap: .35rem; }
+  .otp-cell { font-size: 1.05rem; padding: .6rem 0; }
+
+  /* Toasts hug the screen edge less aggressively */
+  .toast { right: .75rem; bottom: .75rem; left: .75rem; }
+
+  /* Avatar dropdown menu fits narrow viewports */
+  .avatar-menu { width: 13rem; }
+
+  /* Icon tiles */
+  .icon-tile { width: 2.4rem; height: 2.4rem; }
+
+  /* Generic safety nets so anything not explicitly tuned still
+     stays inside the viewport on phones. */
+  h1 { font-size: clamp(1.25rem, 6vw, 1.75rem); line-height: 1.2; word-wrap: break-word; }
+  h2 { font-size: clamp(1.125rem, 5.2vw, 1.5rem); line-height: 1.25; word-wrap: break-word; }
+  h3 { font-size: clamp(1rem, 4.4vw, 1.25rem); line-height: 1.3; word-wrap: break-word; }
+  p, li, label, input, select, textarea { word-wrap: break-word; }
+
+  /* Tables should scroll horizontally rather than overflow the page */
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { max-width: 100%; }
+}
+
+/* Slightly larger phones / small tablets — only soften the most painful items */
+@media (min-width: 641px) and (max-width: 768px) {
+  .container { padding-inline: 1rem; }
+  .feature-card { padding: 1.5rem !important; }
+  .stat-num { font-size: 1.65rem; }
+  .event-acc-title { font-size: .9375rem; }
+  .committee-panel-body { padding: 1.25rem; }
+}
+
+/* Very narrow phones (≤380px): one more notch of breathing room */
+@media (max-width: 380px) {
+  .container { padding-inline: .75rem; }
+  .btn { padding: .5rem .8rem; font-size: .8125rem; }
+  .cat-card { padding: 1rem .9rem .9rem; }
+  .feature-card { padding: 1.1rem !important; }
+  .event-acc-head { padding: .8rem .9rem; }
+  .event-acc-meta { margin: 0 .9rem; }
+  .event-acc-cta { margin: 0 .9rem .9rem; }
+  .committee-panel-body { padding: 1rem; }
 }

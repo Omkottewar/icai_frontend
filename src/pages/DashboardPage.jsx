@@ -7,6 +7,7 @@ import { navigate } from '../hooks/useRoute';
 import StatCard from '../components/ui/StatCard';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
+import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
 import InsightsStyles from '../components/dashboard/insights/insightsStyles';
 import Sparkline from '../components/dashboard/insights/Sparkline';
 import {
@@ -85,7 +86,7 @@ export default function DashboardPage() {
       <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: '1fr', alignItems: 'start' }} data-dash-header>
         <div>
           <div className="tiny-eyebrow">My Account</div>
-          <h1 style={{ marginTop: '.15rem', fontSize: '1.5rem', fontWeight: 700 }}>
+          <h1 style={{ marginTop: '.15rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
             Welcome back, {user.name.split(' ')[0]}
           </h1>
           <p className="muted-text" style={{ marginTop: '.15rem', fontSize: '.875rem' }}>
@@ -282,6 +283,8 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
+
+          <NotificationSettingsCard />
         </div>
       </div>
 

@@ -29,6 +29,7 @@ import PhotoGalleryPage from '../pages/PhotoGalleryPage';
 import JobVacanciesPage from '../pages/JobVacanciesPage';
 import MembersDirectoryPage from '../pages/MembersDirectoryPage';
 import RoomBookingPage from '../pages/RoomBookingPage';
+import TrackGrievancePage from '../pages/TrackGrievancePage';
 import PrayGyaanWidget from '../components/ui/PrayGyaanWidget';
 
 import RequireAdmin from '../components/admin/RequireAdmin';
@@ -44,6 +45,13 @@ import ComingSoonPage from '../pages/admin/ComingSoonPage';
 import JobPostingsAdminPage from '../pages/admin/JobPostingsAdminPage';
 import ChecklistTemplatesAdminPage from '../pages/admin/ChecklistTemplatesAdminPage';
 import ApprovalsAdminPage from '../pages/admin/ApprovalsAdminPage';
+import PaperPresentationsAdminPage from '../pages/admin/PaperPresentationsAdminPage';
+import NewslettersAdminPage from '../pages/admin/NewslettersAdminPage';
+import GalleryAlbumsAdminPage from '../pages/admin/GalleryAlbumsAdminPage';
+import OfficeBearersAdminPage from '../pages/admin/OfficeBearersAdminPage';
+import AnnualReportsAdminPage from '../pages/admin/AnnualReportsAdminPage';
+import GrievancesAdminPage from '../pages/admin/GrievancesAdminPage';
+import GrievanceRoutesAdminPage from '../pages/admin/GrievanceRoutesAdminPage';
 
 import RequireEmployer from '../components/employer/RequireEmployer';
 import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
@@ -76,6 +84,7 @@ const ROUTES = {
   '/job-vacancies': JobVacanciesPage,
   '/members-directory': MembersDirectoryPage,
   '/book-room': RoomBookingPage,
+  '/track-grievance': TrackGrievancePage,
 };
 
 // Admin routes. Each is wrapped in <RequireAdmin> at render time. Placeholder
@@ -98,6 +107,14 @@ const ADMIN_ROUTES = {
   '/admin/cabf': () => <ComingSoonPage title="CABF requests" description="Review CA Benevolent Fund assistance requests, approve disbursements, track audit trail." />,
   '/admin/payments': () => <ComingSoonPage title="Payments" description="Read-only view of payments with refunds, disputes, and invoices." />,
   '/admin/files': () => <ComingSoonPage title="Files" description="Browse uploaded banners, certificates, and other assets." />,
+  // ─── Branch content (Resources page, Gallery, About page) ───
+  '/admin/paper-presentations': PaperPresentationsAdminPage,
+  '/admin/newsletters':         NewslettersAdminPage,
+  '/admin/gallery':             GalleryAlbumsAdminPage,
+  '/admin/office-bearers':      OfficeBearersAdminPage,
+  '/admin/annual-reports':      AnnualReportsAdminPage,
+  '/admin/grievances':          GrievancesAdminPage,
+  '/admin/grievance-routes':    GrievanceRoutesAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);

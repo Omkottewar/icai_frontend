@@ -97,7 +97,7 @@ export default function HomePage() {
         minHeight: 'calc(100vh - var(--header-h, 104px))',
         display: 'flex',
         alignItems: 'center',
-        padding: '3rem 0',
+        padding: 'clamp(2rem, 6vw, 3rem) 0',
       }}>
         {/* Background image + readability overlay */}
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
@@ -144,11 +144,11 @@ export default function HomePage() {
               {!user && <a href="#/signup" className="btn btn-outline">Create account <IconArrowRight size="sm" /></a>}
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(.6rem, 2vw, 1rem)' }}>
             {(heroStats.stats || []).map((s, i) => (
-              <div key={s.v || i} style={{ padding: '1.5rem', border: '1px solid var(--border)', background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: '.75rem', boxShadow: '0 10px 24px -16px rgba(11,61,145,.25)' }}>
-                <div style={{ fontSize: '1.875rem', fontWeight: 700 }}>{s.k}</div>
-                <div style={{ marginTop: '.25rem', fontSize: '.875rem', opacity: .75 }}>{s.v}</div>
+              <div key={s.v || i} style={{ padding: 'clamp(.9rem, 3vw, 1.5rem)', border: '1px solid var(--border)', background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: '.75rem', boxShadow: '0 10px 24px -16px rgba(11,61,145,.25)' }}>
+                <div style={{ fontSize: 'clamp(1.25rem, 4vw, 1.875rem)', fontWeight: 700, lineHeight: 1.1 }}>{s.k}</div>
+                <div style={{ marginTop: '.25rem', fontSize: 'clamp(.75rem, 2vw, .875rem)', opacity: .75, lineHeight: 1.35 }}>{s.v}</div>
               </div>
             ))}
           </div>
@@ -157,8 +157,8 @@ export default function HomePage() {
       </section>
 
       {/* Leadership banner — "Nurturing excellence" */}
-      <section className="container" style={{ padding: '7rem 1rem' }}>
-        <div style={{ display: 'grid', gap: '3.5rem', gridTemplateColumns: '1fr', alignItems: 'center' }} data-leadership-grid>
+      <section className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
+        <div style={{ display: 'grid', gap: 'clamp(2rem, 5vw, 3.5rem)', gridTemplateColumns: '1fr', alignItems: 'center' }} data-leadership-grid>
           <div>
             <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>{leadership.eyebrow}</div>
             <h2 style={{ marginTop: '1rem', fontSize: 'clamp(2.125rem, 4.5vw, 3rem)', fontWeight: 700, lineHeight: 1.05, color: 'var(--primary)', letterSpacing: '-.01em', whiteSpace: 'pre-line' }}>
@@ -190,8 +190,8 @@ export default function HomePage() {
 
       {/* Chairperson — "From the Chairman's Desk" */}
       <section style={{ borderTop: '1px solid var(--border)', background: 'oklch(0.98 0.005 240)' }}>
-        <div className="container" style={{ padding: '7rem 1rem' }}>
-          <div style={{ display: 'grid', gap: '3rem', gridTemplateColumns: '1fr', alignItems: 'center' }} data-chair-grid>
+        <div className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
+          <div style={{ display: 'grid', gap: 'clamp(1.75rem, 5vw, 3rem)', gridTemplateColumns: '1fr', alignItems: 'center' }} data-chair-grid>
             <img
               src={chairman.photo_url || swaroopa}
               alt={chairman.name || 'Chairperson, Nagpur Branch'}
@@ -201,7 +201,7 @@ export default function HomePage() {
             <div>
               <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>FROM THE CHAIRMAN'S DESK</div>
               <div aria-hidden="true" style={{ marginTop: '1rem', fontSize: '3rem', color: 'var(--accent)', lineHeight: .5, fontFamily: 'Georgia, serif' }}>“</div>
-              <p style={{ marginTop: '.75rem', fontSize: 'clamp(1.25rem, 2.4vw, 1.625rem)', fontWeight: 600, lineHeight: 1.45, color: 'var(--foreground)', maxWidth: '36rem' }}>
+              <p style={{ marginTop: '.75rem', fontSize: 'clamp(1.0625rem, 2.6vw, 1.625rem)', fontWeight: 600, lineHeight: 1.5, color: 'var(--foreground)', maxWidth: '36rem' }}>
                 {renderInlineMarkdown(chairman.quote)}
               </p>
               <div style={{ marginTop: '2rem' }}>
@@ -215,8 +215,8 @@ export default function HomePage() {
       </section>
 
       {/* Services grid */}
-      <section className="container" style={{ padding: '7rem 1rem' }}>
-        <div style={{ marginBottom: '3rem', maxWidth: '40rem' }}>
+      <section className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
+        <div style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', maxWidth: '40rem' }}>
           <div className="tiny-eyebrow">SERVICES</div>
           <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Explore the Branch</h2>
           <p className="muted-text" style={{ marginTop: '1rem', fontSize: '1rem', lineHeight: 1.65 }}>
@@ -239,7 +239,7 @@ export default function HomePage() {
       </section>
 
       {/* Events */}
-      <section style={{ borderTop: '1px solid var(--border)', background: 'oklch(0.96 0.01 240 / 0.3)', padding: '7rem 0' }}>
+      <section style={{ borderTop: '1px solid var(--border)', background: 'oklch(0.96 0.01 240 / 0.3)', padding: 'clamp(3rem, 8vw, 7rem) 0' }}>
         <div className="container" style={{ padding: '0 1rem' }}>
           {/* Upcoming list */}
           <div className="row" style={{ flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
@@ -256,7 +256,7 @@ export default function HomePage() {
           </div>
 
           {/* Committee categories */}
-          <div style={{ marginTop: '5rem' }}>
+          <div style={{ marginTop: 'clamp(2.5rem, 6vw, 5rem)' }}>
             <div className="tiny-eyebrow">BROWSE BY COMMITTEE</div>
             <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em', marginBottom: '2rem' }}>Committee categories</h2>
             {committees.length === 0 ? (
@@ -281,8 +281,8 @@ export default function HomePage() {
 
 
       {/* Branch Premises + NICASA */}
-      <section className="container" style={{ padding: '7rem 1rem' }}>
-        <div style={{ marginBottom: '3rem', maxWidth: '40rem' }}>
+      <section className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
+        <div style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', maxWidth: '40rem' }}>
           <div className="tiny-eyebrow">OUR HOME</div>
           <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Branch premises &amp; student wing</h2>
         </div>
@@ -297,7 +297,7 @@ export default function HomePage() {
             />
             <div style={{ padding: '1.5rem' }}>
               <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>BRANCH PREMISES</div>
-              <h3 style={{ marginTop: '.25rem', fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>ICAI Bhawan, Dhantoli</h3>
+              <h3 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.2vw, 1.5rem)', fontWeight: 700, color: 'var(--primary)', lineHeight: 1.2 }}>ICAI Bhawan, Dhantoli</h3>
               <div className="muted-text" style={{ marginTop: '.5rem', lineHeight: 1.6 }}>
                 {renderMarkdown(premises.body)}
               </div>
@@ -325,9 +325,9 @@ export default function HomePage() {
       </section>
 
       {/* Knowledge hub */}
-      <section style={{ borderTop: '1px solid var(--border)', background: 'oklch(0.96 0.01 240 / 0.3)', padding: '7rem 0' }}>
+      <section style={{ borderTop: '1px solid var(--border)', background: 'oklch(0.96 0.01 240 / 0.3)', padding: 'clamp(3rem, 8vw, 7rem) 0' }}>
         <div className="container" style={{ padding: '0 1rem' }}>
-          <div className="row" style={{ marginBottom: '3rem', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          <div className="row" style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div style={{ maxWidth: '40rem' }}>
               <div className="tiny-eyebrow">KNOWLEDGE HUB</div>
               <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Circulars, standards &amp; e-Journal</h2>
