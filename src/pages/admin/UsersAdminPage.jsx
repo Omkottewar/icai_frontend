@@ -72,7 +72,6 @@ export default function UsersAdminPage() {
         ))}
       </div>
     )},
-    { key: 'branch_name', header: 'Branch', render: (r) => r.branch_name || '—', width: 120 },
     { key: 'status', header: 'Status', render: (r) => (
       <span className={'admin-pill admin-pill-' + r.status}>{r.status}</span>
     ), width: 100 },
@@ -158,6 +157,15 @@ function UserDrawer({ userId, lookups, onClose, onSaved, showToast }) {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // Only the Nagpur branch exists today, so the branch picker is gone from
+  // the UI and we silently default to whatever lookups returns first.
+  useEffect(() => {
+    if (!isNew) return;
+    const defaultBranch = lookups?.branches?.[0]?.id;
+    if (!defaultBranch) return;
+    setForm((f) => f.branch_id ? f : { ...f, branch_id: defaultBranch });
+  }, [isNew, lookups?.branches]);
 
   // Load user detail when editing.
   useEffect(() => {
@@ -265,16 +273,6 @@ function UserDrawer({ userId, lookups, onClose, onSaved, showToast }) {
                 {STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </FormField>
-
-            <FormField label="Branch" span={2}>
-              <select className="input-base" value={form.branch_id}
-                      onChange={(e) => setField('branch_id', e.target.value)}>
-                <option value="">— None —</option>
-                {(lookups?.branches ?? []).map((b) => (
-                  <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
-                ))}
-              </select>
-            </FormField>
           </div>
 
           {isNew && (
@@ -327,6 +325,11 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
   const needsBranch = selectedRole?.scope === 'branch';
   const needsCommittee = selectedRole?.scope === 'committee';
 
+  // Branch picker is gone (only Nagpur exists). When a branch-scoped role
+  // is picked, silently use the default branch from lookups so the backend
+  // still gets a scope_branch_id without forcing the admin to pick.
+  const defaultBranchId = lookups?.branches?.[0]?.id;
+
   async function addRole() {
     if (!roleForm.role_code) { showToast?.('Pick a role', 'error'); return; }
     setBusy(true);
@@ -335,7 +338,9 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
         method: 'POST',
         body: {
           role_code: roleForm.role_code,
-          scope_branch_id: roleForm.scope_branch_id || null,
+          // For branch-scoped roles auto-fill with Nagpur. For others stay
+          // explicit / null as before.
+          scope_branch_id: needsBranch ? (roleForm.scope_branch_id || defaultBranchId || null) : (roleForm.scope_branch_id || null),
           scope_committee_id: roleForm.scope_committee_id || null,
         },
       });
@@ -385,7 +390,6 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
                 <div style={{ fontWeight: 600, fontSize: '.875rem' }}>{a.role_name}</div>
                 <div className="muted-text" style={{ fontSize: '.75rem' }}>
                   {a.role_code}
-                  {a.branch_name && ` · Branch: ${a.branch_name}`}
                   {a.committee_name && ` · Committee: ${a.committee_name}`}
                   {' · Since '}{fmtDate(a.effective_from)}
                 </div>
@@ -412,18 +416,6 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
                 ))}
               </select>
             </FormField>
-
-            {needsBranch && (
-              <FormField label="Branch" required span={2}>
-                <select className="input-base" value={roleForm.scope_branch_id}
-                        onChange={(e) => setRoleForm((f) => ({ ...f, scope_branch_id: e.target.value }))}>
-                  <option value="">— Select branch —</option>
-                  {(lookups?.branches ?? []).map((b) => (
-                    <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
-                  ))}
-                </select>
-              </FormField>
-            )}
 
             {needsCommittee && (
               <FormField label="Committee" required span={2}>
@@ -458,7 +450,6 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
                   <div style={{ fontWeight: 600, fontSize: '.875rem' }}>{a.role_name}</div>
                   <div className="muted-text" style={{ fontSize: '.75rem' }}>
                     {a.role_code}
-                    {a.branch_name && ` · ${a.branch_name}`}
                     {a.committee_name && ` · ${a.committee_name}`}
                     {' · '}{fmtDate(a.effective_from)} → {fmtDate(a.effective_to)}
                   </div>
