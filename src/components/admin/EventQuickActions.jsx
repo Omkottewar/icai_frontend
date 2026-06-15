@@ -16,17 +16,15 @@ import { useRoleFlags } from '../../hooks/useRoleFlags';
 // auto-publish trigger has already fired; this button is there for events
 // that don't need a checklist OR for chairmen who want to short-circuit.
 //
-// Visibility: matches the backend gate exactly — only branch leadership
-// (admin / chairman / VC) can publish or cancel. Committee chairmen,
-// treasurers, accountants etc. don't see these buttons even though they
-// might land on this page for other reasons.
+// Visibility: matches the backend gate exactly — only admin + branch_chairman
+// can publish or cancel. Vice-chairman, committee chairmen, treasurers,
+// accountants etc. don't see these buttons even though they might land on
+// this page for other reasons (e.g. filling a checklist).
 
 export default function EventQuickActions({ row, onChanged, showToast }) {
   const [busy, setBusy] = useState(false);
   const { codes } = useRoleFlags();
-  const canPublishCancel = codes.has('admin')
-    || codes.has('branch_chairman')
-    || codes.has('branch_vice_chairman');
+  const canManageEvents = codes.has('admin') || codes.has('branch_chairman');
   const s = row.status;
 
   const onPublish = async (e) => {
@@ -80,7 +78,7 @@ export default function EventQuickActions({ row, onChanged, showToast }) {
   };
 
   if (s === 'cancelled' || s === 'completed') return null;
-  if (!canPublishCancel) return null;
+  if (!canManageEvents) return null;
 
   return (
     <div className="event-qa-cell">

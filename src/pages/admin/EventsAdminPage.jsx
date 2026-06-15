@@ -75,6 +75,13 @@ export default function EventsAdminPage() {
   const [editingId, setEditingId] = useState(null); // null | 'new' | uuid
   const drawerOpen = editingId !== null;
 
+  // Only admin + branch_chairman can create / edit / publish / cancel events.
+  // Everyone else (committee chairmen, treasurer, secretary, branch manager,
+  // accountant, MCMs) sees the page read-only so they can still find their
+  // checklist tasks.
+  const { codes } = useRoleFlags();
+  const canManageEvents = codes.has('admin') || codes.has('branch_chairman');
+
   // Open editor from ?edit=<id> hash query so deep links work.
   useEffect(() => {
     if (route.query.edit && editingId === null) setEditingId(route.query.edit);
@@ -111,9 +118,11 @@ export default function EventsAdminPage() {
       title="Events"
       subtitle="Create and publish events to the public site"
       actions={
-        <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
-          + New event
-        </button>
+        canManageEvents ? (
+          <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
+            + New event
+          </button>
+        ) : null
       }
     >
       <DataTable
@@ -151,6 +160,7 @@ export default function EventsAdminPage() {
         open={drawerOpen}
         id={editingId}
         lookups={lookups}
+        canManage={canManageEvents}
         onClose={() => { setEditingId(null); if (route.query.edit || route.query.new) navigate('/admin/events'); }}
         onSaved={() => { refresh(); }}
         showToast={showToast}
@@ -190,7 +200,7 @@ const WIZARD_STEPS = [
   { key: 'review',    label: 'Review',         hint: 'Confirm and submit' },
 ];
 
-function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
+function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast }) {
   const isNew = id === 'new';
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
@@ -199,14 +209,10 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
   const [uploading, setUploading] = useState(false);
   const [stepIdx, setStepIdx] = useState(0);
 
-  // Publish / cancel are branch-leadership only. Hides the in-drawer
-  // buttons for committee chairmen, treasurers, etc. — they can still see
-  // the drawer (and edit if it's their committee's event), but they can't
-  // skip the checklist approval path.
-  const { codes } = useRoleFlags();
-  const canPublishCancel = codes.has('admin')
-    || codes.has('branch_chairman')
-    || codes.has('branch_vice_chairman');
+  // Only admin + branch_chairman can edit / publish / cancel / delete an
+  // event. Other admin-shell roles see the drawer in read-only mode so they
+  // can still inspect details while filling their checklist tasks.
+  const readOnly = !canManage;
 
   // Reset to first step whenever the drawer opens (new or edit).
   useEffect(() => { if (open) setStepIdx(0); }, [open, id]);
@@ -408,31 +414,34 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
     <Drawer
       open={open}
       onClose={onClose}
-      title={isNew ? 'Create event' : 'Edit event'}
+      title={readOnly ? 'Event details' : (isNew ? 'Create event' : 'Edit event')}
       footer={
         <>
-          {canPublishCancel && !isNew && form.status && form.status !== 'published' && form.status !== 'cancelled' && (
+          {canManage && !isNew && form.status && form.status !== 'published' && form.status !== 'cancelled' && (
             <button type="button" className="btn btn-outline" onClick={onPublish} style={{ padding: '.5rem 1rem' }}>Publish</button>
           )}
-          {canPublishCancel && !isNew && form.status && form.status !== 'cancelled' && (
+          {canManage && !isNew && form.status && form.status !== 'cancelled' && (
             <button type="button" className="btn btn-outline" onClick={onCancel} style={{ padding: '.5rem 1rem', color: '#b91c1c' }}>Cancel event</button>
           )}
-          {canPublishCancel && !isNew && (
+          {canManage && !isNew && (
             <button type="button" className="btn btn-outline" onClick={onDelete} style={{ padding: '.5rem 1rem', color: '#b91c1c' }}>Delete</button>
           )}
 
-          {stepIdx > 0 && (
+          {canManage && stepIdx > 0 && (
             <button type="button" className="btn btn-outline" onClick={onBack} style={{ padding: '.5rem 1rem' }}>← Back</button>
           )}
-          {!isLast && (
+          {canManage && !isLast && (
             <button type="button" className="btn btn-primary" onClick={onNext} style={{ padding: '.5rem 1rem' }}>
               Next →
             </button>
           )}
-          {isLast && (
+          {canManage && isLast && (
             <button type="submit" form="event-form" disabled={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
               {saving ? 'Saving…' : (isNew ? 'Create event' : 'Save changes')}
             </button>
+          )}
+          {readOnly && (
+            <button type="button" className="btn btn-outline" onClick={onClose} style={{ padding: '.5rem 1rem' }}>Close</button>
           )}
         </>
       }
@@ -440,7 +449,13 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
       {loading ? (
         <DrawerFormSkeleton />
       ) : (
+        <fieldset id="event-form-fieldset" disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minInlineSize: 'auto' }}>
         <form id="event-form" onSubmit={onSubmit}>
+          {readOnly && (
+            <div style={{ background: '#eff6ff', color: '#1e3a8a', padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', marginBottom: '1rem', border: '1px solid #bfdbfe' }}>
+              Read-only view. Only the branch chairman or admin can change event details.
+            </div>
+          )}
           {error && (
             <div style={{ background: '#fee2e2', color: '#991b1b', padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', marginBottom: '1rem' }}>
               {error}
@@ -587,6 +602,7 @@ function EventDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
             </>
           )}
         </form>
+        </fieldset>
       )}
     </Drawer>
   );
