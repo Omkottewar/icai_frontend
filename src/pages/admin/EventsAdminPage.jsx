@@ -12,6 +12,19 @@ import { eventLabel, EVENT_STATUS, toneStyle } from '../../lib/eventStatus';
 import EventTimeline from '../../components/admin/EventTimeline';
 import ComparableEventsPanel from '../../components/admin/ComparableEventsPanel';
 import EventQuickActions from '../../components/admin/EventQuickActions';
+import DateTimePicker from '../../components/admin/DateTimePicker';
+
+// Programme types are a fixed list (no more free-text typos). Stays in sync
+// with the dropdown options used in the Event Basics checklist preset.
+const PROGRAM_TYPES = [
+  { value: 'cpe_seminar',  label: 'CPE Seminar' },
+  { value: 'workshop',     label: 'Workshop' },
+  { value: 'study_circle', label: 'Study Circle Meet' },
+  { value: 'conference',   label: 'Conference' },
+  { value: 'mock_test',    label: 'Mock Test' },
+  { value: 'revisionary',  label: 'Revisionary Batch' },
+  { value: 'other',        label: 'Other' },
+];
 
 const EMPTY_FORM = {
   title: '',
@@ -216,6 +229,17 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
 
   // Reset to first step whenever the drawer opens (new or edit).
   useEffect(() => { if (open) setStepIdx(0); }, [open, id]);
+
+  // Auto-default branch on new events. The Nagpur branch is the only one
+  // configured today, so we transparently pick the first branch returned
+  // by the lookups endpoint instead of asking the user to pick. This used
+  // to be a visible dropdown that confused non-tech users.
+  useEffect(() => {
+    if (!open || !isNew) return;
+    const defaultBranch = lookups?.branches?.[0]?.id;
+    if (!defaultBranch) return;
+    setForm((f) => f.branch_id ? f : { ...f, branch_id: defaultBranch });
+  }, [open, isNew, lookups?.branches]);
 
   // Load existing event when editing.
   useEffect(() => {
@@ -470,19 +494,10 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
               <FormField label="Title" required span={2}>
                 <input className="input-base" value={form.title} onChange={(e) => set('title', e.target.value)} required />
               </FormField>
-              <FormField label="URL slug" hint="Leave blank to auto-generate from title">
-                <input className="input-base" value={form.slug} onChange={(e) => set('slug', e.target.value)} placeholder="auto-generated" />
-              </FormField>
               <FormField label="Committee" required>
                 <select className="input-base" value={form.committee_id} onChange={(e) => set('committee_id', e.target.value)} required>
                   <option value="">Select committee…</option>
                   {lookups?.committees?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </FormField>
-              <FormField label="Branch" hint="Leave blank for branch-agnostic events">
-                <select className="input-base" value={form.branch_id} onChange={(e) => set('branch_id', e.target.value)}>
-                  <option value="">Not branch-specific</option>
-                  {lookups?.branches?.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </FormField>
               <FormField label="Audience" required>
@@ -499,10 +514,13 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
                   <option value="hybrid">Hybrid</option>
                 </select>
               </FormField>
-              <FormField label="Programme type" hint="e.g. Seminar, Workshop, Mock test" span={2}>
-                <input className="input-base" value={form.program_type} onChange={(e) => set('program_type', e.target.value)} />
+              <FormField label="Programme type">
+                <select className="input-base" value={form.program_type} onChange={(e) => set('program_type', e.target.value)}>
+                  <option value="">— Pick a type —</option>
+                  {PROGRAM_TYPES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
               </FormField>
-              <FormField label="Description" hint="Markdown supported" span={2}>
+              <FormField label="Description" span={2}>
                 <textarea className="input-base" rows={4} value={form.description} onChange={(e) => set('description', e.target.value)} />
               </FormField>
             </Grid>
@@ -511,10 +529,10 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
           <Section title="Schedule">
             <Grid>
               <FormField label="Starts at" required>
-                <input type="datetime-local" className="input-base" value={form.starts_at} onChange={(e) => set('starts_at', e.target.value)} required />
+                <DateTimePicker value={form.starts_at} onChange={(v) => set('starts_at', v)} required />
               </FormField>
               <FormField label="Ends at" required>
-                <input type="datetime-local" className="input-base" value={form.ends_at} onChange={(e) => set('ends_at', e.target.value)} required />
+                <DateTimePicker value={form.ends_at} onChange={(v) => set('ends_at', v)} required />
               </FormField>
             </Grid>
           </Section>
@@ -577,12 +595,6 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
           <Section title="Highlights">
             <FormField label="One per line" hint="Shown as bullet points on the public page">
               <textarea className="input-base" rows={4} value={form.highlights} onChange={(e) => set('highlights', e.target.value)} placeholder="Live Q&A with industry experts&#10;Certificate of participation" />
-            </FormField>
-          </Section>
-
-          <Section title="Recurrence (optional)">
-            <FormField label="RRULE" hint="RFC 5545 recurrence rule, e.g. FREQ=WEEKLY;BYDAY=MO">
-              <input className="input-base" value={form.recurrence_rrule} onChange={(e) => set('recurrence_rrule', e.target.value)} />
             </FormField>
           </Section>
           </>)}
@@ -689,11 +701,11 @@ function WizardStepper({ steps, activeIdx, onJump }) {
 // ─── Step 4: Review pane ─────────────────────────────────────────────────────
 function WizardReview({ form, lookups, onJumpToStep }) {
   const committee = lookups?.committees?.find((c) => c.id === form.committee_id);
-  const branch    = lookups?.branches?.find((b) => b.id === form.branch_id);
+  const programLabel = PROGRAM_TYPES.find((p) => p.value === form.program_type)?.label || '—';
   const rows = [
     { label: 'Title',         value: form.title || '—',                   step: 0 },
     { label: 'Committee',     value: committee?.name || '—',              step: 0 },
-    { label: 'Branch',        value: branch?.name || 'Not branch-specific', step: 0 },
+    { label: 'Programme type', value: programLabel,                        step: 0 },
     { label: 'When',          value: form.starts_at && form.ends_at ? `${fmtDate(form.starts_at)} → ${fmtDate(form.ends_at)}` : '—', step: 0 },
     { label: 'Mode',          value: form.mode?.replace('_', ' '),        step: 0 },
     { label: 'Venue / URL',   value: form.mode === 'online' ? (form.online_url || '—') : (form.venue || '—'), step: 0 },

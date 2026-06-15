@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Drawer from '../../components/admin/Drawer';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import {
   QUESTION_TYPES, QUESTION_TYPE_MAP, POPULAR_TYPES,
-  QUESTION_LIBRARY, ROLE_OPTIONS, CATEGORY_OPTIONS,
+  QUESTION_LIBRARY, ROLE_OPTIONS,
   SECTION_PRESETS,
   newQuestion, defaultConfig,
 } from '../../lib/checklistQuestions';
@@ -113,7 +113,27 @@ function TemplateList({ onEdit, onPreview }) {
     try {
       await api(`/api/checklist-templates/${row.id}`, { method: 'DELETE' });
       load();
-    } catch (e) { showToast?.(e.message, 'error'); }
+    } catch (e) {
+      // Backend refuses if live (non-terminal, non-soft-deleted) instances
+      // still reference the template. Offer the cascade soft-delete path
+      // so the admin doesn't have to hunt down the stray instance manually.
+      const msg = e?.message || '';
+      if (msg.includes('active instance') || msg.includes('force=1')) {
+        const okay = confirm(
+          `${msg}\n\nDelete the template AND soft-delete those instances?`,
+        );
+        if (!okay) return;
+        try {
+          await api(`/api/checklist-templates/${row.id}?force=1`, { method: 'DELETE' });
+          showToast?.('Template and its active instances were soft-deleted', 'success');
+          load();
+        } catch (e2) {
+          showToast?.(e2.message || 'Delete failed', 'error');
+        }
+        return;
+      }
+      showToast?.(msg, 'error');
+    }
   };
 
   if (err) return <p style={{ color: 'var(--destructive)' }}>{err}</p>;
@@ -511,12 +531,14 @@ function BuilderDrawer({ id, onClose }) {
   );
 }
 
-// ─── Template metadata (name, description, category, roles) ───────────────
+// ─── Template metadata (name, description) ────────────────────────────────
+// Simplified for non-tech users: just a name and a one-line description.
+// Category / fill_role / review_role used to live here but were dropped —
+// they're either covered by per-section owners (filling) or weren't doing
+// anything load-bearing (category was a free-form tag). The state object
+// still carries those fields so existing templates round-trip without data
+// loss on save; we just don't expose inputs.
 function TemplateMetaForm({ meta, setMeta }) {
-  const [showCustomCategory, setShowCustomCategory] = useState(
-    meta.category ? !CATEGORY_OPTIONS.includes(meta.category) : false,
-  );
-
   return (
     <div className="meta">
       <Field label="Name *">
@@ -533,54 +555,6 @@ function TemplateMetaForm({ meta, setMeta }) {
           onChange={(e) => setMeta((m) => ({ ...m, description: e.target.value }))} />
       </Field>
 
-      <div className="meta-grid">
-        <Field label="Category">
-          {showCustomCategory ? (
-            <input type="text" className="meta-input"
-              placeholder="Custom category"
-              value={meta.category}
-              onChange={(e) => setMeta((m) => ({ ...m, category: e.target.value }))} />
-          ) : (
-            <select className="meta-input"
-              value={CATEGORY_OPTIONS.includes(meta.category) ? meta.category : ''}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === 'Other') {
-                  setShowCustomCategory(true);
-                  setMeta((m) => ({ ...m, category: '' }));
-                } else {
-                  setMeta((m) => ({ ...m, category: v }));
-                }
-              }}>
-              <option value="">— Pick a category —</option>
-              {CATEGORY_OPTIONS.filter((c) => c !== '').map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
-        </Field>
-
-        <Field label="Who fills this in?">
-          <select className="meta-input"
-            value={meta.fill_role}
-            onChange={(e) => setMeta((m) => ({ ...m, fill_role: e.target.value }))}>
-            {ROLE_OPTIONS.map((r) => (
-              <option key={r.code} value={r.code}>{r.label}</option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Who reviews and approves?">
-          <select className="meta-input"
-            value={meta.review_role}
-            onChange={(e) => setMeta((m) => ({ ...m, review_role: e.target.value }))}>
-            {ROLE_OPTIONS.map((r) => (
-              <option key={r.code} value={r.code}>{r.label}</option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
       <style>{`
         .meta {
           display: flex; flex-direction: column; gap: .625rem;
@@ -592,12 +566,6 @@ function TemplateMetaForm({ meta, setMeta }) {
           font: inherit; color: inherit;
         }
         .meta-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
-        .meta-grid {
-          display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem;
-        }
-        @media (max-width: 700px) {
-          .meta-grid { grid-template-columns: 1fr; }
-        }
       `}</style>
     </div>
   );
@@ -956,6 +924,29 @@ function SectionCard({
   // The collapse chevron is for managing long templates with 8+ sections.
   // The pre-section group (no heading) is never collapsible.
   const [collapsed, setCollapsed] = useState(false);
+  // Section settings popover holds the "owner" picker + remove button.
+  // Hidden by default so the header reads as just a title — non-tech users
+  // pick a section preset (which already sets the right owner) and never
+  // need to touch this.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef(null);
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const close = (e) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) setSettingsOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [settingsOpen]);
+
+  // Look up the human label for the current owner so we can show a tiny
+  // hint ("Owner: Treasurer") in the header without forcing the user to
+  // open the popover just to see it.
+  const ownerLabel = (() => {
+    if (!heading?.section_owner_role) return null;
+    const match = ROLE_OPTIONS.find((r) => r.code === heading.section_owner_role);
+    return match?.label ?? null;
+  })();
 
   return (
     <div className="sc-card">
@@ -983,22 +974,48 @@ function SectionCard({
               placeholder="Section name (e.g. Event basics)"
               onChange={(e) => onPatchQuestion(group.headingIdx, { label: e.target.value })}
             />
-            <select
-              className="sc-owner-select"
-              value={heading.section_owner_role ?? ''}
-              onChange={(e) => onPatchQuestion(group.headingIdx, { section_owner_role: e.target.value || null })}
-            >
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r.code || 'any'} value={r.code}>👤 {r.label}</option>
-              ))}
-            </select>
+            {ownerLabel && (
+              <span className="sc-owner-hint" title="Who fills this section">
+                👤 {ownerLabel}
+              </span>
+            )}
           </div>
           {collapsed && (
             <span className="sc-count">{items.length} question{items.length === 1 ? '' : 's'}</span>
           )}
-          <button type="button" className="sc-remove" onClick={onRemoveSection} title="Remove this section">
-            Remove section
-          </button>
+          <div ref={settingsRef} className="sc-settings-wrap">
+            <button
+              type="button"
+              className="sc-settings-trigger"
+              onClick={() => setSettingsOpen((o) => !o)}
+              title="Section settings"
+              aria-label="Section settings"
+              aria-expanded={settingsOpen}
+            >
+              ⋯
+            </button>
+            {settingsOpen && (
+              <div className="sc-settings-menu">
+                <label className="sc-settings-label">Who fills this section?</label>
+                <select
+                  className="sc-owner-select"
+                  value={heading.section_owner_role ?? ''}
+                  onChange={(e) => onPatchQuestion(group.headingIdx, { section_owner_role: e.target.value || null })}
+                >
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.code || 'any'} value={r.code}>{r.label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="sc-settings-remove"
+                  onClick={() => { setSettingsOpen(false); onRemoveSection(); }}
+                >
+                  Remove section
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1070,11 +1087,11 @@ function SectionCard({
           color: var(--muted-foreground);
         }
         .sc-head-inputs {
-          flex: 1; display: grid;
-          grid-template-columns: 1.6fr 1fr; gap: .375rem;
+          flex: 1; display: flex; align-items: center; gap: .5rem;
           min-width: 0;
         }
         .sc-title-input {
+          flex: 1; min-width: 0;
           padding: .4rem .55rem;
           border: 1px solid transparent; background: transparent;
           font-size: 1rem; font-weight: 700; color: var(--primary, #1e40af);
@@ -1083,25 +1100,59 @@ function SectionCard({
         .sc-title-input:hover, .sc-title-input:focus {
           background: white; border-color: var(--border); outline: 0;
         }
+        .sc-owner-hint {
+          flex-shrink: 0;
+          padding: .15rem .5rem;
+          border-radius: 999px;
+          background: white; border: 1px solid var(--border);
+          font-size: .7rem; font-weight: 600;
+          color: var(--muted-foreground);
+          white-space: nowrap;
+        }
+        .sc-settings-wrap { position: relative; flex-shrink: 0; }
+        .sc-settings-trigger {
+          width: 1.85rem; height: 1.85rem;
+          background: transparent; border: 1px solid transparent;
+          color: var(--muted-foreground);
+          font-size: 1.05rem; line-height: 1;
+          border-radius: .3rem; cursor: pointer;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+        .sc-settings-trigger:hover {
+          background: white; border-color: var(--border); color: var(--foreground);
+        }
+        .sc-settings-menu {
+          position: absolute; top: calc(100% + .25rem); right: 0;
+          z-index: 6; min-width: 14rem;
+          background: white; border: 1px solid var(--border);
+          border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.1);
+          padding: .65rem;
+          display: flex; flex-direction: column; gap: .5rem;
+        }
+        .sc-settings-label {
+          font-size: .7rem; font-weight: 600;
+          color: var(--muted-foreground);
+          text-transform: uppercase; letter-spacing: .04em;
+        }
         .sc-owner-select {
           padding: .4rem .5rem;
           border: 1px solid var(--border);
           background: white;
-          border-radius: .25rem;
-          font-size: .8125rem; font-weight: 600;
+          border-radius: .3rem;
+          font: inherit; font-size: .85rem;
           color: var(--foreground);
         }
-        .sc-remove {
-          padding: .3rem .55rem;
-          background: transparent; border: 1px solid transparent;
-          color: var(--muted-foreground);
-          font-size: .7rem; font-weight: 600;
-          border-radius: .25rem; cursor: pointer;
-        }
-        .sc-remove:hover {
+        .sc-settings-remove {
+          margin-top: .25rem;
+          padding: .4rem .55rem;
+          background: transparent; border: 1px solid var(--border);
           color: var(--destructive, #b91c1c);
-          border-color: #fecaca;
-          background: #fef2f2;
+          font-size: .8125rem; font-weight: 600;
+          border-radius: .3rem; cursor: pointer;
+          text-align: left;
+        }
+        .sc-settings-remove:hover {
+          background: #fef2f2; border-color: #fecaca;
         }
         .sc-body { padding: .75rem; display: flex; flex-direction: column; gap: 0; }
         .sc-empty {
