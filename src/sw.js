@@ -11,8 +11,24 @@
 // is the literal SW that ships — no auto-generation magic on top.
 
 import { precacheAndRoute } from 'workbox-precaching';
+import { registerRoute, setDefaultHandler } from 'workbox-routing';
+import { NetworkOnly } from 'workbox-strategies';
 
 precacheAndRoute(self.__WB_MANIFEST);
+
+// Belt-and-braces: API + uploads + service-worker-internal paths must NEVER
+// be served from the SW cache. precacheAndRoute already excludes anything
+// not in the manifest, but a stale Workbox version OR a misconfigured
+// devOptions can sometimes intercept and serve a stale response. Explicit
+// NetworkOnly routes guarantee fresh data even after a Workbox upgrade.
+registerRoute(({ url }) => url.pathname.startsWith('/api/'),     new NetworkOnly());
+registerRoute(({ url }) => url.pathname.startsWith('/uploads/'), new NetworkOnly());
+
+// Fallback for navigation requests not in the precache (e.g. hash routes
+// like /#/dashboard) — go straight to the network. Without this, an old
+// Workbox install can swallow same-origin GETs into a "cache or 503"
+// strategy.
+setDefaultHandler(new NetworkOnly());
 
 // Activate the new SW immediately on update so users see fresh notifications
 // without a manual refresh.
