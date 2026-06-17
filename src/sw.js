@@ -53,8 +53,12 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'ICAI Nagpur';
   const options = {
     body:  payload.body || '',
+    // Large coloured icon on the right of the notification — the full CA logo.
     icon:  payload.icon  || '/pwa-192.png',
-    badge: payload.badge || '/pwa-192.png',
+    // Tiny status-bar / app-row badge — Android renders this monochrome by
+    // tinting whatever pixels you give it. Must be white on transparent OR
+    // a clean silhouette; full-colour PNGs come out as a black square.
+    badge: payload.badge || '/notification-badge.svg',
     // tag dedupes — if a second push with the same tag arrives (e.g. two
     // "event reminder" pushes for the same event), it replaces the first
     // instead of stacking.

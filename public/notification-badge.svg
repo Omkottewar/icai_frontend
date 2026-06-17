@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <!--
+    Monochrome notification badge for Android Chrome's small-icon slot.
+    White on transparent is required — the OS tints it with the system
+    accent. A full-colour PNG appears as a solid black square here (which
+    is what was happening with /pwa-192.png).
+    Simple bell silhouette: instantly recognisable, scales well, doesn't
+    compete with the big colour icon next to it.
+  -->
+  <path fill="#fff" d="M48 12c-2.21 0-4 1.79-4 4v2.2C32.1 20.1 24 30.27 24 42v14l-6 8v4h60v-4l-6-8V42c0-11.73-8.1-21.9-20-23.8V16c0-2.21-1.79-4-4-4zm0 76c-4.42 0-8-3.58-8-8h16c0 4.42-3.58 8-8 8z"/>
+</svg>
