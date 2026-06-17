@@ -3,14 +3,15 @@ import { apiWrite } from '../lib/apiCache';
 
 // In-app notifications.
 //
-// Polls /api/notifications + /api/notifications/unread-count every POLL_MS.
-// We do NOT use the shared cachedGet here — the bell badge wants the freshest
-// count at all times, and the request is cheap (single integer / 50-row read).
+// Polls /api/notifications + /api/notifications/unread-count.
+// Tab visible  → poll every 10s (snappy badge updates)
+// Tab hidden   → suspend polling entirely (saves battery, server load)
+// Tab focused  → immediate refresh (catches anything that fired while away)
 //
 // markRead / markAllRead optimistically update local state and reconcile
 // against the server response.
 
-const POLL_MS = 30_000;
+const POLL_MS_ACTIVE = 10_000;
 
 async function get(path) {
   const r = await fetch(path, { credentials: 'include' });
@@ -49,9 +50,40 @@ export function useNotifications({ enabled = true } = {}) {
 
   useEffect(() => {
     if (!enabled) { setLoading(false); return; }
+
+    const start = () => {
+      if (timer.current) clearInterval(timer.current);
+      timer.current = setInterval(refresh, POLL_MS_ACTIVE);
+    };
+    const stop = () => {
+      if (timer.current) { clearInterval(timer.current); timer.current = null; }
+    };
+
+    // Initial fetch + start polling immediately.
     refresh();
-    timer.current = setInterval(refresh, POLL_MS);
-    return () => { if (timer.current) clearInterval(timer.current); };
+    start();
+
+    // Pause when the tab is hidden so a left-open browser doesn't keep
+    // hitting the API. Resume + force-refresh when the tab is visible
+    // again — catches anything that fired while the user was away.
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        stop();
+      } else {
+        refresh();
+        start();
+      }
+    };
+    const onFocus = () => { refresh(); };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onFocus);
+    };
   }, [enabled, refresh]);
 
   const markRead = useCallback(async (id) => {

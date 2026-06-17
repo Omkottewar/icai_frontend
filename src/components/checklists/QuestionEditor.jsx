@@ -89,9 +89,9 @@ export default function QuestionEditor({
         {isSection && (
           <div className="qe-section-owner">
             <label className="qe-section-owner-label">
-              Who owns this section?
+              Who reviews this section?
               <span style={{ color: 'var(--muted-foreground)', fontWeight: 400, fontSize: '.7rem', marginLeft: '.4rem' }}>
-                — only they can edit the questions below
+                — drives the approval routing after submission
               </span>
             </label>
             <select

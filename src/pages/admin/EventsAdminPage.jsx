@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import DataTable from '../../components/admin/DataTable';
 import Drawer from '../../components/admin/Drawer';
@@ -13,6 +13,7 @@ import EventTimeline from '../../components/admin/EventTimeline';
 import ComparableEventsPanel from '../../components/admin/ComparableEventsPanel';
 import EventQuickActions from '../../components/admin/EventQuickActions';
 import DateTimePicker from '../../components/admin/DateTimePicker';
+import { IconPlus, IconCheckCircle } from '../../icons';
 
 // Programme types are a fixed list (no more free-text typos). Stays in sync
 // with the dropdown options used in the Event Basics checklist preset.
@@ -140,8 +141,9 @@ export default function EventsAdminPage() {
       subtitle="Create and publish events to the public site"
       actions={
         canManageEvents ? (
-          <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
-            + New event
+          <button type="button" className="btn btn-primary" onClick={() => setEditingId('new')}>
+            <IconPlus size="sm" />
+            <span>New event</span>
           </button>
         ) : null
       }
@@ -861,9 +863,10 @@ function ChecklistButton({ row, showToast, refresh }) {
         type="button"
         className="btn btn-outline"
         onClick={(e) => { e.stopPropagation(); setPickerOpen(true); }}
-        style={{ padding: '.25rem .55rem', fontSize: '.75rem' }}
+        style={{ padding: '.3rem .6rem', fontSize: '.73rem', gap: '.3rem' }}
       >
-        + Create checklist
+        <IconCheckCircle size="xs" />
+        <span>Create checklist</span>
       </button>
       {pickerOpen && (
         <TemplatePickerModal
@@ -882,22 +885,37 @@ function ChecklistButton({ row, showToast, refresh }) {
   );
 }
 
-// ─── Template picker (event approval flow) ──────────────────────────────
+// ─── Template picker + assignment (event approval flow) ─────────────────
 //
-// Creates a checklist_instances row bound to the event. Backend auto-assigns
-// the current committee chairman (filler) and branch chairman (reviewer)
-// when the template's fill_role/review_role reference those role codes —
-// see findActiveRoleHolder() in routes/checklistInstances.ts.
+// Two-step modal:
+//   Step 1 — pick a published template.
+//   Step 2 — review the template's sections + assign WHO fills each one
+//            (chairman, treasurer, convener, etc.). Skipping a section
+//            leaves it to the primary filler (auto-resolved committee
+//            chairman). Optional override for primary filler + reviewer too.
 //
-// The fill UI is the new rich renderer (radio, dropdown, file, etc.). On
-// approval, a DB trigger auto-publishes the event (mirror of the legacy
-// trigger on event_checklists).
+// On Create, POSTs to /api/checklist-instances with section_assignments
+// included. The fill UI is the new rich renderer (radio, dropdown, file,
+// etc.). On approval, a DB trigger auto-publishes the event.
 
 function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToast }) {
+  // step: 'pick' | 'assign'
+  const [step, setStep] = useState('pick');
   const [templates, setTemplates] = useState(null);
+  const [pickedTemplate, setPickedTemplate] = useState(null);
+  const [templateDetail, setTemplateDetail] = useState(null); // { questions, ... }
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  // assignments: { [section_question_id]: user_id|null }
+  const [assignments, setAssignments] = useState({});
+  const [primaryFiller, setPrimaryFiller] = useState(''); // user_id
+  const [primaryReviewer, setPrimaryReviewer] = useState(''); // user_id
   const [err, setErr] = useState('');
-  const [busyId, setBusyId] = useState(null);
+  const [creating, setCreating] = useState(false);
 
+  // Load published templates on mount.
   useEffect(() => {
     let cancelled = false;
     adminFetch('/api/checklist-templates')
@@ -906,42 +924,114 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
     return () => { cancelled = true; };
   }, []);
 
+  // Pre-fetch the user directory in the background — same call we'll use
+  // for the per-section picker. Throttled by 250ms debounce on search.
+  useEffect(() => {
+    let cancelled = false;
+    setUsersLoading(true);
+    const q = userSearch.trim();
+    const url = q
+      ? `/api/admin/users?q=${encodeURIComponent(q)}&status=active&pageSize=25`
+      : '/api/admin/users?status=active&pageSize=50';
+    const t = setTimeout(() => {
+      adminFetch(url)
+        .then((j) => { if (!cancelled) setUsers(j.rows || []); })
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setUsersLoading(false); });
+    }, q ? 250 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [userSearch]);
+
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  async function pick(template) {
-    if (busyId) return;
-    setBusyId(template.id);
+  // Helper: friendly description of a role-code → label mapping. The
+  // template's section_owner_role hints WHO REVIEWS this section; we mirror
+  // that hint as a placeholder ("Suggested: Treasurer") on each picker so
+  // the admin knows the recommended role before picking a user.
+  const roleLabel = (code) => {
+    if (!code) return null;
+    const map = {
+      committee_chairman: 'Committee Chairman',
+      committee_convener: 'Committee Convener',
+      committee_co_convener: 'Committee Co-Convener',
+      committee_member: 'Committee Member',
+      mcm: 'Managing Committee Member',
+      branch_chairman: 'Branch Chairman',
+      branch_vice_chairman: 'Branch Vice-Chairman',
+      branch_secretary: 'Branch Secretary',
+      branch_treasurer: 'Branch Treasurer',
+      accountant: 'Accountant',
+      branch_manager: 'Branch Manager',
+    };
+    return map[code] || code;
+  };
+
+  async function pickTemplate(template) {
+    setPickedTemplate(template);
+    setStep('assign');
+    setLoadingDetail(true);
     try {
-      const created = await adminFetch('/api/checklist-instances', {
-        method: 'POST',
-        body: {
-          template_id: template.id,
-          event_id: eventId,
-          title: `${template.name} — ${eventTitle}`,
-        },
-      });
-      // adminFetch only auto-invalidates by '/api/admin/...' prefix; bust the
-      // events list manually so the new instance_id column updates.
-      invalidate('/api/admin/events');
-      showToast?.(`Checklist created from "${template.name}"`, 'success');
-      onCreated(created.id);
+      const j = await adminFetch(`/api/checklist-templates/${template.id}`);
+      setTemplateDetail(j);
     } catch (e) {
-      showToast?.(e.message, 'error');
+      setErr(e.message);
     } finally {
-      setBusyId(null);
+      setLoadingDetail(false);
     }
   }
+
+  async function create() {
+    if (creating || !pickedTemplate) return;
+    setCreating(true);
+    setErr('');
+    try {
+      // Convert the assignments map into the array shape the API expects.
+      // Drop null/empty values — those mean "no override, let primary filler
+      // cover this section".
+      const section_assignments = Object.entries(assignments)
+        .filter(([_, uid]) => !!uid)
+        .map(([section_question_id, assignee_id]) => ({ section_question_id, assignee_id }));
+
+      const body = {
+        template_id: pickedTemplate.id,
+        event_id: eventId,
+        title: `${pickedTemplate.name} — ${eventTitle}`,
+        section_assignments,
+      };
+      if (primaryFiller)   body.assigned_fill_user_id   = primaryFiller;
+      if (primaryReviewer) body.assigned_review_user_id = primaryReviewer;
+
+      const created = await adminFetch('/api/checklist-instances', { method: 'POST', body });
+      invalidate('/api/admin/events');
+      showToast?.(`Checklist created from "${pickedTemplate.name}"`, 'success');
+      onCreated(created.id);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  // Sections to assign — derived from the template detail. Filters
+  // questions[] down to type=section_heading rows, in template order.
+  const sections = (templateDetail?.questions || [])
+    .filter((q) => q.type === 'section_heading');
+
+  // Total of currently-assigned sections (used for the assign button copy).
+  const assignedCount = Object.values(assignments).filter(Boolean).length;
 
   return (
     <div className="tp-root" onClick={onClose}>
       <div className="tp-card" onClick={(e) => e.stopPropagation()}>
         <header className="tp-head">
           <div>
-            <h2 className="tp-title">Pick a checklist template</h2>
+            <h2 className="tp-title">
+              {step === 'pick' ? 'Pick a checklist template' : 'Who fills each section?'}
+            </h2>
             <p className="tp-sub">For event: <strong>{eventTitle}</strong></p>
           </div>
           <button className="tp-x" onClick={onClose} aria-label="Close">×</button>
@@ -950,41 +1040,158 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
         <div className="tp-body">
           {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
 
-          {templates === null && <p className="muted-text">Loading templates…</p>}
-          {templates && templates.length === 0 && (
-            <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
-              <p className="muted-text" style={{ marginBottom: '.5rem' }}>
-                No published templates yet.
-              </p>
-              <a href="#/admin/checklist-templates" className="btn-primary" style={{ padding: '.375rem .75rem', display: 'inline-block', textDecoration: 'none', fontSize: '.8125rem' }}>
-                Build one →
-              </a>
-            </div>
-          )}
-          {templates?.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className="tp-row"
-              onClick={() => pick(t)}
-              disabled={busyId !== null}
-            >
-              <div>
-                <strong>{t.name}</strong>{' '}
-                <span className="muted-text" style={{ fontSize: '.75rem' }}>v{t.version}</span>
-                {t.category && (
-                  <span className="tp-chip">{t.category}</span>
-                )}
-                {t.description && (
-                  <div className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.15rem' }}>
-                    {t.description}
+          {/* ─── Step 1: pick template ─── */}
+          {step === 'pick' && (
+            <>
+              {templates === null && <p className="muted-text">Loading templates…</p>}
+              {templates && templates.length === 0 && (
+                <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+                  <p className="muted-text" style={{ marginBottom: '.5rem' }}>
+                    No active templates yet.
+                  </p>
+                  <a href="#/admin/checklist-templates" className="btn-primary" style={{ padding: '.375rem .75rem', display: 'inline-block', textDecoration: 'none', fontSize: '.8125rem' }}>
+                    Build one →
+                  </a>
+                </div>
+              )}
+              {templates?.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  className="tp-row"
+                  onClick={() => pickTemplate(t)}
+                >
+                  <div>
+                    <strong>{t.name}</strong>{' '}
+                    <span className="muted-text" style={{ fontSize: '.75rem' }}>v{t.version}</span>
+                    {t.category && (
+                      <span className="tp-chip">{t.category}</span>
+                    )}
+                    {t.description && (
+                      <div className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.15rem' }}>
+                        {t.description}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              <span className="tp-cta">{busyId === t.id ? 'Creating…' : 'Use →'}</span>
-            </button>
-          ))}
+                  <span className="tp-cta">Next →</span>
+                </button>
+              ))}
+            </>
+          )}
+
+          {/* ─── Step 2: assign fillers ─── */}
+          {step === 'assign' && (
+            <>
+              {loadingDetail && <p className="muted-text">Loading template…</p>}
+              {!loadingDetail && templateDetail && (
+                <>
+                  <div className="tp-banner">
+                    <strong>{pickedTemplate.name}</strong>
+                    <p>
+                      Pick a person for each section, or leave it blank. Anyone you skip will be filled by the
+                      <strong> primary filler</strong> below (auto-set to the committee chairman by default).
+                    </p>
+                  </div>
+
+                  <div className="tp-search">
+                    <input
+                      type="search"
+                      placeholder="Search users by name or email…"
+                      value={userSearch}
+                      onChange={(e) => setUserSearch(e.target.value)}
+                      className="tp-input"
+                    />
+                    {usersLoading && <span className="muted-text" style={{ fontSize: '.7rem' }}>Loading…</span>}
+                  </div>
+
+                  {sections.length === 0 && (
+                    <p className="muted-text" style={{ fontSize: '.85rem' }}>
+                      This template has no sections — the primary filler handles everything.
+                    </p>
+                  )}
+
+                  {sections.map((s) => {
+                    const value = assignments[s.id] || '';
+                    const hint = roleLabel(s.section_owner_role);
+                    return (
+                      <div key={s.id} className="tp-section-row">
+                        <div className="tp-section-info">
+                          <strong>{s.label || '(unnamed section)'}</strong>
+                          {hint && (
+                            <span className="muted-text" style={{ fontSize: '.7rem' }}>
+                              Reviewed by {hint}
+                            </span>
+                          )}
+                        </div>
+                        <UserPicker
+                          users={users}
+                          value={value}
+                          placeholder="— Primary filler —"
+                          onChange={(uid) => setAssignments((m) => ({ ...m, [s.id]: uid }))}
+                        />
+                      </div>
+                    );
+                  })}
+
+                  <details className="tp-advanced">
+                    <summary>Advanced: override primary filler / reviewer</summary>
+                    <div className="tp-advanced-body">
+                      <div className="tp-section-row">
+                        <div className="tp-section-info">
+                          <strong>Primary filler</strong>
+                          <span className="muted-text" style={{ fontSize: '.7rem' }}>
+                            Default: current Committee Chairman
+                          </span>
+                        </div>
+                        <UserPicker
+                          users={users}
+                          value={primaryFiller}
+                          placeholder="— Auto (Committee Chairman) —"
+                          onChange={setPrimaryFiller}
+                        />
+                      </div>
+                      <div className="tp-section-row">
+                        <div className="tp-section-info">
+                          <strong>Reviewer</strong>
+                          <span className="muted-text" style={{ fontSize: '.7rem' }}>
+                            Default: current Branch Chairman
+                          </span>
+                        </div>
+                        <UserPicker
+                          users={users}
+                          value={primaryReviewer}
+                          placeholder="— Auto (Branch Chairman) —"
+                          onChange={setPrimaryReviewer}
+                        />
+                      </div>
+                    </div>
+                  </details>
+                </>
+              )}
+            </>
+          )}
         </div>
+
+        <footer className="tp-foot">
+          {step === 'assign' && (
+            <button type="button" className="tp-back" onClick={() => { setStep('pick'); setPickedTemplate(null); setAssignments({}); }}>
+              ← Back
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
+          <button type="button" className="tp-cancel" onClick={onClose}>Cancel</button>
+          {step === 'assign' && (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={create}
+              disabled={creating || loadingDetail}
+              style={{ padding: '.45rem 1rem' }}
+            >
+              {creating ? 'Creating…' : `Create checklist${assignedCount > 0 ? ` (${assignedCount} assigned)` : ''}`}
+            </button>
+          )}
+        </footer>
 
         <style>{`
           .tp-root {
@@ -994,7 +1201,7 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
             padding: 5vh 1rem; overflow-y: auto;
           }
           .tp-card {
-            width: 100%; max-width: 560px;
+            width: 100%; max-width: 640px;
             background: var(--card); border-radius: .5rem;
             box-shadow: 0 20px 50px rgba(0,0,0,.25);
             display: flex; flex-direction: column; max-height: 90vh;
@@ -1030,8 +1237,180 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
             background: var(--background); border: 1px solid var(--border);
             border-radius: 999px; font-size: .65rem; color: var(--muted-foreground);
           }
+          .tp-foot {
+            display: flex; gap: .5rem; align-items: center;
+            padding: .75rem 1rem;
+            border-top: 1px solid var(--border);
+            background: var(--background, #fafbfc);
+          }
+          .tp-back, .tp-cancel {
+            background: transparent; border: 1px solid var(--border);
+            border-radius: .375rem; padding: .4rem .75rem;
+            font: inherit; font-size: .8125rem; cursor: pointer;
+            color: var(--muted-foreground);
+          }
+          .tp-back:hover, .tp-cancel:hover { color: var(--foreground); }
+          .tp-banner {
+            padding: .65rem .875rem; margin-bottom: .75rem;
+            background: rgba(37, 99, 235, .06);
+            border: 1px solid rgba(37, 99, 235, .15);
+            border-radius: .375rem;
+            font-size: .8125rem;
+          }
+          .tp-banner strong { display: block; font-size: .9rem; margin-bottom: .15rem; }
+          .tp-banner p { margin: 0; color: var(--muted-foreground); }
+          .tp-search {
+            display: flex; align-items: center; gap: .5rem;
+            margin-bottom: .65rem;
+          }
+          .tp-input {
+            flex: 1; padding: .4rem .55rem;
+            border: 1px solid var(--border); border-radius: .375rem;
+            background: var(--card); font: inherit; color: inherit;
+          }
+          .tp-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+          .tp-section-row {
+            display: flex; gap: .75rem; align-items: center;
+            padding: .55rem .65rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: .375rem; margin-bottom: .35rem;
+          }
+          .tp-section-info {
+            flex: 1; min-width: 0;
+            display: flex; flex-direction: column; gap: .1rem;
+          }
+          .tp-section-info strong { font-size: .85rem; }
+          .tp-advanced {
+            margin-top: 1rem; padding: .5rem .75rem;
+            background: var(--background, #fafbfc);
+            border: 1px solid var(--border); border-radius: .375rem;
+            font-size: .8125rem;
+          }
+          .tp-advanced summary {
+            cursor: pointer; font-weight: 600;
+            color: var(--muted-foreground);
+          }
+          .tp-advanced summary:hover { color: var(--foreground); }
+          .tp-advanced-body { margin-top: .5rem; }
+          .up-wrap {
+            position: relative; min-width: 220px; max-width: 260px;
+            flex-shrink: 0;
+          }
+          .up-trigger {
+            width: 100%; padding: .35rem .55rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: .375rem;
+            font: inherit; font-size: .8125rem; text-align: left;
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer;
+          }
+          .up-trigger:hover { border-color: var(--primary); }
+          .up-trigger.is-empty { color: var(--muted-foreground); }
+          .up-chev { font-size: .65rem; opacity: .6; margin-left: .3rem; }
+          .up-menu {
+            position: absolute; top: calc(100% + .25rem); right: 0;
+            z-index: 6; min-width: 280px;
+            background: white; border: 1px solid var(--border);
+            border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.12);
+            padding: .35rem;
+            display: flex; flex-direction: column;
+            max-height: 280px; overflow-y: auto;
+          }
+          .up-item {
+            display: flex; align-items: center; gap: .5rem;
+            width: 100%; padding: .4rem .55rem;
+            text-align: left; background: transparent; border: 0; cursor: pointer;
+            font: inherit; font-size: .8125rem; color: var(--foreground);
+            border-radius: .3rem;
+          }
+          .up-item:hover { background: var(--background, #f8fafc); }
+          .up-item.is-active {
+            background: rgba(37, 99, 235, .08);
+            color: var(--primary, #1e40af);
+            font-weight: 600;
+          }
+          .up-item-empty {
+            color: var(--muted-foreground); padding: .5rem .55rem; font-size: .8rem;
+          }
+          .up-item-clear {
+            border-top: 1px solid var(--border); margin-top: .2rem;
+            color: var(--muted-foreground);
+          }
         `}</style>
       </div>
+    </div>
+  );
+}
+
+// ─── User picker (used in TemplatePickerModal) ────────────────────────────
+// Click-to-open dropdown. Doesn't filter `users` — the parent already
+// debounced its server-side ?q= search — but does show "no users found"
+// when empty so the admin understands what's going on. The empty value
+// `''` is treated as "no override" and renders the placeholder text.
+function UserPicker({ users, value, placeholder, onChange }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  const picked = value ? users.find((u) => u.id === value) : null;
+  const label = picked ? `${picked.name}` : placeholder;
+
+  return (
+    <div ref={wrapRef} className="up-wrap">
+      <button
+        type="button"
+        className={'up-trigger' + (picked ? '' : ' is-empty')}
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {label}
+        </span>
+        <span className="up-chev">▾</span>
+      </button>
+      {open && (
+        <div className="up-menu" role="menu">
+          {users.length === 0 ? (
+            <div className="up-item-empty">No users in that search</div>
+          ) : (
+            users.map((u) => {
+              const active = u.id === value;
+              return (
+                <button
+                  key={u.id}
+                  type="button"
+                  className={'up-item' + (active ? ' is-active' : '')}
+                  onClick={() => { onChange(u.id); setOpen(false); }}
+                >
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    <strong style={{ fontWeight: 600 }}>{u.name}</strong>
+                    <span style={{ marginLeft: '.4rem', color: 'var(--muted-foreground)', fontSize: '.75rem' }}>
+                      {u.email}
+                    </span>
+                  </span>
+                  {active && <span style={{ color: 'var(--primary, #1e40af)' }}>✓</span>}
+                </button>
+              );
+            })
+          )}
+          {value && (
+            <button
+              type="button"
+              className="up-item up-item-clear"
+              onClick={() => { onChange(''); setOpen(false); }}
+            >
+              Clear (use default)
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

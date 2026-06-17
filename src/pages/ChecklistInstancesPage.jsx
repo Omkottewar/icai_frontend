@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { useAuth } from '../context/AuthContext';
@@ -126,6 +126,9 @@ function InstanceDrawer({ id, onClose }) {
   // Reset when the instance id changes.
   const [openSections, setOpenSections] = useState(null);
   useEffect(() => { setOpenSections(null); }, [id]);
+  // Admin-only "Manage assignments" dialog state. Opens via the Manage
+  // button next to the assignee summary.
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
 
   const load = async () => {
     try {
@@ -139,32 +142,22 @@ function InstanceDrawer({ id, onClose }) {
   if (err) return <FullDrawer onClose={onClose}><p style={{ color: 'var(--destructive)' }}>{err}</p></FullDrawer>;
   if (!data) return <FullDrawer onClose={onClose}><p className="muted-text">Loading…</p></FullDrawer>;
 
-  const { instance, template, questions, reviews, perms, assignees, stages = [], tasks: taskMap = {} } = data;
-  const editable = perms.canFill && (instance.status === 'awaiting_fill' || instance.status === 'rejected');
+  const { instance, template, questions, reviews, perms, assignees, stages = [], tasks: taskMap = {}, section_assignments = [] } = data;
+  const editable = (perms.canFill || perms.canFillSections) && (instance.status === 'awaiting_fill' || instance.status === 'rejected');
   const reviewable = perms.canReview && instance.status === 'awaiting_review';
   const releaseable = perms.canRelease;  // admin + status='draft'
   const isMultiStage = stages.length > 0;
+  // Admin sees the "Manage assignments" affordance. canManage is set true
+  // only for admins on the instance, so checking it is enough.
+  const canManageAssignments = !!perms.canManage;
 
-  // Compute per-question section owner: inherit from the closest preceding
-  // section_heading. NULL on questions before any heading (open to all
-  // users with fill rights). The fill UI uses this to lock sections to
-  // the right role; the backend enforces the same on PUT /responses.
+  // The `section_owner_role` on a section_heading now denotes who REVIEWS
+  // the section after submission — it drives the multi-stage approval
+  // routing (treasurer reviews Budget & IUT, VC reviews Speakers & Agenda,
+  // etc.) and the per-section label rendered below. It is NOT a fill gate;
+  // one person (the committee chairman) fills the entire checklist.
   const sortedQuestions = [...questions].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-  const sectionOwnerByQuestion = (() => {
-    const out = {};
-    let owner = null;
-    for (const q of sortedQuestions) {
-      if (q.type === 'section_heading') owner = q.section_owner_role ?? null;
-      out[q.id] = owner;
-    }
-    return out;
-  })();
   const myRoles = roleFlags.codes;
-  const ownsSection = (q) => {
-    const owner = sectionOwnerByQuestion[q.id];
-    if (!owner) return true;
-    return myRoles.has('admin') || myRoles.has(owner);
-  };
 
   // Group questions into accordion sections. Each section starts with a
   // section_heading; questions before any heading go into a pre-section
@@ -187,21 +180,19 @@ function InstanceDrawer({ id, onClose }) {
   // Default-open logic — picked once per (id, role, status) and overridden
   // by user clicks afterwards. The rule:
   //   - Pre-section groups (no heading) are always open
-  //   - Filler: open sections I own
-  //   - Approver in multi-stage: open sections whose owner matches a pending
-  //     stage I can decide. If none matched, open all (e.g. chairman whose
-  //     stage isn't section-bound)
-  //   - Single-reviewer / draft / view-only: open all
+  //   - Filler: open EVERY section (one person fills the whole checklist)
+  //   - Approver in multi-stage: open sections whose reviewer matches a
+  //     pending stage I can decide. If none matched, open all (e.g.
+  //     chairman whose stage isn't section-bound)
+  //   - Draft / view-only: open all
   const computedOpenSet = (() => {
     const set = new Set();
     for (let i = 0; i < sectionGroups.length; i++) {
       if (!sectionGroups[i].heading) set.add(i);
     }
     if (editable) {
-      for (let i = 0; i < sectionGroups.length; i++) {
-        const owner = sectionGroups[i].owner_role;
-        if (!owner || myRoles.has('admin') || myRoles.has(owner)) set.add(i);
-      }
+      // Filler edits every section. Open them all by default.
+      for (let i = 0; i < sectionGroups.length; i++) set.add(i);
     } else if (reviewable && isMultiStage) {
       const myPendingStageRoles = new Set();
       for (const s of stages) {
@@ -404,26 +395,67 @@ function InstanceDrawer({ id, onClose }) {
         </div>
 
         {/* Assignee summary — surfaced for everyone but most useful to admin
-            who needs to confirm the auto-assignment before releasing. */}
-        {(assignees?.filler || assignees?.reviewer || instance.status === 'draft') && (
+            who needs to confirm the auto-assignment before releasing.
+            Also shows per-section assignments when present, and exposes a
+            "Manage" button (admin only) that opens the reassignment dialog. */}
+        {(assignees?.filler || assignees?.reviewer || instance.status === 'draft' || section_assignments.length > 0) && (
           <div style={{
             marginTop: '.75rem', padding: '.625rem .875rem',
             background: 'var(--background)', border: '1px solid var(--border)',
             borderRadius: '.375rem', fontSize: '.8125rem',
-            display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '.4rem 1rem',
           }}>
-            <strong>Filler:</strong>
-            <span>
-              {assignees?.filler
-                ? <>{assignees.filler.name} <span className="muted-text">· {assignees.filler.email}</span></>
-                : <em className="muted-text">— not assigned —</em>}
-            </span>
-            <strong>Reviewer:</strong>
-            <span>
-              {assignees?.reviewer
-                ? <>{assignees.reviewer.name} <span className="muted-text">· {assignees.reviewer.email}</span></>
-                : <em className="muted-text">— not assigned —</em>}
-            </span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '.5rem' }}>
+              <strong style={{ fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-foreground)' }}>
+                Assignments
+              </strong>
+              {canManageAssignments && (
+                <button
+                  type="button"
+                  onClick={() => setAssignDialogOpen(true)}
+                  style={{
+                    background: 'transparent', border: '1px solid var(--border)',
+                    borderRadius: '.3rem', padding: '.15rem .55rem',
+                    font: 'inherit', fontSize: '.7rem', fontWeight: 600,
+                    cursor: 'pointer', color: 'var(--primary, #1e40af)',
+                  }}
+                >
+                  Manage →
+                </button>
+              )}
+            </div>
+            <div style={{ marginTop: '.4rem', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '.3rem 1rem' }}>
+              <strong>Primary filler:</strong>
+              <span>
+                {assignees?.filler
+                  ? <>{assignees.filler.name} <span className="muted-text">· {assignees.filler.email}</span></>
+                  : <em className="muted-text">— not assigned —</em>}
+              </span>
+              <strong>Reviewer:</strong>
+              <span>
+                {assignees?.reviewer
+                  ? <>{assignees.reviewer.name} <span className="muted-text">· {assignees.reviewer.email}</span></>
+                  : <em className="muted-text">— not assigned —</em>}
+              </span>
+              {section_assignments.length > 0 && (
+                <>
+                  <strong style={{ alignSelf: 'start' }}>By section:</strong>
+                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                    {section_assignments.map((sa) => {
+                      const sec = questions.find((q) => q.id === sa.section_question_id);
+                      return (
+                        <li key={sa.id} style={{ marginBottom: '.15rem' }}>
+                          <strong>{sec?.label || '(section)'}</strong>
+                          {' → '}
+                          {sa.assignee_name
+                            ? <>{sa.assignee_name} <span className="muted-text">· {sa.assignee_email}</span></>
+                            : <em className="muted-text">no one</em>}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
+            </div>
           </div>
         )}
 
@@ -486,19 +518,24 @@ function InstanceDrawer({ id, onClose }) {
 
         {sectionGroups.map((group, gi) => {
           const heading = group.heading;
-          const ownerRole = group.owner_role;
-          const iOwn = !ownerRole || myRoles.has('admin') || myRoles.has(ownerRole);
+          // The role attached to a section now means "who REVIEWS this
+          // section after submission" — NOT "who fills it". The filler
+          // (committee chairman) edits every section regardless.
+          const reviewerRole = group.owner_role;
           const prog = sectionProgress(group);
           const open = isOpen(gi);
           // Highlight the section the current approver is being asked to
           // sign off on, even when other sections are collapsed.
-          const isMyApprovalTarget = reviewable && isMultiStage && ownerRole && stages.some(
-            (s) => s.status === 'pending' && s.required_role_code === ownerRole
+          const isMyApprovalTarget = reviewable && isMultiStage && reviewerRole && stages.some(
+            (s) => s.status === 'pending' && s.required_role_code === reviewerRole
                    && (myRoles.has('admin') || myRoles.has(s.required_role_code)),
           );
 
           const body = group.questions.map((q) => {
-            const showAsReadonly = !editable || !iOwn;
+            // Fill rights now belong wholly to the filler — no per-section
+            // gate. Read-only only when the page is in non-fill mode at all
+            // (e.g. status='awaiting_review' or 'approved').
+            const showAsReadonly = !editable;
             return (
               <QuestionRenderer
                 key={q.id}
@@ -528,9 +565,9 @@ function InstanceDrawer({ id, onClose }) {
               >
                 <span className={'acc-chev' + (open ? ' open' : '')}>▸</span>
                 <span className="acc-title">{heading.label || 'Untitled section'}</span>
-                {ownerRole && (
-                  <span className={'acc-owner' + (iOwn ? ' mine' : ' readonly')}>
-                    {iOwn ? 'Your section' : `Owned by ${roleLabel(ownerRole)}`}
+                {reviewerRole && (
+                  <span className="acc-owner readonly">
+                    Reviewed by {roleLabel(reviewerRole)}
                   </span>
                 )}
                 {isMyApprovalTarget && (
@@ -664,7 +701,337 @@ function InstanceDrawer({ id, onClose }) {
           </>
         )}
       </footer>
+
+      {assignDialogOpen && (
+        <SectionAssignmentsDialog
+          instanceId={instance.id}
+          sections={questions.filter((q) => q.type === 'section_heading')}
+          initialAssignments={section_assignments}
+          initialFiller={assignees?.filler?.id || ''}
+          initialReviewer={assignees?.reviewer?.id || ''}
+          onClose={() => setAssignDialogOpen(false)}
+          onSaved={async () => {
+            setAssignDialogOpen(false);
+            await load();
+            showToast?.('Assignments updated', 'success');
+          }}
+          showToast={showToast}
+        />
+      )}
     </FullDrawer>
+  );
+}
+
+// ─── Section assignments dialog (admin reassign) ────────────────────────
+// Admin-only modal that re-edits the per-section filler picker AFTER
+// creation. Same shape as Step 2 in the events-page create modal — wires
+// to PUT /api/checklist-instances/:id/section-assignments (replace-all)
+// plus an optional PATCH to the primary filler/reviewer.
+function SectionAssignmentsDialog({
+  instanceId, sections, initialAssignments, initialFiller, initialReviewer,
+  onClose, onSaved, showToast,
+}) {
+  // Pre-fill the picker with whatever's already on the instance.
+  const [assignments, setAssignments] = useState(() => {
+    const m = {};
+    for (const a of initialAssignments || []) {
+      if (a.assignee_id) m[a.section_question_id] = a.assignee_id;
+    }
+    return m;
+  });
+  const [primaryFiller, setPrimaryFiller] = useState(initialFiller || '');
+  const [primaryReviewer, setPrimaryReviewer] = useState(initialReviewer || '');
+  const [users, setUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  // Pre-load users (same debounce pattern as the create modal).
+  useEffect(() => {
+    let cancelled = false;
+    const q = userSearch.trim();
+    const url = q
+      ? `/api/admin/users?q=${encodeURIComponent(q)}&status=active&pageSize=25`
+      : '/api/admin/users?status=active&pageSize=50';
+    const t = setTimeout(() => {
+      api(url)
+        .then((j) => { if (!cancelled) setUsers(j.rows || []); })
+        .catch(() => {});
+    }, q ? 250 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [userSearch]);
+
+  // Always close on Escape — matches the rest of the modal UX.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true); setErr('');
+    try {
+      // 1. Replace-all section assignments.
+      const list = Object.entries(assignments)
+        .filter(([_, uid]) => !!uid)
+        .map(([section_question_id, assignee_id]) => ({ section_question_id, assignee_id }));
+      await api(`/api/checklist-instances/${instanceId}/section-assignments`, {
+        method: 'PUT',
+        body: { assignments: list },
+      });
+
+      // 2. Patch primary filler / reviewer only if they actually changed.
+      //    Sending undefined would no-op; sending an empty string clears.
+      const patch = {};
+      if (primaryFiller   !== initialFiller)   patch.assigned_fill_user_id   = primaryFiller || null;
+      if (primaryReviewer !== initialReviewer) patch.assigned_review_user_id = primaryReviewer || null;
+      if (Object.keys(patch).length > 0) {
+        await api(`/api/checklist-instances/${instanceId}`, { method: 'PATCH', body: patch });
+      }
+
+      onSaved?.();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="sad-root" onClick={onClose}>
+      <div className="sad-card" onClick={(e) => e.stopPropagation()}>
+        <header className="sad-head">
+          <h2 style={{ margin: 0, fontSize: '1rem' }}>Manage assignments</h2>
+          <button className="sad-x" onClick={onClose} aria-label="Close">×</button>
+        </header>
+
+        <div className="sad-body">
+          {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
+
+          <div className="sad-search">
+            <input
+              type="search"
+              placeholder="Search users by name or email…"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="sad-input"
+            />
+          </div>
+
+          {sections.length === 0 && (
+            <p className="muted-text" style={{ fontSize: '.85rem' }}>
+              This template has no sections.
+            </p>
+          )}
+
+          {sections.map((s) => {
+            const value = assignments[s.id] || '';
+            return (
+              <div key={s.id} className="sad-row">
+                <div className="sad-row-info">
+                  <strong>{s.label || '(unnamed section)'}</strong>
+                </div>
+                <DialogUserPicker
+                  users={users}
+                  value={value}
+                  placeholder="— Primary filler —"
+                  onChange={(uid) => setAssignments((m) => ({ ...m, [s.id]: uid }))}
+                />
+              </div>
+            );
+          })}
+
+          <div className="sad-divider">Primary filler / reviewer</div>
+
+          <div className="sad-row">
+            <div className="sad-row-info"><strong>Primary filler</strong></div>
+            <DialogUserPicker
+              users={users}
+              value={primaryFiller}
+              placeholder="— Auto (Committee Chairman) —"
+              onChange={setPrimaryFiller}
+            />
+          </div>
+          <div className="sad-row">
+            <div className="sad-row-info"><strong>Reviewer</strong></div>
+            <DialogUserPicker
+              users={users}
+              value={primaryReviewer}
+              placeholder="— Auto (Branch Chairman) —"
+              onChange={setPrimaryReviewer}
+            />
+          </div>
+        </div>
+
+        <footer className="sad-foot">
+          <button type="button" className="sad-cancel" onClick={onClose}>Cancel</button>
+          <button type="button" className="btn-primary" onClick={save} disabled={saving} style={{ padding: '.45rem 1rem' }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </button>
+        </footer>
+
+        <style>{`
+          .sad-root {
+            position: fixed; inset: 0; z-index: 300;
+            background: rgba(15,23,42,.45);
+            display: flex; align-items: flex-start; justify-content: center;
+            padding: 5vh 1rem; overflow-y: auto;
+          }
+          .sad-card {
+            width: 100%; max-width: 600px;
+            background: var(--card); border-radius: .5rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,.25);
+            display: flex; flex-direction: column; max-height: 90vh;
+          }
+          .sad-head {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: .85rem 1.1rem; border-bottom: 1px solid var(--border);
+          }
+          .sad-x {
+            background: transparent; border: 0; font-size: 1.5rem; line-height: 1;
+            cursor: pointer; color: var(--muted-foreground); padding: 0 .5rem;
+          }
+          .sad-body { padding: 1rem 1.1rem; overflow-y: auto; }
+          .sad-search { margin-bottom: .65rem; }
+          .sad-input {
+            width: 100%; padding: .4rem .55rem;
+            border: 1px solid var(--border); border-radius: .375rem;
+            background: var(--card); font: inherit; color: inherit;
+          }
+          .sad-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+          .sad-divider {
+            margin: .85rem 0 .4rem;
+            font-size: .7rem; font-weight: 600;
+            color: var(--muted-foreground);
+            text-transform: uppercase; letter-spacing: .04em;
+          }
+          .sad-row {
+            display: flex; gap: .75rem; align-items: center;
+            padding: .5rem .65rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: .375rem; margin-bottom: .35rem;
+          }
+          .sad-row-info { flex: 1; min-width: 0; font-size: .85rem; }
+          .sad-foot {
+            display: flex; gap: .5rem; justify-content: flex-end;
+            padding: .75rem 1rem;
+            border-top: 1px solid var(--border);
+            background: var(--background, #fafbfc);
+          }
+          .sad-cancel {
+            background: transparent; border: 1px solid var(--border);
+            border-radius: .375rem; padding: .4rem .75rem;
+            font: inherit; font-size: .8125rem; cursor: pointer;
+            color: var(--muted-foreground);
+          }
+          .sad-cancel:hover { color: var(--foreground); }
+          .dup-wrap {
+            position: relative; min-width: 220px; max-width: 260px;
+            flex-shrink: 0;
+          }
+          .dup-trigger {
+            width: 100%; padding: .35rem .55rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: .375rem;
+            font: inherit; font-size: .8125rem; text-align: left;
+            display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer;
+          }
+          .dup-trigger:hover { border-color: var(--primary); }
+          .dup-trigger.is-empty { color: var(--muted-foreground); }
+          .dup-menu {
+            position: absolute; top: calc(100% + .25rem); right: 0;
+            z-index: 6; min-width: 280px;
+            background: white; border: 1px solid var(--border);
+            border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.12);
+            padding: .35rem;
+            display: flex; flex-direction: column;
+            max-height: 280px; overflow-y: auto;
+          }
+          .dup-item {
+            display: flex; align-items: center; gap: .5rem;
+            width: 100%; padding: .4rem .55rem;
+            text-align: left; background: transparent; border: 0; cursor: pointer;
+            font: inherit; font-size: .8125rem; color: var(--foreground);
+            border-radius: .3rem;
+          }
+          .dup-item:hover { background: var(--background, #f8fafc); }
+          .dup-item.is-active {
+            background: rgba(37, 99, 235, .08);
+            color: var(--primary, #1e40af);
+            font-weight: 600;
+          }
+          .dup-clear {
+            border-top: 1px solid var(--border); margin-top: .2rem;
+            color: var(--muted-foreground);
+          }
+        `}</style>
+      </div>
+    </div>
+  );
+}
+
+// Lightweight user picker for the reassign dialog. Duplicated (with
+// different class names) so that styling collisions with the create-flow
+// picker don't bleed across.
+function DialogUserPicker({ users, value, placeholder, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+  const picked = value ? users.find((u) => u.id === value) : null;
+  return (
+    <div ref={ref} className="dup-wrap">
+      <button
+        type="button"
+        className={'dup-trigger' + (picked ? '' : ' is-empty')}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {picked ? picked.name : placeholder}
+        </span>
+        <span style={{ fontSize: '.65rem', opacity: .6, marginLeft: '.3rem' }}>▾</span>
+      </button>
+      {open && (
+        <div className="dup-menu">
+          {users.length === 0 ? (
+            <div style={{ color: 'var(--muted-foreground)', padding: '.5rem .55rem', fontSize: '.8rem' }}>
+              No users in that search
+            </div>
+          ) : users.map((u) => {
+            const active = u.id === value;
+            return (
+              <button
+                key={u.id}
+                type="button"
+                className={'dup-item' + (active ? ' is-active' : '')}
+                onClick={() => { onChange(u.id); setOpen(false); }}
+              >
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <strong style={{ fontWeight: 600 }}>{u.name}</strong>
+                  <span style={{ marginLeft: '.4rem', color: 'var(--muted-foreground)', fontSize: '.75rem' }}>{u.email}</span>
+                </span>
+                {active && <span style={{ color: 'var(--primary, #1e40af)' }}>✓</span>}
+              </button>
+            );
+          })}
+          {value && (
+            <button
+              type="button"
+              className="dup-item dup-clear"
+              onClick={() => { onChange(''); setOpen(false); }}
+            >
+              Clear (use default)
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

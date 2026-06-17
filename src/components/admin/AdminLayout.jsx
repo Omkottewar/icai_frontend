@@ -94,7 +94,7 @@ const NAV_GROUPS = [
     label: 'System',
     items: [
       { to: '/admin/files',                  label: 'Files',                  Icon: IconFileText, soon: true, roles: [] /* admin-only */ },
-      { to: '/admin/notification-templates', label: 'Notification templates', Icon: IconBookOpen, roles: [] /* admin-only */ },
+      { to: '/admin/notifications-log',      label: 'Notifications log',      Icon: IconBookOpen, roles: [] /* admin-only */ },
     ],
   },
 ];

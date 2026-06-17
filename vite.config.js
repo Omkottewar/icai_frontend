@@ -24,6 +24,15 @@ export default defineConfig({
       filename: 'sw.js',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
+      // Register the SW in dev too — otherwise navigator.serviceWorker.ready
+      // hangs forever and push enable fails with the generic "Server push is
+      // not configured" error. Modern VitePWA + Vite no longer conflict with
+      // HMR in dev (the older guidance to leave this off is obsolete).
+      devOptions: {
+        enabled: true,
+        type: 'module',
+        navigateFallback: 'index.html',
+      },
       manifest: {
         name: 'ICAI Nagpur Branch',
         short_name: 'ICAI Nagpur',

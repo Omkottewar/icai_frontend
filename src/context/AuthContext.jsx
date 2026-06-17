@@ -3,6 +3,40 @@ import { IconCheckCircle, IconX, IconBell } from '../icons';
 
 const AuthContext = createContext(null);
 
+// Cache the signed-in user's identity in localStorage so subsequent visits
+// render with the correct header (avatar + Dashboard link) on the FIRST
+// frame instead of flashing "Sign in" while /api/auth/me round-trips.
+//
+// Security note: the actual session is in an httpOnly cookie — this cache
+// is purely a UI hint. If the session was revoked server-side, /me will
+// return 401 on the background refresh and we clear the cache. An attacker
+// with XSS access could read name/email here, but couldn't impersonate the
+// user (the cookie is httpOnly).
+const USER_CACHE_KEY = 'icai_cached_user_v1';
+
+function readCachedUser() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(USER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Sanity check the shape — refuse cache rows from old app versions to
+    // avoid rendering with stale field names.
+    if (!parsed || typeof parsed !== 'object' || !parsed.id) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedUser(user) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    if (user) localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
+    else      localStorage.removeItem(USER_CACHE_KEY);
+  } catch { /* incognito / quota — silently skip */ }
+}
+
 // Map the server's /api/auth/me shape onto the identity fields the UI uses.
 // Role-specific dashboard data (MRN, SRN, CPE hours, etc.) lives in
 // /api/dashboard — see src/hooks/useDashboard.js.
@@ -42,8 +76,18 @@ async function postJson(path, body) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Hydrate synchronously from the localStorage cache. On subsequent visits
+  // this means the very first React render already has the correct user, so
+  // the header shows the avatar instead of "Sign in" while /me is in flight.
+  // On a brand-new device / after sign-out the cache is empty — `loading`
+  // stays true and consumers can gate the UI with it.
+  const initialCachedUser = readCachedUser();
+  const [user, setUser] = useState(initialCachedUser);
+  // `loading` means "we have not yet confirmed with the server who the user
+  // is". When we have a cached user we still need to confirm in the
+  // background, but we can render the UI immediately — `loading` is false
+  // in that case because the UI is renderable with full confidence.
+  const [loading, setLoading] = useState(!initialCachedUser);
   const [toast, setToast] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -52,16 +96,25 @@ export function AuthProvider({ children }) {
       if (r.ok) {
         const u = toUiUser(await r.json());
         setUser(u);
+        writeCachedUser(u);
         return u;
       }
+      // 401 / other non-2xx → session is gone. Clear both the in-memory
+      // user and the cache so the next reload doesn't flash a stale identity.
+      if (r.status === 401) {
+        setUser(null);
+        writeCachedUser(null);
+      }
     } catch {
-      /* fall through */
+      // Network error — keep whatever state we have. The cached user is
+      // still the most accurate guess until the network comes back.
     }
-    setUser(null);
     return null;
   }, []);
 
-  // Hydrate from the server on mount. Cookie-based session, so just GET /me.
+  // Confirm the session against the server on mount. If we already had a
+  // cached user the UI is already rendered correctly; this is just a
+  // background check that flips us to null if the cookie expired.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -125,6 +178,7 @@ export function AuthProvider({ children }) {
       /* even if the server call fails, drop local state */
     }
     setUser(null);
+    writeCachedUser(null);
     showToast('Signed out', 'info');
     window.location.hash = '#/';
   };

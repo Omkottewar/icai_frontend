@@ -1,109 +1,614 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { IconCalendar, IconClock, IconChevronUp, IconChevronDownAlt } from '../../icons';
 
-// Hybrid date+time input.
+// Custom date + time picker.
 //
-// Desktop (>=768px wide): keeps the native <input type="datetime-local">.
-// Chromium and Firefox render a perfectly usable popover there, and the
-// form already validates against this format.
+// Trigger looks like a normal input ("24 Jun 2026, 5:30 PM ▾"). Click opens
+// a popover with a calendar grid + a 12-hour time row + quick presets
+// (Now, +1h, +1d). Keyboard: Esc closes, Enter on a date picks it.
 //
-// Mobile (<768px): native datetime-local is unreliable — Safari iOS hides
-// the time picker, older Android Chrome falls back to a plain text field.
-// We split into two well-supported inputs:
-//   <input type="date"> + <input type="time">
-// Both have rock-solid mobile pickers across every browser.
+// Wire format stays "YYYY-MM-DDTHH:MM" (same as native datetime-local) so
+// any existing caller doesn't need to change. Empty value = '' (no selection).
 //
-// Wire format (the parent's `value` and the value passed back to `onChange`)
-// stays "YYYY-MM-DDTHH:MM" — same as datetime-local — so callers don't
-// need to know which mode they're in.
+// Why custom: native datetime-local is unstyleable, opens awkwardly in
+// modals, and on Safari iOS hides the time picker entirely.
 export default function DateTimePicker({
   value,
   onChange,
   required = false,
   disabled = false,
   className = 'input-base',
+  placeholder = 'Pick date & time',
+  minDate,           // 'YYYY-MM-DD' — optional lower bound for picking
+  maxDate,           // 'YYYY-MM-DD' — optional upper bound for picking
 }) {
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return false;
-    return window.matchMedia('(max-width: 767px)').matches;
+  const [open, setOpen] = useState(false);
+  // Anchor month shown in the calendar — independent of `value` so users
+  // can flip through months without committing.
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = parseValue(value) || new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
   });
+  const wrapRef = useRef(null);
+  const popRef = useRef(null);
 
+  // Keep viewMonth in sync if a parent updates `value` (e.g. resetting form).
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return;
-    const mq = window.matchMedia('(max-width: 767px)');
-    const handler = (e) => setIsMobile(e.matches);
-    // Safari < 14 only supports addListener/removeListener.
-    if (mq.addEventListener) {
-      mq.addEventListener('change', handler);
-      return () => mq.removeEventListener('change', handler);
-    }
-    mq.addListener(handler);
-    return () => mq.removeListener(handler);
-  }, []);
+    const d = parseValue(value);
+    if (d) setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, [value]);
 
-  if (!isMobile) {
-    return (
-      <input
-        type="datetime-local"
-        className={className}
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-        disabled={disabled}
-      />
+  // Close on outside click + Esc.
+  useEffect(() => {
+    if (!open) return;
+    const onMouse = (e) => {
+      if (!wrapRef.current?.contains(e.target) && !popRef.current?.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onMouse);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onMouse);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const picked = parseValue(value);
+  const label = picked ? formatPretty(picked) : '';
+
+  const emit = (d) => onChange(formatWire(d));
+
+  const setDateKeepTime = (newDate) => {
+    const base = picked || defaultTime();
+    const merged = new Date(
+      newDate.getFullYear(), newDate.getMonth(), newDate.getDate(),
+      base.getHours(), base.getMinutes(),
     );
-  }
+    emit(merged);
+  };
 
-  // Mobile path — split fields. The wire format is "YYYY-MM-DDTHH:MM".
-  const [datePart, timePart] = value ? splitValue(value) : ['', ''];
+  const setHour = (newHour) => {
+    const base = picked || defaultTime();
+    const merged = new Date(
+      base.getFullYear(), base.getMonth(), base.getDate(),
+      newHour, base.getMinutes(),
+    );
+    emit(merged);
+  };
+  const setMinute = (newMinute) => {
+    const base = picked || defaultTime();
+    const merged = new Date(
+      base.getFullYear(), base.getMonth(), base.getDate(),
+      base.getHours(), newMinute,
+    );
+    emit(merged);
+  };
 
-  const emit = (d, t) => {
-    if (!d && !t) {
-      onChange('');
-      return;
-    }
-    // If only one side is filled, fall back to a sensible default for the
-    // other so the parent gets a complete value to validate. Users will
-    // see the missing field highlighted by required-field validation.
-    const finalDate = d || todayLocalISO();
-    const finalTime = t || '09:00';
-    onChange(`${finalDate}T${finalTime}`);
+  // Calendar grid: always show 6 weeks (42 cells) so the popover height
+  // doesn't jitter month-to-month. Cells before/after the current month
+  // fade out but stay clickable.
+  const grid = useMemo(() => buildMonthGrid(viewMonth), [viewMonth]);
+
+  const minD = minDate ? parseValue(minDate + 'T00:00') : null;
+  const maxD = maxDate ? parseValue(maxDate + 'T23:59') : null;
+  const isDisabledDay = (d) => {
+    if (minD && d < startOfDay(minD)) return true;
+    if (maxD && d > endOfDay(maxD)) return true;
+    return false;
   };
 
   return (
-    <div className="dtp-mobile">
-      <input
-        type="date"
-        className={className}
-        value={datePart}
-        onChange={(e) => emit(e.target.value, timePart)}
-        required={required}
+    <div className="dtp-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className={className + ' dtp-trigger' + (picked ? '' : ' is-empty')}
+        onClick={() => !disabled && setOpen((o) => !o)}
         disabled={disabled}
-        style={{ flex: '1.4 1 0', minWidth: 0 }}
-      />
-      <input
-        type="time"
-        className={className}
-        value={timePart}
-        onChange={(e) => emit(datePart, e.target.value)}
-        required={required}
-        disabled={disabled}
-        style={{ flex: '1 1 0', minWidth: 0 }}
-      />
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <IconCalendar size="sm" />
+        <span className="dtp-trigger-text">
+          {label || placeholder}
+        </span>
+        <span className="dtp-trigger-chev" aria-hidden>▾</span>
+      </button>
+
+      {required && !picked && (
+        <input
+          type="text"
+          required
+          tabIndex={-1}
+          value=""
+          onChange={() => {}}
+          aria-hidden
+          style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+        />
+      )}
+
+      {open && (
+        <div className="dtp-pop" ref={popRef} role="dialog" aria-label="Choose date and time">
+          {/* Quick presets */}
+          <div className="dtp-presets">
+            <button type="button" className="dtp-preset" onClick={() => { const d = new Date(); emit(d); }}>
+              Now
+            </button>
+            <button type="button" className="dtp-preset" onClick={() => {
+              const base = picked || new Date();
+              const d = new Date(base.getTime() + 60 * 60 * 1000);
+              emit(d);
+            }}>+1 hour</button>
+            <button type="button" className="dtp-preset" onClick={() => {
+              const base = picked || new Date();
+              const d = new Date(base.getTime() + 24 * 60 * 60 * 1000);
+              emit(d);
+            }}>+1 day</button>
+            <button type="button" className="dtp-preset" onClick={() => {
+              const base = picked || new Date();
+              const d = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000);
+              emit(d);
+            }}>+1 week</button>
+          </div>
+
+          {/* Month nav */}
+          <div className="dtp-monthnav">
+            <button
+              type="button"
+              className="dtp-navbtn"
+              onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+              aria-label="Previous month"
+            >‹</button>
+            <strong className="dtp-monthlbl">{monthLabel(viewMonth)}</strong>
+            <button
+              type="button"
+              className="dtp-navbtn"
+              onClick={() => setViewMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+              aria-label="Next month"
+            >›</button>
+          </div>
+
+          {/* Day-of-week row */}
+          <div className="dtp-dow">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+              <span key={d} className="dtp-dow-cell">{d}</span>
+            ))}
+          </div>
+
+          {/* Day grid */}
+          <div className="dtp-grid">
+            {grid.map((d, i) => {
+              const inMonth = d.getMonth() === viewMonth.getMonth();
+              const isToday = sameDay(d, new Date());
+              const isPicked = picked && sameDay(d, picked);
+              const disabled = isDisabledDay(d);
+              return (
+                <button
+                  type="button"
+                  key={i}
+                  className={
+                    'dtp-day'
+                    + (inMonth ? '' : ' is-other')
+                    + (isToday ? ' is-today' : '')
+                    + (isPicked ? ' is-picked' : '')
+                  }
+                  disabled={disabled}
+                  onClick={() => setDateKeepTime(d)}
+                >
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Time row */}
+          <div className="dtp-time">
+            <IconClock size="sm" />
+            <TimeStepper
+              hour={picked ? picked.getHours() : 9}
+              minute={picked ? picked.getMinutes() : 0}
+              onHour={setHour}
+              onMinute={setMinute}
+            />
+          </div>
+
+          {/* Footer actions */}
+          <div className="dtp-foot">
+            {picked && (
+              <button type="button" className="dtp-clear" onClick={() => onChange('')}>
+                Clear
+              </button>
+            )}
+            <div style={{ flex: 1 }} />
+            <button type="button" className="dtp-done" onClick={() => setOpen(false)}>
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
       <style>{`
-        .dtp-mobile { display: flex; gap: .5rem; }
+        .dtp-wrap { position: relative; }
+        .dtp-trigger {
+          display: flex; align-items: center; gap: .5rem;
+          width: 100%;
+          padding: .55rem .75rem;
+          text-align: left;
+          cursor: pointer;
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-radius: .375rem;
+          font: inherit; color: inherit;
+          transition: border-color .15s, box-shadow .15s;
+        }
+        .dtp-trigger:hover:not(:disabled) {
+          border-color: oklch(0.36 0.13 255 / 0.5);
+        }
+        .dtp-trigger:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: -1px;
+        }
+        .dtp-trigger:disabled {
+          opacity: .55; cursor: not-allowed; background: var(--background, #f8fafc);
+        }
+        .dtp-trigger.is-empty .dtp-trigger-text {
+          color: var(--muted-foreground);
+        }
+        .dtp-trigger-text {
+          flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+          font-size: .9rem;
+        }
+        .dtp-trigger-chev {
+          font-size: .7rem; opacity: .55; color: var(--muted-foreground);
+        }
+        .dtp-pop {
+          position: absolute; z-index: 50;
+          top: calc(100% + .35rem); left: 0;
+          width: 320px; max-width: calc(100vw - 2rem);
+          padding: .75rem;
+          background: white;
+          border: 1px solid var(--border);
+          border-radius: .55rem;
+          box-shadow: 0 10px 30px rgba(15, 23, 42, .12), 0 2px 6px rgba(15, 23, 42, .06);
+          animation: dtpFade .12s ease-out;
+        }
+        @keyframes dtpFade {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .dtp-presets {
+          display: flex; gap: .25rem; flex-wrap: wrap;
+          padding-bottom: .55rem;
+          border-bottom: 1px solid var(--border);
+          margin-bottom: .55rem;
+        }
+        .dtp-preset {
+          padding: .25rem .55rem;
+          background: var(--background, #f8fafc);
+          border: 1px solid var(--border);
+          border-radius: 999px;
+          font: inherit; font-size: .72rem; font-weight: 600;
+          color: var(--muted-foreground);
+          cursor: pointer;
+          transition: all .12s;
+        }
+        .dtp-preset:hover {
+          background: rgba(37, 99, 235, .08);
+          color: var(--primary, #1e40af);
+          border-color: rgba(37, 99, 235, .25);
+        }
+        .dtp-monthnav {
+          display: grid;
+          grid-template-columns: auto 1fr auto;
+          gap: .25rem; align-items: center;
+          margin-bottom: .35rem;
+        }
+        .dtp-navbtn {
+          width: 1.85rem; height: 1.85rem;
+          padding: 0;
+          background: transparent;
+          border: 1px solid transparent;
+          border-radius: .35rem;
+          font-size: 1.15rem; line-height: 1;
+          color: var(--muted-foreground);
+          cursor: pointer;
+        }
+        .dtp-navbtn:hover {
+          background: var(--background, #f1f5f9);
+          color: var(--foreground);
+        }
+        .dtp-monthlbl {
+          text-align: center; font-size: .9rem; font-weight: 700;
+          color: var(--foreground);
+        }
+        .dtp-dow {
+          display: grid; grid-template-columns: repeat(7, 1fr); gap: .15rem;
+          margin-bottom: .2rem;
+        }
+        .dtp-dow-cell {
+          text-align: center; font-size: .68rem; font-weight: 700;
+          color: var(--muted-foreground);
+          letter-spacing: .04em; text-transform: uppercase;
+          padding: .25rem 0;
+        }
+        .dtp-grid {
+          display: grid; grid-template-columns: repeat(7, 1fr); gap: .15rem;
+        }
+        .dtp-day {
+          aspect-ratio: 1 / 1;
+          display: flex; align-items: center; justify-content: center;
+          background: transparent; border: 1px solid transparent;
+          border-radius: .35rem;
+          font: inherit; font-size: .82rem; font-weight: 500;
+          color: var(--foreground);
+          cursor: pointer;
+          transition: background .1s, color .1s;
+        }
+        .dtp-day:hover:not(:disabled) {
+          background: rgba(37, 99, 235, .1);
+          color: var(--primary, #1e40af);
+        }
+        .dtp-day.is-other {
+          color: var(--muted-foreground); opacity: .5;
+        }
+        .dtp-day.is-today {
+          border-color: rgba(37, 99, 235, .3);
+          font-weight: 700;
+        }
+        .dtp-day.is-picked {
+          background: var(--primary, #1e40af);
+          color: white;
+          font-weight: 700;
+        }
+        .dtp-day.is-picked:hover { background: oklch(0.32 0.13 255); color: white; }
+        .dtp-day:disabled {
+          color: var(--muted-foreground); opacity: .25;
+          cursor: not-allowed;
+        }
+        .dtp-time {
+          display: flex; align-items: center; gap: .5rem;
+          margin-top: .65rem; padding-top: .65rem;
+          border-top: 1px solid var(--border);
+          color: var(--muted-foreground);
+        }
+        .dtp-foot {
+          display: flex; gap: .35rem; align-items: center;
+          margin-top: .65rem;
+        }
+        .dtp-clear {
+          padding: .35rem .65rem;
+          background: transparent;
+          border: 1px solid var(--border);
+          border-radius: .35rem;
+          font: inherit; font-size: .75rem; font-weight: 600;
+          color: var(--muted-foreground);
+          cursor: pointer;
+        }
+        .dtp-clear:hover {
+          color: var(--destructive, #b91c1c);
+          border-color: var(--destructive, #fecaca);
+        }
+        .dtp-done {
+          padding: .4rem 1.1rem;
+          background: var(--primary, #1e40af);
+          color: white;
+          border: 0;
+          border-radius: .375rem;
+          font: inherit; font-size: .8125rem; font-weight: 700;
+          cursor: pointer;
+        }
+        .dtp-done:hover { background: oklch(0.32 0.13 255); }
       `}</style>
     </div>
   );
 }
 
-function splitValue(v) {
-  if (typeof v !== 'string' || !v.includes('T')) return ['', ''];
-  const [d, t] = v.split('T');
-  return [d || '', (t || '').slice(0, 5)];
+// ─── Time stepper (12h with AM/PM toggle) ───────────────────────────────
+function TimeStepper({ hour, minute, onHour, onMinute }) {
+  // Convert 24h hour to 12h display.
+  const isPM = hour >= 12;
+  const display12 = ((hour % 12) || 12);
+
+  const setH12 = (h12) => {
+    const h24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+    onHour(h24);
+  };
+  const togglePM = () => {
+    onHour(isPM ? hour - 12 : hour + 12);
+  };
+  const bumpMinute = (delta) => {
+    const next = (minute + delta + 60) % 60;
+    onMinute(next);
+  };
+  const bumpHour12 = (delta) => {
+    let next = display12 + delta;
+    if (next < 1) next = 12;
+    if (next > 12) next = 1;
+    setH12(next);
+  };
+
+  return (
+    <div className="ts-wrap">
+      <div className="ts-field">
+        <button type="button" className="ts-up" onClick={() => bumpHour12(1)} aria-label="Hour up">
+          <IconChevronUp size="xs" />
+        </button>
+        <input
+          type="number"
+          min="1" max="12"
+          value={display12}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n) && n >= 1 && n <= 12) setH12(n);
+          }}
+          aria-label="Hour"
+        />
+        <button type="button" className="ts-down" onClick={() => bumpHour12(-1)} aria-label="Hour down">
+          <IconChevronDownAlt size="xs" />
+        </button>
+      </div>
+      <span className="ts-colon">:</span>
+      <div className="ts-field">
+        <button type="button" className="ts-up" onClick={() => bumpMinute(5)} aria-label="Minute up">
+          <IconChevronUp size="xs" />
+        </button>
+        <input
+          type="number"
+          min="0" max="59"
+          value={String(minute).padStart(2, '0')}
+          onChange={(e) => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n) && n >= 0 && n <= 59) onMinute(n);
+          }}
+          aria-label="Minute"
+        />
+        <button type="button" className="ts-down" onClick={() => bumpMinute(-5)} aria-label="Minute down">
+          <IconChevronDownAlt size="xs" />
+        </button>
+      </div>
+      <button
+        type="button"
+        className={'ts-ampm' + (isPM ? ' is-pm' : '')}
+        onClick={togglePM}
+        aria-label="Toggle AM/PM"
+      >
+        {isPM ? 'PM' : 'AM'}
+      </button>
+      <style>{`
+        .ts-wrap {
+          display: flex; align-items: center; gap: .35rem;
+          flex: 1;
+        }
+        .ts-field {
+          position: relative;
+          display: flex; flex-direction: column; align-items: center;
+        }
+        .ts-field input {
+          width: 2.4rem; height: 2rem;
+          padding: 0;
+          text-align: center;
+          font: inherit; font-size: .95rem; font-weight: 700;
+          color: var(--foreground);
+          background: var(--background, #f8fafc);
+          border: 1px solid var(--border);
+          border-radius: .35rem;
+          -moz-appearance: textfield;
+        }
+        .ts-field input::-webkit-outer-spin-button,
+        .ts-field input::-webkit-inner-spin-button {
+          -webkit-appearance: none; margin: 0;
+        }
+        .ts-field input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
+        .ts-up, .ts-down {
+          position: absolute;
+          width: 1.4rem; height: .9rem;
+          padding: 0;
+          background: transparent; border: 0; cursor: pointer;
+          color: var(--muted-foreground);
+          display: flex; align-items: center; justify-content: center;
+          opacity: 0; transition: opacity .12s;
+        }
+        .ts-field:hover .ts-up, .ts-field:hover .ts-down,
+        .ts-field:focus-within .ts-up, .ts-field:focus-within .ts-down {
+          opacity: 1;
+        }
+        .ts-up { top: -1.05rem; }
+        .ts-down { bottom: -1.05rem; }
+        .ts-up:hover, .ts-down:hover { color: var(--primary, #1e40af); }
+        .ts-colon {
+          font-size: 1rem; font-weight: 700;
+          color: var(--muted-foreground);
+          padding-bottom: .15rem;
+        }
+        .ts-ampm {
+          padding: .3rem .65rem;
+          background: var(--background, #f8fafc);
+          border: 1px solid var(--border);
+          border-radius: .35rem;
+          font: inherit; font-size: .8rem; font-weight: 700;
+          color: var(--muted-foreground);
+          cursor: pointer;
+          margin-left: .25rem;
+        }
+        .ts-ampm.is-pm {
+          background: var(--primary, #1e40af);
+          color: white;
+          border-color: var(--primary, #1e40af);
+        }
+        .ts-ampm:hover:not(.is-pm) {
+          color: var(--foreground);
+        }
+      `}</style>
+    </div>
+  );
 }
 
-function todayLocalISO() {
-  const d = new Date();
+// ─── Pure helpers ────────────────────────────────────────────────────────
+
+function parseValue(v) {
+  if (!v || typeof v !== 'string') return null;
+  // Accept "YYYY-MM-DDTHH:MM" or full ISO. Treat as local time so the
+  // calendar shows the user's intent (not UTC shifted).
+  const m = v.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/);
+  if (!m) return null;
+  const [, y, mo, d, hh, mm] = m;
+  const date = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh || 0), Number(mm || 0));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatWire(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatPretty(d) {
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const hours24 = d.getHours();
+  const hours12 = ((hours24 % 12) || 12);
+  const ampm = hours24 >= 12 ? 'PM' : 'AM';
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}, ${hours12}:${mm} ${ampm}`;
+}
+
+function monthLabel(d) {
+  const MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return `${MON[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function buildMonthGrid(viewMonth) {
+  // 6 rows × 7 cols, Monday-first. First cell is the most recent Monday on
+  // or before the 1st of the month.
+  const first = new Date(viewMonth.getFullYear(), viewMonth.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7; // 0 = Mon
+  const start = new Date(first);
+  start.setDate(first.getDate() - offset);
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    cells.push(d);
+  }
+  return cells;
+}
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
+}
+
+function startOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function endOfDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+}
+
+function defaultTime() {
+  // Sensible default when the user types into the time fields before
+  // picking a date: today at 09:00.
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0);
 }

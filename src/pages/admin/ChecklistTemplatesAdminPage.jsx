@@ -34,15 +34,34 @@ export default function ChecklistTemplatesAdminPage() {
   const route = useRoute();
   const editingId = route.query.edit || null;
   const previewId = route.query.preview || null;
+  // Gallery state lives in the page (not the URL) — it's a transient picker
+  // that closes the moment the user picks anything. Keeping it out of the
+  // URL means the back button skips it cleanly.
+  const [galleryOpen, setGalleryOpen] = useState(false);
 
   return (
     <AdminLayout
       title="Checklist templates"
-      subtitle="Build reusable forms — text, numbers, choices, files, and more."
-      actions={<NewButton />}
+      subtitle="Pick a ready-made template, tweak it, you're done."
+      actions={<NewButton onClick={() => setGalleryOpen(true)} />}
     >
       <TemplateList onEdit={(id) => navigate('/admin/checklist-templates?edit=' + id)}
-                    onPreview={(id) => navigate('/admin/checklist-templates?preview=' + id)} />
+                    onPreview={(id) => navigate('/admin/checklist-templates?preview=' + id)}
+                    onEmptyStateNew={() => setGalleryOpen(true)} />
+
+      {galleryOpen && (
+        <StarterGalleryDrawer
+          onClose={() => setGalleryOpen(false)}
+          onPicked={(newId) => {
+            setGalleryOpen(false);
+            navigate('/admin/checklist-templates?edit=' + newId);
+          }}
+          onStartBlank={() => {
+            setGalleryOpen(false);
+            navigate('/admin/checklist-templates?edit=new');
+          }}
+        />
+      )}
 
       {editingId && (
         <BuilderDrawer
@@ -60,19 +79,181 @@ export default function ChecklistTemplatesAdminPage() {
   );
 }
 
-function NewButton() {
+function NewButton({ onClick }) {
   return (
     <button
-      className="btn-primary"
-      onClick={() => navigate('/admin/checklist-templates?edit=new')}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}
+      className="btn btn-primary"
+      onClick={onClick}
     >
-      <IconPlus size="sm" /> New template
+      <IconPlus size="sm" />
+      <span>New template</span>
     </button>
   );
 }
 
-function TemplateList({ onEdit, onPreview }) {
+// ─── Starter gallery ───────────────────────────────────────────────────────
+// The first thing a chairman sees when they click "+ New template". Shows
+// the 4 curated, ready-to-use templates (CPE Seminar, Workshop, Study
+// Circle, Post-Event Bills) as big clickable cards. Picking one clones it
+// into a fresh draft and drops the user into the builder with everything
+// pre-filled — typical create flow collapses from ~15 clicks to 2.
+//
+// "Start blank" is intentionally less prominent (text link, not a button)
+// because virtually nobody should need it.
+function StarterGalleryDrawer({ onClose, onPicked, onStartBlank }) {
+  const { showToast } = useAuth();
+  const [starters, setStarters] = useState(null);
+  const [err, setErr] = useState('');
+  const [picking, setPicking] = useState(null); // id currently being cloned
+
+  useEffect(() => {
+    let cancelled = false;
+    api('/api/checklist-templates/starters')
+      .then((j) => { if (!cancelled) setStarters(j.rows || []); })
+      .catch((e) => { if (!cancelled) setErr(e.message); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const onUseStarter = async (starter) => {
+    if (picking) return;
+    setPicking(starter.id);
+    try {
+      // The backend auto-forks when source is a starter — we don't need
+      // ?fork=1 explicitly, but pass it anyway to be unambiguous.
+      const row = await api(`/api/checklist-templates/${starter.id}/clone?fork=1`, { method: 'POST' });
+      showToast?.(`"${starter.name}" added to your templates`, 'success');
+      onPicked(row.id);
+    } catch (e) {
+      showToast?.(e.message || 'Could not use this starter', 'error');
+      setPicking(null);
+    }
+  };
+
+  // Hand-tuned icon per starter name. If a new starter is seeded later,
+  // it'll fall back to 📋 — fine for the rare new addition.
+  const iconFor = (name) => {
+    if (/cpe/i.test(name)) return '📚';
+    if (/workshop|training/i.test(name)) return '🔧';
+    if (/study circle/i.test(name)) return '👥';
+    if (/bills|closure|post[- ]event/i.test(name)) return '💰';
+    return '📋';
+  };
+
+  return (
+    <Drawer open onClose={onClose} title="Start a new template" width={680}>
+      <div className="sg-wrap">
+        <p className="sg-lede">
+          Pick a ready-made template. You'll be able to rename it and edit any item.
+        </p>
+
+        {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
+        {!starters && !err && <p className="muted-text">Loading…</p>}
+
+        {starters && (
+          <div className="sg-grid">
+            {starters.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className="sg-card"
+                disabled={!!picking}
+                onClick={() => onUseStarter(s)}
+              >
+                <div className="sg-card-icon">{iconFor(s.name)}</div>
+                <div className="sg-card-body">
+                  <strong>{s.name}</strong>
+                  <p className="sg-card-desc">{s.description}</p>
+                  <span className="sg-card-meta">
+                    {s.question_count} {s.question_count === 1 ? 'question' : 'questions'}
+                    {s.section_count > 0 && ` · ${s.section_count} ${s.section_count === 1 ? 'section' : 'sections'}`}
+                  </span>
+                </div>
+                <div className="sg-card-cta">
+                  {picking === s.id ? 'Adding…' : 'Use →'}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="sg-blank">
+          <span className="muted-text" style={{ fontSize: '.8125rem' }}>None of these fit?</span>
+          <button type="button" className="sg-blank-btn" disabled={!!picking} onClick={onStartBlank}>
+            Start with a blank template →
+          </button>
+        </div>
+
+        <style>{`
+          .sg-wrap { display: flex; flex-direction: column; gap: 1rem; }
+          .sg-lede {
+            margin: 0; font-size: .9rem; color: var(--muted-foreground);
+          }
+          .sg-grid {
+            display: grid; gap: .625rem;
+            grid-template-columns: 1fr;
+          }
+          .sg-card {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            gap: .9rem; align-items: center;
+            text-align: left;
+            padding: .9rem 1rem;
+            background: var(--card, white);
+            border: 1px solid var(--border);
+            border-radius: .5rem;
+            cursor: pointer;
+            transition: border-color .12s, transform .12s, box-shadow .12s;
+          }
+          .sg-card:hover:not(:disabled) {
+            border-color: var(--primary, #1e40af);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(30, 64, 175, .08);
+          }
+          .sg-card:disabled { opacity: .5; cursor: wait; }
+          .sg-card-icon {
+            font-size: 1.85rem; line-height: 1;
+            width: 2.6rem; height: 2.6rem;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(37, 99, 235, .08);
+            border-radius: .5rem;
+          }
+          .sg-card-body { min-width: 0; display: flex; flex-direction: column; gap: .15rem; }
+          .sg-card-body strong { font-size: .95rem; }
+          .sg-card-desc {
+            margin: 0; font-size: .8125rem; color: var(--muted-foreground);
+            line-height: 1.35;
+          }
+          .sg-card-meta {
+            font-size: .7rem; font-weight: 600;
+            color: var(--muted-foreground);
+            text-transform: uppercase; letter-spacing: .04em;
+            margin-top: .15rem;
+          }
+          .sg-card-cta {
+            font-size: .8125rem; font-weight: 700;
+            color: var(--primary, #1e40af);
+            white-space: nowrap;
+          }
+          .sg-blank {
+            display: flex; align-items: center; justify-content: center; gap: .6rem;
+            padding: .75rem; margin-top: .25rem;
+            border-top: 1px dashed var(--border);
+          }
+          .sg-blank-btn {
+            background: transparent; border: 0; cursor: pointer;
+            font-size: .8125rem; font-weight: 600;
+            color: var(--primary, #1e40af);
+            padding: .25rem .5rem;
+          }
+          .sg-blank-btn:hover:not(:disabled) { text-decoration: underline; }
+          .sg-blank-btn:disabled { opacity: .5; cursor: not-allowed; }
+        `}</style>
+      </div>
+    </Drawer>
+  );
+}
+
+function TemplateList({ onEdit, onPreview, onEmptyStateNew }) {
   const { showToast } = useAuth();
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState('');
@@ -92,10 +273,10 @@ function TemplateList({ onEdit, onPreview }) {
   }, [route.query.edit, route.query.preview]);
 
   const onPublish = async (row) => {
-    if (!confirm(`Publish "${row.name}"? After publishing, you'll need to clone a new version to edit it.`)) return;
+    if (!confirm(`Activate "${row.name}"?\n\nOnce active it can be used on events. To change it later, you'll make a new version.`)) return;
     try {
       await api(`/api/checklist-templates/${row.id}/publish`, { method: 'POST' });
-      showToast?.('Published', 'success');
+      showToast?.('Template is now active', 'success');
       load();
     } catch (e) { showToast?.(e.message, 'error'); }
   };
@@ -141,7 +322,19 @@ function TemplateList({ onEdit, onPreview }) {
   if (rows.length === 0) {
     return (
       <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
-        <p className="muted-text">No templates yet. Click <strong>New template</strong> to build your first one.</p>
+        <p style={{ margin: 0, fontSize: '.95rem' }}>No templates yet — pick a ready-made one to start.</p>
+        <p className="muted-text" style={{ marginTop: '.4rem', fontSize: '.85rem' }}>
+          CPE Seminar, Workshop, Study Circle, Post-Event Bills…
+        </p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={onEmptyStateNew}
+          style={{ marginTop: '1rem' }}
+        >
+          <IconPlus size="sm" />
+          <span>Pick a starter</span>
+        </button>
       </div>
     );
   }
@@ -170,7 +363,7 @@ function TemplateList({ onEdit, onPreview }) {
             ) : (
               <>
                 <button title="Edit" onClick={() => onEdit(r.id)}><IconEdit size="sm" /></button>
-                <button title="Publish" onClick={() => onPublish(r)} style={{ color: 'var(--secondary, #16a34a)' }}><IconCheckCircle size="sm" /></button>
+                <button title="Activate (make it usable)" onClick={() => onPublish(r)} style={{ color: 'var(--secondary, #16a34a)' }}><IconCheckCircle size="sm" /></button>
               </>
             )}
             <button title="Duplicate as new template" onClick={() => onClone(r, true)}><IconCopy size="sm" /></button>
@@ -202,7 +395,7 @@ function PublishedPill({ v }) {
       background: v ? '#dcfce7' : '#fef3c7',
       color: v ? '#166534' : '#92400e',
     }}>
-      {v ? 'PUBLISHED' : 'DRAFT'}
+      {v ? 'ACTIVE' : 'DRAFT'}
     </span>
   );
 }
@@ -380,8 +573,8 @@ function BuilderDrawer({ id, onClose }) {
       footer={
         <>
           {err && <span style={{ color: 'var(--destructive)', marginRight: 'auto', fontSize: '.875rem' }}>{err}</span>}
-          <button onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn-primary" onClick={save} disabled={saving}>
+          <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>Cancel</button>
+          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>
         </>
@@ -856,44 +1049,39 @@ function EmptyBuildState({ onPreset, onBlank }) {
 }
 
 // ─── Preset bar at the top of the build tab (when not empty) ──────────────
-// Compact "add one of these" strip the user can click any time to drop in
-// another preset section.
+// "Add another section" strip — the grid is ALWAYS visible (previously
+// hidden behind a toggle, which made non-tech users miss it). The whole
+// point of preset sections is to be one-click obvious.
 function SectionPresetBar({ onPreset }) {
-  const [open, setOpen] = useState(false);
   return (
     <div className="bld-preset-bar">
-      <button type="button" className="bld-preset-bar-toggle" onClick={() => setOpen((o) => !o)}>
+      <div className="bld-preset-bar-head">
         ⚡ Add a ready-made section
-        <span style={{ marginLeft: '.4rem', fontSize: '.7rem', color: 'var(--muted-foreground)' }}>
-          {open ? '▾' : '▸'}
-        </span>
-      </button>
-      {open && (
-        <div className="bld-preset-bar-grid">
-          {SECTION_PRESETS.map((p) => (
-            <button key={p.key} type="button" className="bld-preset-tile"
-              onClick={() => { onPreset(p); setOpen(false); }}>
-              <span className="bld-preset-icon">{p.icon}</span>
-              <strong>{p.title}</strong>
-              <span className="bld-preset-desc">{p.description}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      </div>
+      <div className="bld-preset-bar-grid">
+        {SECTION_PRESETS.map((p) => (
+          <button key={p.key} type="button" className="bld-preset-tile"
+            onClick={() => onPreset(p)}>
+            <span className="bld-preset-icon">{p.icon}</span>
+            <strong>{p.title}</strong>
+            <span className="bld-preset-desc">{p.description}</span>
+          </button>
+        ))}
+      </div>
       <style>{`
         .bld-preset-bar {
-          padding: .5rem .625rem;
+          padding: .625rem .75rem;
           background: var(--muted, #f8fafc);
           border: 1px solid var(--border); border-radius: .375rem;
           margin-bottom: .5rem;
         }
-        .bld-preset-bar-toggle {
-          width: 100%; text-align: left;
-          background: transparent; border: 0; cursor: pointer;
+        .bld-preset-bar-head {
           font-size: .8125rem; font-weight: 600;
+          color: var(--muted-foreground);
+          margin-bottom: .5rem;
         }
         .bld-preset-bar-grid {
-          display: grid; gap: .375rem; margin-top: .5rem;
+          display: grid; gap: .375rem;
           grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
         }
       `}</style>
@@ -924,20 +1112,25 @@ function SectionCard({
   // The collapse chevron is for managing long templates with 8+ sections.
   // The pre-section group (no heading) is never collapsible.
   const [collapsed, setCollapsed] = useState(false);
-  // Section settings popover holds the "owner" picker + remove button.
-  // Hidden by default so the header reads as just a title — non-tech users
-  // pick a section preset (which already sets the right owner) and never
-  // need to touch this.
+  // Two popovers: the role picker (clickable owner pill) and the ⋯ menu
+  // (now slimmed to just "Remove section" since role moved out).
+  const [rolePickerOpen, setRolePickerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const rolePickerRef = useRef(null);
   const settingsRef = useRef(null);
   useEffect(() => {
-    if (!settingsOpen) return;
+    if (!rolePickerOpen && !settingsOpen) return;
     const close = (e) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target)) setSettingsOpen(false);
+      if (rolePickerOpen && rolePickerRef.current && !rolePickerRef.current.contains(e.target)) {
+        setRolePickerOpen(false);
+      }
+      if (settingsOpen && settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setSettingsOpen(false);
+      }
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, [settingsOpen]);
+  }, [rolePickerOpen, settingsOpen]);
 
   // Look up the human label for the current owner so we can show a tiny
   // hint ("Owner: Treasurer") in the header without forcing the user to
@@ -974,11 +1167,40 @@ function SectionCard({
               placeholder="Section name (e.g. Event basics)"
               onChange={(e) => onPatchQuestion(group.headingIdx, { label: e.target.value })}
             />
-            {ownerLabel && (
-              <span className="sc-owner-hint" title="Who fills this section">
-                👤 {ownerLabel}
-              </span>
-            )}
+            <div ref={rolePickerRef} className="sc-owner-wrap">
+              <button
+                type="button"
+                className="sc-owner-pill"
+                onClick={() => setRolePickerOpen((o) => !o)}
+                title="Click to choose who reviews this section"
+                aria-expanded={rolePickerOpen}
+              >
+                👤 {ownerLabel || 'Anyone'}
+                <span className="sc-owner-chev">▾</span>
+              </button>
+              {rolePickerOpen && (
+                <div className="sc-role-menu" role="menu">
+                  <div className="sc-settings-label">Who reviews this section?</div>
+                  {ROLE_OPTIONS.map((r) => {
+                    const active = (heading.section_owner_role ?? '') === r.code;
+                    return (
+                      <button
+                        key={r.code || 'any'}
+                        type="button"
+                        className={'sc-role-item' + (active ? ' is-active' : '')}
+                        onClick={() => {
+                          onPatchQuestion(group.headingIdx, { section_owner_role: r.code || null });
+                          setRolePickerOpen(false);
+                        }}
+                      >
+                        {active && <span className="sc-role-check">✓</span>}
+                        <span>{r.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           {collapsed && (
             <span className="sc-count">{items.length} question{items.length === 1 ? '' : 's'}</span>
@@ -988,24 +1210,14 @@ function SectionCard({
               type="button"
               className="sc-settings-trigger"
               onClick={() => setSettingsOpen((o) => !o)}
-              title="Section settings"
-              aria-label="Section settings"
+              title="More section options"
+              aria-label="More section options"
               aria-expanded={settingsOpen}
             >
               ⋯
             </button>
             {settingsOpen && (
               <div className="sc-settings-menu">
-                <label className="sc-settings-label">Who fills this section?</label>
-                <select
-                  className="sc-owner-select"
-                  value={heading.section_owner_role ?? ''}
-                  onChange={(e) => onPatchQuestion(group.headingIdx, { section_owner_role: e.target.value || null })}
-                >
-                  {ROLE_OPTIONS.map((r) => (
-                    <option key={r.code || 'any'} value={r.code}>{r.label}</option>
-                  ))}
-                </select>
                 <button
                   type="button"
                   className="sc-settings-remove"
@@ -1100,14 +1312,49 @@ function SectionCard({
         .sc-title-input:hover, .sc-title-input:focus {
           background: white; border-color: var(--border); outline: 0;
         }
-        .sc-owner-hint {
-          flex-shrink: 0;
-          padding: .15rem .5rem;
+        .sc-owner-wrap { position: relative; flex-shrink: 0; }
+        .sc-owner-pill {
+          display: inline-flex; align-items: center; gap: .25rem;
+          padding: .2rem .55rem;
           border-radius: 999px;
           background: white; border: 1px solid var(--border);
-          font-size: .7rem; font-weight: 600;
+          font-size: .72rem; font-weight: 600;
           color: var(--muted-foreground);
           white-space: nowrap;
+          cursor: pointer;
+        }
+        .sc-owner-pill:hover {
+          border-color: var(--primary, #1e40af);
+          color: var(--primary, #1e40af);
+        }
+        .sc-owner-chev {
+          font-size: .65rem; opacity: .7;
+        }
+        .sc-role-menu {
+          position: absolute; top: calc(100% + .25rem); right: 0;
+          z-index: 6; min-width: 15rem;
+          background: white; border: 1px solid var(--border);
+          border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.1);
+          padding: .4rem;
+          display: flex; flex-direction: column; gap: .1rem;
+          max-height: 320px; overflow-y: auto;
+        }
+        .sc-role-item {
+          display: flex; align-items: center; gap: .5rem;
+          width: 100%; padding: .4rem .55rem; text-align: left;
+          background: transparent; border: 0; cursor: pointer;
+          font-size: .8125rem; color: var(--foreground);
+          border-radius: .3rem;
+        }
+        .sc-role-item:hover { background: var(--muted, #f8fafc); }
+        .sc-role-item.is-active {
+          background: rgba(37, 99, 235, .08);
+          color: var(--primary, #1e40af);
+          font-weight: 600;
+        }
+        .sc-role-check {
+          color: var(--primary, #1e40af);
+          font-weight: 800;
         }
         .sc-settings-wrap { position: relative; flex-shrink: 0; }
         .sc-settings-trigger {
@@ -1130,17 +1377,10 @@ function SectionCard({
           display: flex; flex-direction: column; gap: .5rem;
         }
         .sc-settings-label {
+          padding: .25rem .55rem .15rem;
           font-size: .7rem; font-weight: 600;
           color: var(--muted-foreground);
           text-transform: uppercase; letter-spacing: .04em;
-        }
-        .sc-owner-select {
-          padding: .4rem .5rem;
-          border: 1px solid var(--border);
-          background: white;
-          border-radius: .3rem;
-          font: inherit; font-size: .85rem;
-          color: var(--foreground);
         }
         .sc-settings-remove {
           margin-top: .25rem;

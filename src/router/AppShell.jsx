@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { useRoute } from '../hooks/useRoute';
+import { useAuth } from '../context/AuthContext';
+import caIndiaLogo from '../assets/CA India Logo.png';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
+import PushPermissionBanner from '../components/PushPermissionBanner';
 
 import HomePage from '../pages/HomePage';
 import AboutPage from '../pages/AboutPage';
@@ -44,6 +47,7 @@ import AnnouncementsAdminPage from '../pages/admin/AnnouncementsAdminPage';
 import ComingSoonPage from '../pages/admin/ComingSoonPage';
 import JobPostingsAdminPage from '../pages/admin/JobPostingsAdminPage';
 import ChecklistTemplatesAdminPage from '../pages/admin/ChecklistTemplatesAdminPage';
+import NotificationsLogAdminPage from '../pages/admin/NotificationsLogAdminPage';
 import ApprovalsAdminPage from '../pages/admin/ApprovalsAdminPage';
 import PaperPresentationsAdminPage from '../pages/admin/PaperPresentationsAdminPage';
 import NewslettersAdminPage from '../pages/admin/NewslettersAdminPage';
@@ -107,6 +111,7 @@ const ADMIN_ROUTES = {
   '/admin/cabf': () => <ComingSoonPage title="CABF requests" description="Review CA Benevolent Fund assistance requests, approve disbursements, track audit trail." />,
   '/admin/payments': () => <ComingSoonPage title="Payments" description="Read-only view of payments with refunds, disputes, and invoices." />,
   '/admin/files': () => <ComingSoonPage title="Files" description="Browse uploaded banners, certificates, and other assets." />,
+  '/admin/notifications-log': NotificationsLogAdminPage,
   // ─── Branch content (Resources page, Gallery, About page) ───
   '/admin/paper-presentations': PaperPresentationsAdminPage,
   '/admin/newsletters':         NewslettersAdminPage,
@@ -146,8 +151,61 @@ function ScrollToTop() {
   return null;
 }
 
+// Minimal branded splash shown on a brand-new visit before /api/auth/me
+// has resolved. We only see this when there's no cached user in
+// localStorage — on subsequent visits hydration is synchronous and this
+// component never mounts. Keeps the page from flashing "Sign in" before
+// snapping to the authenticated header.
+function AuthBootstrapSplash() {
+  return (
+    <div style={{
+      position: 'fixed', inset: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      background: 'white', zIndex: 9999,
+    }}>
+      <div style={{
+        width: '4rem', height: '4rem', borderRadius: '.5rem',
+        background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '.25rem', boxShadow: '0 2px 8px rgba(0,0,0,.06)',
+      }}>
+        <img src={caIndiaLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+      </div>
+      <div style={{ marginTop: '1rem', fontSize: '.85rem', fontWeight: 600, color: 'var(--muted-foreground, #64748b)' }}>
+        Nagpur Branch of ICAI
+      </div>
+      <div className="bs-spinner" />
+      <style>{`
+        .bs-spinner {
+          margin-top: 1rem;
+          width: 1.4rem; height: 1.4rem;
+          border: 2px solid rgba(30, 64, 175, .15);
+          border-top-color: var(--primary, #1e40af);
+          border-radius: 50%;
+          animation: bs-spin .8s linear infinite;
+        }
+        @keyframes bs-spin { to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+}
+
+// Routes that don't depend on auth state and should NOT be blocked behind
+// the splash — public login/signup/forgot pages render instantly even on a
+// brand-new device. (If a user is already signed in those routes redirect
+// elsewhere anyway, but that's a separate concern.)
+const SPLASH_BYPASS_ROUTES = new Set(['/login', '/signup', '/forgot']);
+
 export default function AppShell() {
   const route = useRoute();
+  const { loading: authLoading } = useAuth();
+
+  // Block the entire app on first paint until /api/auth/me resolves —
+  // but only if we don't have a cached user (otherwise authLoading is
+  // already false and this branch is skipped). Login/signup pages bypass
+  // so users can sign in even with a stale cookie.
+  if (authLoading && !SPLASH_BYPASS_ROUTES.has(route.path)) {
+    return <AuthBootstrapSplash />;
+  }
 
   if (isAdminPath(route.path)) {
     const AdminPage = ADMIN_ROUTES[route.path] ?? (() => <ComingSoonPage title="Not found" description="No admin page exists at this path." />);
@@ -189,6 +247,7 @@ export default function AppShell() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <ScrollToTop />
       <Header />
+      <PushPermissionBanner />
       <main style={{ flex: 1 }}>
         <Page />
       </main>

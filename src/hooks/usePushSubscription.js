@@ -71,8 +71,18 @@ export function usePushSubscription({ enabled = true } = {}) {
     }
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      // 1. Get the active service worker.
-      const reg = await navigator.serviceWorker.ready;
+      // 1. Get the active service worker. `navigator.serviceWorker.ready`
+      //    hangs forever if no SW has been registered for the scope — most
+      //    commonly because the dev server isn't serving sw.js. Race it
+      //    against a 5-second timeout so the user gets an actionable error
+      //    instead of "Asking…" spinning forever.
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, reject) => setTimeout(
+          () => reject(new Error('Service worker did not activate within 5 seconds. In dev, make sure VitePWA devOptions.enabled is true and refresh the page.')),
+          5000,
+        )),
+      ]);
 
       // 2. Ask the user. permission can only be requested from a user gesture
       //    — this hook expects to be called from a click handler.
@@ -85,10 +95,19 @@ export function usePushSubscription({ enabled = true } = {}) {
         throw new Error('Notification permission was not granted.');
       }
 
-      // 3. Fetch the server's VAPID public key.
+      // 3. Fetch the server's VAPID public key. Surface the actual HTTP
+      //    status + response body so the user sees WHY this failed instead
+      //    of the old "Server push is not configured" catch-all.
       const keyResp = await fetch('/api/push/public-key', { credentials: 'include' });
-      if (!keyResp.ok) throw new Error('Server push is not configured.');
+      if (!keyResp.ok) {
+        const bodyText = await keyResp.text().catch(() => '');
+        throw new Error(
+          `Could not fetch VAPID key — server returned ${keyResp.status}` +
+          (bodyText ? `: ${bodyText.slice(0, 200)}` : '. Check that the backend is running and VAPID_PUBLIC_KEY is set in backend/.env.')
+        );
+      }
       const { key } = await keyResp.json();
+      if (!key) throw new Error('Backend returned an empty VAPID key. Check VAPID_PUBLIC_KEY in backend/.env.');
 
       // 4. Subscribe through the browser's PushManager. userVisibleOnly is
       //    mandatory on Chromium browsers — silent pushes are not allowed.

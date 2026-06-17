@@ -36,26 +36,23 @@ export default function CommitteeChairmanHome({ data, user }) {
         </div>
       </div>
 
-      <InboxCard inbox={inbox} emptyMessage="No checklists waiting for your review." />
+      <InboxCard inbox={inbox} emptyMessage="No checklists waiting for you." />
 
       <div className="home-card">
         <div className="home-card-head">
           <div>
             <h2 className="home-card-title">Your committee's upcoming events</h2>
-            <div className="home-card-sub">Click any row to manage its details, attendees, or approval.</div>
+            <div className="home-card-sub">Click any row to view details and fill its checklist.</div>
           </div>
-          <button className="btn btn-primary" onClick={() => navigate('/admin/events')} style={{ padding: '.4rem .9rem', fontSize: '.8125rem' }}>
-            + New event
-          </button>
         </div>
 
         <div className="home-event-list">
           {myEvents.length === 0 && (
             <div className="home-event-empty">
-              <div style={{ marginBottom: '.5rem' }}>You haven't scheduled an event yet.</div>
-              <button className="btn btn-outline" onClick={() => navigate('/admin/events')} style={{ padding: '.4rem .9rem', fontSize: '.8125rem' }}>
-                Create your committee's first event
-              </button>
+              <div>No upcoming events scheduled for your committee yet.</div>
+              <div style={{ fontSize: '.75rem', marginTop: '.35rem' }}>
+                The branch chairman creates events; you'll fill the approval checklist when one is assigned.
+              </div>
             </div>
           )}
           {myEvents.map((e) => {
@@ -95,10 +92,10 @@ export default function CommitteeChairmanHome({ data, user }) {
       <QuickActions
         title="Tools for your committee"
         actions={[
-          { label: 'Manage events',         description: 'Plan, edit, publish',                     href: '/admin/events' },
-          { label: 'Review registrations',  description: 'See who has signed up',                   href: '/admin/registrations' },
-          { label: 'Checklist templates',   description: 'Edit the approval-checklist questions',   href: '/admin/checklist-templates' },
-          { label: 'Committee roster',      description: 'Manage members of your committee',        href: '/admin/committees' },
+          { label: 'View events',           description: 'See your committee’s schedule',       href: '/admin/events' },
+          { label: 'My checklists',         description: 'Fill checklists assigned to you',          href: '/my-checklists' },
+          { label: 'Review registrations',  description: 'See who has signed up',                    href: '/admin/registrations' },
+          { label: 'Committee roster',      description: 'Manage members of your committee',         href: '/admin/committees' },
         ]}
       />
 
