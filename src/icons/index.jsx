@@ -58,3 +58,6 @@ export const IconLock = (p) => <I {...p}><rect x="3" y="11" width="18" height="1
 export const IconChevronDown = (p) => <I {...p}><path d="M6 9l6 6 6-6"/></I>;
 export const IconBell = (p) => <I {...p}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></I>;
 export const IconHandshake = (p) => <I {...p}><path d="M11 17l2 2a1 1 0 1 0 3-3M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a3 3 0 0 1-4.24 0l-2.12-2.12a3 3 0 0 1 0-4.24l2.83-2.83a3 3 0 0 1 4.24 0L13 4M21 3l-3 3M3 21l3-3"/></I>;
+export const IconThumbsUp = (p) => <I {...p}><path d="M7 10v12M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88z"/></I>;
+export const IconThumbsDown = (p) => <I {...p}><path d="M17 14V2M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22a3.13 3.13 0 0 1-3-3.88z"/></I>;
+export const IconGlobe = (p) => <I {...p}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></I>;

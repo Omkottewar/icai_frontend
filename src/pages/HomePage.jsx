@@ -140,7 +140,7 @@ export default function HomePage() {
             </form> */}
             <div className="row gap-3" style={{ marginTop: '1.25rem', flexWrap: 'wrap' }}>
               <a href="#/events" className="btn btn-primary">Upcoming Events <IconArrowRight size="sm" /></a>
-              <a href="#/praygyaan" className="btn btn-outline"><IconBot size="sm" /> Ask PrayGyaan AI</a>
+              <a href="#/pragyaan" className="btn btn-outline"><IconBot size="sm" /> Ask Pragyaan AI</a>
               {!user && <a href="#/signup" className="btn btn-outline">Create account <IconArrowRight size="sm" /></a>}
             </div>
           </div>

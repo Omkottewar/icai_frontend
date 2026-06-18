@@ -108,8 +108,8 @@ export default function Header() {
             />
           </form>
 
-          {/* <a href="#/praygyaan" className="row gap-1 praygyaan-pill" style={{ display: 'none', padding: '.375rem .75rem', background: 'rgba(255,255,255,.12)', color: 'white', borderRadius: '.375rem', fontSize: '.75rem', fontWeight: 600 }}>
-            <IconBot size="sm" /> PrayGyaan AI
+          {/* <a href="#/pragyaan" className="row gap-1 pragyaan-pill" style={{ display: 'none', padding: '.375rem .75rem', background: 'rgba(255,255,255,.12)', color: 'white', borderRadius: '.375rem', fontSize: '.75rem', fontWeight: 600 }}>
+            <IconBot size="sm" /> Pragyaan AI
           </a> */}
 
           {user && <NotificationsBell />}
@@ -188,7 +188,7 @@ export default function Header() {
                 {n.label}
               </a>
             ))}
-            <a href="#/praygyaan" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--secondary)' }}>PrayGyaan AI</a>
+            <a href="#/pragyaan" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--secondary)' }}>Pragyaan AI</a>
             {user && (() => {
               // Office bearers get a direct mobile link into /admin too — the
               // chairman approving from her phone during a meeting shouldn't
@@ -228,7 +228,7 @@ export default function Header() {
         }
         @media (min-width: 768px) {
           .search-form { display: flex !important; }
-          .praygyaan-pill { display: inline-flex !important; }
+          .pragyaan-pill { display: inline-flex !important; }
           .signup-cta { display: inline-flex !important; }
         }
         @media (max-width: 1023px) {

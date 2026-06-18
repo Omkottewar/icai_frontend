@@ -13,7 +13,7 @@ import MembersPage from '../pages/MembersPage';
 import StudentsPage from '../pages/StudentsPage';
 import ResourcesPage from '../pages/ResourcesPage';
 import ContactPage from '../pages/ContactPage';
-import PrayGyaanPage from '../pages/PrayGyaanPage';
+import PragyaanPage from '../pages/PragyaanPage';
 import BenevolentFundPage from '../pages/BenevolentFundPage';
 import CA2VisionPage from '../pages/CA2VisionPage';
 import InvestorAwarenessPage from '../pages/InvestorAwarenessPage';
@@ -33,7 +33,7 @@ import JobVacanciesPage from '../pages/JobVacanciesPage';
 import MembersDirectoryPage from '../pages/MembersDirectoryPage';
 import RoomBookingPage from '../pages/RoomBookingPage';
 import TrackGrievancePage from '../pages/TrackGrievancePage';
-import PrayGyaanWidget from '../components/ui/PrayGyaanWidget';
+import PragyaanWidget from '../components/ui/PragyaanWidget';
 
 import RequireAdmin from '../components/admin/RequireAdmin';
 import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
@@ -71,7 +71,10 @@ const ROUTES = {
   '/students': StudentsPage,
   '/resources': ResourcesPage,
   '/contact': ContactPage,
-  '/praygyaan': PrayGyaanPage,
+  '/pragyaan': PragyaanPage,
+  // Backward-compat alias — old links to #/praygyaan still resolve to the
+  // Pragyaan page. This is the only place the legacy token remains.
+  '/praygyaan': PragyaanPage,
   '/benevolent-fund': BenevolentFundPage,
   '/ca2-vision': CA2VisionPage,
   '/investor-awareness': InvestorAwarenessPage,
@@ -252,7 +255,7 @@ export default function AppShell() {
         <Page />
       </main>
       <Footer />
-      <PrayGyaanWidget />
+      <PragyaanWidget />
     </div>
   );
 }

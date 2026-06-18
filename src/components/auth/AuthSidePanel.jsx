@@ -32,7 +32,7 @@ export default function AuthSidePanel({ mode }) {
           {[
             { Icon: IconCheckCircle, t: 'Self-service for members & students' },
             { Icon: IconCheckCircle, t: '150+ CPE events curated each year' },
-            { Icon: IconCheckCircle, t: 'PrayGyaan AI assistant — built-in' },
+            { Icon: IconCheckCircle, t: 'Pragyaan AI assistant — built-in' },
           ].map((f, i) => (
             <div key={i} className="row gap-3" style={{ fontSize: '.875rem' }}>
               <span style={{ width: '1.5rem', height: '1.5rem', borderRadius: 999, background: 'rgba(255,255,255,.15)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
