@@ -56,6 +56,7 @@ import OfficeBearersAdminPage from '../pages/admin/OfficeBearersAdminPage';
 import AnnualReportsAdminPage from '../pages/admin/AnnualReportsAdminPage';
 import GrievancesAdminPage from '../pages/admin/GrievancesAdminPage';
 import GrievanceRoutesAdminPage from '../pages/admin/GrievanceRoutesAdminPage';
+import PragyaanAdminPage from '../pages/admin/PragyaanAdminPage';
 
 import RequireEmployer from '../components/employer/RequireEmployer';
 import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
@@ -123,6 +124,8 @@ const ADMIN_ROUTES = {
   '/admin/annual-reports':      AnnualReportsAdminPage,
   '/admin/grievances':          GrievancesAdminPage,
   '/admin/grievance-routes':    GrievanceRoutesAdminPage,
+  // ─── Pragyaan assistant (knowledge base + analytics) ───
+  '/admin/pragyaan':            PragyaanAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);
