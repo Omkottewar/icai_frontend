@@ -7,6 +7,7 @@ import {
   IconCalendar, IconUsers, IconAward, IconShield, IconBriefcase, IconHeart,
   IconFileText, IconSettings, IconArrowLeft, IconLogOut, IconMenu, IconX,
   IconCheckCircle, IconBookOpen, IconMapPin, IconGraduationCap, IconHandshake,
+  IconSparkles,
 } from '../../icons';
 import caIndiaLogo from '../../assets/CA India Logo.png';
 
@@ -93,6 +94,7 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
+      { to: '/admin/pragyaan',               label: 'Pragyaan',               Icon: IconSparkles, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
       { to: '/admin/files',                  label: 'Files',                  Icon: IconFileText, soon: true, roles: [] /* admin-only */ },
       { to: '/admin/notifications-log',      label: 'Notifications log',      Icon: IconBookOpen, roles: [] /* admin-only */ },
     ],
