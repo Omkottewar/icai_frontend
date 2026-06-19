@@ -2,6 +2,23 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { IconBell, IconCheck } from '../../icons';
+import { Shimmer } from '../ui/Shimmer';
+
+function BellShimmerList() {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} style={{
+          display: 'flex', flexDirection: 'column', gap: '.35rem',
+          padding: '.85rem 1rem', borderBottom: '1px solid var(--border)',
+        }}>
+          <Shimmer height=".85rem" width={`${50 + ((i * 13) % 35)}%`} />
+          <Shimmer height=".7rem" width={`${30 + ((i * 17) % 45)}%`} />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Header bell + dropdown inbox. Mounts inside Header.jsx next to the avatar.
 // Polls every 30s (handled inside the hook); on dropdown open we don't refetch
@@ -94,9 +111,7 @@ export default function NotificationsBell() {
           </div>
 
           <div className="bell-list">
-            {loading && items.length === 0 && (
-              <div className="bell-empty">Loading…</div>
-            )}
+            {loading && items.length === 0 && <BellShimmerList />}
             {!loading && items.length === 0 && (
               <div className="bell-empty">You're all caught up.</div>
             )}

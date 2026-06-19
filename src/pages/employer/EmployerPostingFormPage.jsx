@@ -3,6 +3,7 @@ import EmployerLayout from '../../components/employer/EmployerLayout';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
 import { IconArrowRight, IconX } from '../../icons';
+import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 
 const EMPTY = {
   type:        'job',
@@ -89,7 +90,11 @@ export default function EmployerPostingFormPage() {
         </button>
       }
     >
-      {loading && <p className="muted-text">Loading…</p>}
+      {loading && (
+        <div className="card" style={{ padding: '1.5rem' }}>
+          <ShimmerDrawerBody fields={8} cols={2} />
+        </div>
+      )}
       {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
       {!loading && (

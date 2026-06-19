@@ -3,6 +3,7 @@ import EmployerLayout from '../../components/employer/EmployerLayout';
 import { navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
 import { IconBriefcase, IconX } from '../../icons';
+import { Shimmer } from '../../components/ui/Shimmer';
 
 const STATUS_BADGE = {
   draft:           { bg: '#f1f5f9', fg: '#475569', label: 'Draft'   },
@@ -61,7 +62,19 @@ export default function EmployerPostingsPage() {
     >
       {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
-      {!items && !err && <p className="muted-text">Loading…</p>}
+      {!items && !err && (
+        <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1rem' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                <Shimmer height=".9rem" width={`${50 + ((i * 11) % 25)}%`} />
+                <Shimmer height=".7rem" width="40%" />
+              </div>
+              <Shimmer height="1.1rem" width="3.5rem" radius="999px" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {items && items.length === 0 && (
         <div className="card" style={{ padding: '2rem', textAlign: 'center' }}>

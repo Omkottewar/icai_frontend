@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { IconStar } from '../../icons';
+import { Shimmer } from '../ui/Shimmer';
 
 // Renders one question of any type. Two modes:
 //   mode="fill"     — interactive input, calls onChange(value)
@@ -341,7 +342,12 @@ function FileField({ cfg, value, onChange }) {
         accept={Array.isArray(cfg.accept) ? cfg.accept.join(',') : undefined}
         disabled={uploading}
       />
-      {uploading && <p className="muted-text" style={{ fontSize: '.8125rem' }}>Uploading…</p>}
+      {uploading && (
+        <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', marginTop: '.5rem' }}>
+          <Shimmer height=".75rem" width="60%" />
+          <Shimmer height=".6rem" width="35%" />
+        </div>
+      )}
       {err && <p className="checklist-q-error">{err}</p>}
     </div>
   );
@@ -524,7 +530,16 @@ function AssigneePicker({ assigneeId, assigneeName, onPick }) {
         className="tlist-input"
       />
       <div className="tlist-assignee-list">
-        {loading && <div className="tlist-assignee-loading">Searching…</div>}
+        {loading && (
+          <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.4rem', padding: '.5rem .65rem' }}>
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
+                <Shimmer height=".8rem" width={`${50 + ((i * 13) % 30)}%`} />
+                <Shimmer height=".65rem" width={`${30 + ((i * 11) % 35)}%`} />
+              </div>
+            ))}
+          </div>
+        )}
         {!loading && results.length === 0 && q && <div className="tlist-assignee-loading">No matches</div>}
         {results.slice(0, 8).map((u) => (
           <button key={u.id} type="button" className="tlist-assignee-row"

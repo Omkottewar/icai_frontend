@@ -3,6 +3,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import { useAdminList } from '../../hooks/useAdminList';
 import { navigate } from '../../hooks/useRoute';
 import { IconArrowRight } from '../../icons';
+import { Shimmer, ShimmerLines } from '../../components/ui/Shimmer';
 
 // Cross-cutting approvals queue. Replaces the ComingSoonPage that used to
 // live at /admin/approvals.
@@ -77,7 +78,17 @@ export default function ApprovalsAdminPage() {
 
       <div className="apv-list">
         {loading && rows.length === 0 && (
-          <div className="apv-empty">Loading…</div>
+          <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="apv-row" style={{ pointerEvents: 'none' }}>
+                <div className="apv-row-body" style={{ display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+                  <Shimmer height=".95rem" width={`${50 + ((i * 11) % 30)}%`} />
+                  <Shimmer height=".7rem" width="40%" />
+                </div>
+                <Shimmer height="1.25rem" width="4.5rem" radius="999px" />
+              </div>
+            ))}
+          </div>
         )}
         {!loading && rows.length === 0 && (
           <div className="apv-empty">

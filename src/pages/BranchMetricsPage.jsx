@@ -9,6 +9,7 @@ import { navigate } from '../hooks/useRoute';
 import { IconArrowRight } from '../icons';
 
 import InsightsStyles from '../components/dashboard/insights/insightsStyles';
+import { ShimmerPageBody, Shimmer } from '../components/ui/Shimmer';
 import { useUrlState } from '../components/dashboard/insights/useUrlState';
 import { mergeWithMock, MOCK_KPIS, MOCK_EVENTS_PER_MONTH, MOCK_REGS_PER_MONTH, MOCK_BY_COMMITTEE, MOCK_RECENT_EVENTS, MOCK_PENDING_APPROVALS } from '../components/dashboard/insights/branchMetricsMock';
 import {
@@ -205,7 +206,7 @@ export default function BranchMetricsPage() {
   }
 
   if (authLoading) {
-    return <p className="muted-text" style={{ padding: '4rem 1rem', textAlign: 'center' }}>Loading…</p>;
+    return <ShimmerPageBody cards={4} />;
   }
   if (!user) return null;
 
@@ -289,7 +290,11 @@ export default function BranchMetricsPage() {
 
           <div className="insights-main">
             {layoutLoading ? (
-              <p className="muted-text" style={{ padding: '2rem 0', textAlign: 'center' }}>Loading your layout…</p>
+              <div aria-hidden="true" style={{ display: 'grid', gap: '.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', padding: '.5rem 0' }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Shimmer key={i} height="170px" width="100%" radius="14px" />
+                ))}
+              </div>
             ) : layout.length === 0 ? (
               <EmptyLayoutPrompt onStart={startEditing} />
             ) : (

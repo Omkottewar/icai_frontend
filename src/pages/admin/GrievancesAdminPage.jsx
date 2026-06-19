@@ -3,6 +3,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
 import { IconX, IconCheckCircle } from '../../icons';
+import { Shimmer } from '../../components/ui/Shimmer';
 
 const TABS = [
   { key: 'open',      label: 'Open' },
@@ -112,7 +113,19 @@ export default function GrievancesAdminPage() {
         })}
       </div>
 
-      {!items && !err && <p className="muted-text">Loading…</p>}
+      {!items && !err && (
+        <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1rem' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                <Shimmer height=".9rem" width={`${50 + ((i * 11) % 30)}%`} />
+                <Shimmer height=".7rem" width="50%" />
+              </div>
+              <Shimmer height="1.1rem" width="4rem" radius="999px" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {items && items.length === 0 && (
         <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>

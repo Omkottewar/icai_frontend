@@ -9,6 +9,25 @@ import { usePublicCommittees, committeeColor } from '../hooks/usePublicCommittee
 import { apiEventToCardEvent } from '../lib/eventAdapter';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
+
+function EventRowsShimmer({ count = 4 }) {
+  return (
+    <div aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card" style={{ display: 'flex', gap: '1rem', padding: '1rem', marginBottom: '.75rem' }}>
+          <Shimmer width="5rem" height="5rem" radius=".5rem" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
+            <Shimmer height="1rem" width={`${55 + ((i * 9) % 30)}%`} />
+            <Shimmer height=".75rem" width="40%" />
+            <ShimmerLines count={2} lastWidth="60%" />
+          </div>
+          <Shimmer width="5rem" height="2rem" radius=".375rem" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Single hero fallback when a committee row carries no admin-supplied image.
 // Replace with a `committees.hero_image_url` column if admins should pick.
@@ -200,7 +219,7 @@ export default function EventsPage() {
 
         <div className="tiny-eyebrow" style={{ marginBottom: '.75rem' }}>UPCOMING EVENTS</div>
         {eventsLoading ? (
-          <p className="muted-text">Loading…</p>
+          <EventRowsShimmer count={4} />
         ) : audienceFiltered.length > 0 ? (
           <div>{audienceFiltered.map((e) => <EventRow key={e.id ?? e.title} event={e} detailed />)}</div>
         ) : (

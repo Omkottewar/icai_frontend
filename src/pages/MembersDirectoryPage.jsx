@@ -3,6 +3,7 @@ import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { cachedGet } from '../lib/apiCache';
 import { IconSearch, IconLock, IconArrowRight } from '../icons';
+import { ShimmerTableRow } from '../components/ui/Shimmer';
 
 const STATUS_COLORS = {
   FCA: { bg: '#eff6ff', color: '#2563eb' },
@@ -140,6 +141,9 @@ export default function MembersDirectoryPage() {
               </tr>
             </thead>
             <tbody>
+              {loading && rows.length === 0 && Array.from({ length: 8 }).map((_, i) => (
+                <ShimmerTableRow key={'mds-' + i} cols={5} />
+              ))}
               {rows.map((m, i) => {
                 const sc = STATUS_COLORS[m.status] || { bg: '#f9fafb', color: '#6b7280' };
                 return (

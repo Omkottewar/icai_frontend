@@ -7,7 +7,7 @@ import { useAdminList, adminFetch, invalidate } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { useRoleFlags } from '../../hooks/useRoleFlags';
 import { useRoute, navigate } from '../../hooks/useRoute';
-import { Shimmer, ShimmerFormField } from '../../components/ui/Shimmer';
+import { Shimmer, ShimmerFormField, ShimmerLines } from '../../components/ui/Shimmer';
 import { eventLabel, EVENT_STATUS, toneStyle } from '../../lib/eventStatus';
 import EventTimeline from '../../components/admin/EventTimeline';
 import ComparableEventsPanel from '../../components/admin/ComparableEventsPanel';
@@ -1043,7 +1043,19 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
           {/* ─── Step 1: pick template ─── */}
           {step === 'pick' && (
             <>
-              {templates === null && <p className="muted-text">Loading templates…</p>}
+              {templates === null && (
+                <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1rem' }}>
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                        <Shimmer height=".9rem" width={`${45 + ((i * 11) % 30)}%`} />
+                        <Shimmer height=".7rem" width="65%" />
+                      </div>
+                      <Shimmer height="1rem" width="2.5rem" />
+                    </div>
+                  ))}
+                </div>
+              )}
               {templates && templates.length === 0 && (
                 <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
                   <p className="muted-text" style={{ marginBottom: '.5rem' }}>
@@ -1082,7 +1094,17 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
           {/* ─── Step 2: assign fillers ─── */}
           {step === 'assign' && (
             <>
-              {loadingDetail && <p className="muted-text">Loading template…</p>}
+              {loadingDetail && (
+                <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+                  <Shimmer height="1.1rem" width="55%" />
+                  <ShimmerLines count={3} lastWidth="60%" />
+                  <div style={{ display: 'grid', gap: '.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginTop: '.5rem' }}>
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <ShimmerFormField key={i} />
+                    ))}
+                  </div>
+                </div>
+              )}
               {!loadingDetail && templateDetail && (
                 <>
                   <div className="tp-banner">

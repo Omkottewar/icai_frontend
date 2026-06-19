@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminLayout from './AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
+import { Shimmer } from '../ui/Shimmer';
 
 // Generic admin CRUD page used by the 5 branch-content entities
 // (paper-presentations, gallery-albums, newsletters, office-bearers,
@@ -153,7 +154,19 @@ export default function BranchContentAdmin({
 
       {err && !editing && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
-      {!items && !err && <p className="muted-text">Loading…</p>}
+      {!items && !err && (
+        <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1rem' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                <Shimmer height=".9rem" width={`${45 + ((i * 11) % 35)}%`} />
+                <Shimmer height=".7rem" width="55%" />
+              </div>
+              <Shimmer height="1.1rem" width="3.5rem" radius="999px" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {items && items.length === 0 && (
         <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>

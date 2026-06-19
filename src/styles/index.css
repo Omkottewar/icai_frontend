@@ -65,8 +65,12 @@ html, body, #root {
   text-size-adjust: 100%;
 }
 
-/* Block horizontal scroll caused by any rogue full-width element on mobile */
-html, body { overflow-x: hidden; }
+/* Block horizontal scroll caused by any rogue full-width element on mobile.
+   Why `clip` and not `hidden`: `overflow-x: hidden` turns html/body into a
+   scroll container for descendants, which breaks `position: sticky` on the
+   admin sidebar (it sticks to body, not the viewport). `clip` blocks overflow
+   without establishing a scroll container, preserving sticky behavior. */
+html, body { overflow-x: clip; }
 
 /* Media defaults — keep images/videos from blowing out narrow viewports */
 img, video, svg { max-width: 100%; height: auto; }

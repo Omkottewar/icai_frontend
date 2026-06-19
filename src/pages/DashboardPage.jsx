@@ -5,6 +5,7 @@ import { useRoleFlags } from '../hooks/useRoleFlags';
 import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
 import StatCard from '../components/ui/StatCard';
+import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
 import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
@@ -46,11 +47,7 @@ export default function DashboardPage() {
   }, [authLoading, user]);
 
   if (authLoading || (user && dashLoading)) {
-    return (
-      <section className="container" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
-        <p className="muted-text">Loading your dashboard…</p>
-      </section>
-    );
+    return <ShimmerPageBody cards={4} />;
   }
   if (!user) return null;
 

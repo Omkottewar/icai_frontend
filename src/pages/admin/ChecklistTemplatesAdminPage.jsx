@@ -12,6 +12,7 @@ import {
 import QuestionEditor from '../../components/checklists/QuestionEditor';
 import QuestionRenderer from '../../components/checklists/QuestionRenderer';
 import { IconPlus, IconCopy, IconTrash, IconCheckCircle, IconEdit, IconEye } from '../../icons';
+import { Shimmer, ShimmerLines, ShimmerDrawerBody } from '../../components/ui/Shimmer';
 
 function fmt(d) {
   if (!d) return '—';
@@ -147,7 +148,16 @@ function StarterGalleryDrawer({ onClose, onPicked, onStartBlank }) {
         </p>
 
         {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
-        {!starters && !err && <p className="muted-text">Loading…</p>}
+        {!starters && !err && (
+          <div className="sg-grid" aria-hidden="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                <Shimmer height="1rem" width="60%" />
+                <ShimmerLines count={2} lastWidth="55%" />
+              </div>
+            ))}
+          </div>
+        )}
 
         {starters && (
           <div className="sg-grid">
@@ -318,7 +328,19 @@ function TemplateList({ onEdit, onPreview, onEmptyStateNew }) {
   };
 
   if (err) return <p style={{ color: 'var(--destructive)' }}>{err}</p>;
-  if (rows === null) return <p className="muted-text">Loading…</p>;
+  if (rows === null) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.625rem' }} aria-hidden="true">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            <Shimmer height="1rem" width={`${45 + ((i * 13) % 35)}%`} />
+            <Shimmer height=".7rem" width="55%" />
+          </div>
+          <Shimmer height="1.25rem" width="3.5rem" radius="999px" />
+        </div>
+      ))}
+    </div>
+  );
   if (rows.length === 0) {
     return (
       <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
@@ -580,7 +602,13 @@ function BuilderDrawer({ id, onClose }) {
         </>
       }
     >
-      {loading ? <p className="muted-text">Loading…</p> : (
+      {loading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <ShimmerDrawerBody fields={4} cols={2} />
+          <Shimmer height="2rem" width="60%" radius=".375rem" />
+          <ShimmerDrawerBody fields={6} cols={1} />
+        </div>
+      ) : (
         <div className="bld">
           <TemplateMetaForm meta={meta} setMeta={setMeta} />
 
@@ -1433,7 +1461,13 @@ function PreviewDrawer({ id, onClose }) {
   return (
     <Drawer open onClose={onClose} title="Preview" width={640}>
       {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
-      {!data ? <p className="muted-text">Loading…</p> : (
+      {!data ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <Shimmer height="1.5rem" width="60%" />
+          <ShimmerLines count={2} lastWidth="50%" />
+          <ShimmerDrawerBody fields={6} cols={1} />
+        </div>
+      ) : (
         <>
           <h2 style={{ marginTop: 0 }}>{data.template.name}</h2>
           {data.template.description && <p className="muted-text">{data.template.description}</p>}

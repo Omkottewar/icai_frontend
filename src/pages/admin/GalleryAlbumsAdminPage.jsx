@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX, IconFileText } from '../../icons';
+import { Shimmer } from '../../components/ui/Shimmer';
+
+function GalleryRowShimmer({ count = 5 }) {
+  return (
+    <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1rem' }}>
+          <Shimmer width="3rem" height="3rem" radius=".375rem" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+            <Shimmer height=".9rem" width={`${50 + ((i * 11) % 30)}%`} />
+            <Shimmer height=".7rem" width="40%" />
+          </div>
+          <Shimmer height="1.1rem" width="4rem" radius="999px" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Photo gallery admin. Two responsibilities:
 //   1. Album CRUD (title, committee, occurred_on, cover, hidden)
@@ -137,7 +155,7 @@ export default function GalleryAlbumsAdminPage() {
       </div>
 
       {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
-      {!albums && !err && <p className="muted-text">Loading…</p>}
+      {!albums && !err && <GalleryRowShimmer count={5} />}
       {albums && albums.length === 0 && (
         <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>
           <p className="muted-text">No albums yet.</p>

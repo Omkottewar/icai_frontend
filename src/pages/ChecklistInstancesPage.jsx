@@ -7,6 +7,7 @@ import { hasAnswer, ROLE_OPTIONS } from '../lib/checklistQuestions';
 import { IconX } from '../icons';
 import { CHECKLIST_STATUS, toneStyle } from '../lib/eventStatus';
 import { useRoleFlags } from '../hooks/useRoleFlags';
+import { Shimmer, ShimmerLines, ShimmerDrawerBody } from '../components/ui/Shimmer';
 
 // Friendly label for an internal role code. Falls back to a prettified
 // version of the code if it's not in our known list.
@@ -78,7 +79,19 @@ function InstancesList({ onOpen }) {
   }, []);
 
   if (err)        return <p className="muted-text" style={{ color: 'var(--destructive)' }}>{err}</p>;
-  if (rows === null) return <p className="muted-text">Loading…</p>;
+  if (rows === null) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.625rem' }} aria-hidden="true">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem 1.25rem' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            <Shimmer height="1rem" width={`${50 + ((i * 11) % 30)}%`} />
+            <Shimmer height=".7rem" width="65%" />
+          </div>
+          <Shimmer height="1.25rem" width="4rem" radius="999px" />
+        </div>
+      ))}
+    </div>
+  );
   if (rows.length === 0) {
     return (
       <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
@@ -140,7 +153,15 @@ function InstanceDrawer({ id, onClose }) {
   useEffect(() => { load(); }, [id]);
 
   if (err) return <FullDrawer onClose={onClose}><p style={{ color: 'var(--destructive)' }}>{err}</p></FullDrawer>;
-  if (!data) return <FullDrawer onClose={onClose}><p className="muted-text">Loading…</p></FullDrawer>;
+  if (!data) return (
+    <FullDrawer onClose={onClose}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <Shimmer height="1.4rem" width="55%" />
+        <Shimmer height=".75rem" width="40%" />
+        <ShimmerDrawerBody fields={6} cols={2} />
+      </div>
+    </FullDrawer>
+  );
 
   const { instance, template, questions, reviews, perms, assignees, stages = [], tasks: taskMap = {}, section_assignments = [] } = data;
   const editable = (perms.canFill || perms.canFillSections) && (instance.status === 'awaiting_fill' || instance.status === 'rejected');

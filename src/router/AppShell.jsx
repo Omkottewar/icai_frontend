@@ -1,67 +1,85 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useRoute } from '../hooks/useRoute';
 import { useAuth } from '../context/AuthContext';
 import caIndiaLogo from '../assets/CA India Logo.png';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import PushPermissionBanner from '../components/PushPermissionBanner';
+import { ShimmerFullPageSplash } from '../components/ui/Shimmer';
 
+// Eagerly loaded — the entry point and auth surfaces. Splitting these would
+// just delay the first interaction visitors care about.
 import HomePage from '../pages/HomePage';
-import AboutPage from '../pages/AboutPage';
-import EventsPage from '../pages/EventsPage';
-import MembersPage from '../pages/MembersPage';
-import StudentsPage from '../pages/StudentsPage';
-import ResourcesPage from '../pages/ResourcesPage';
-import ContactPage from '../pages/ContactPage';
-import PrayGyaanPage from '../pages/PrayGyaanPage';
-import BenevolentFundPage from '../pages/BenevolentFundPage';
-import CA2VisionPage from '../pages/CA2VisionPage';
-import InvestorAwarenessPage from '../pages/InvestorAwarenessPage';
-import CareerCounsellingPage from '../pages/CareerCounsellingPage';
-import SearchPage from '../pages/SearchPage';
-import DashboardPage from '../pages/DashboardPage';
-import ChecklistInstancesPage from '../pages/ChecklistInstancesPage';
-import BranchMetricsPage from '../pages/BranchMetricsPage';
 import NotFound from '../pages/NotFound';
-
 import LoginPage from '../pages/auth/LoginPage';
 import SignupPage from '../pages/auth/SignupPage';
 import ForgotPage from '../pages/auth/ForgotPage';
-import OnboardingPage from '../pages/auth/OnboardingPage';
-import PhotoGalleryPage from '../pages/PhotoGalleryPage';
-import JobVacanciesPage from '../pages/JobVacanciesPage';
-import MembersDirectoryPage from '../pages/MembersDirectoryPage';
-import RoomBookingPage from '../pages/RoomBookingPage';
-import TrackGrievancePage from '../pages/TrackGrievancePage';
-import PrayGyaanWidget from '../components/ui/PrayGyaanWidget';
 
-import RequireAdmin from '../components/admin/RequireAdmin';
-import AdminDashboardPage from '../pages/admin/AdminDashboardPage';
-import EventsAdminPage from '../pages/admin/EventsAdminPage';
-import EventRegistrationsAdminPage from '../pages/admin/EventRegistrationsAdminPage';
-import UsersAdminPage from '../pages/admin/UsersAdminPage';
-import CommitteesAdminPage from '../pages/admin/CommitteesAdminPage';
-import SiteContentAdminPage from '../pages/admin/SiteContentAdminPage';
-import SiteSettingsAdminPage from '../pages/admin/SiteSettingsAdminPage';
-import AnnouncementsAdminPage from '../pages/admin/AnnouncementsAdminPage';
-import ComingSoonPage from '../pages/admin/ComingSoonPage';
-import JobPostingsAdminPage from '../pages/admin/JobPostingsAdminPage';
-import ChecklistTemplatesAdminPage from '../pages/admin/ChecklistTemplatesAdminPage';
-import NotificationsLogAdminPage from '../pages/admin/NotificationsLogAdminPage';
-import ApprovalsAdminPage from '../pages/admin/ApprovalsAdminPage';
-import PaperPresentationsAdminPage from '../pages/admin/PaperPresentationsAdminPage';
-import NewslettersAdminPage from '../pages/admin/NewslettersAdminPage';
-import GalleryAlbumsAdminPage from '../pages/admin/GalleryAlbumsAdminPage';
-import OfficeBearersAdminPage from '../pages/admin/OfficeBearersAdminPage';
-import AnnualReportsAdminPage from '../pages/admin/AnnualReportsAdminPage';
-import GrievancesAdminPage from '../pages/admin/GrievancesAdminPage';
-import GrievanceRoutesAdminPage from '../pages/admin/GrievanceRoutesAdminPage';
+// Everything else is lazy — the browser only fetches a page's chunk when
+// the user navigates to it. Cuts the initial JS payload dramatically, so
+// HomePage paints faster and the dashboard/admin shells download in
+// parallel with the API calls they fire on mount.
+const AboutPage              = lazy(() => import('../pages/AboutPage'));
+const EventsPage             = lazy(() => import('../pages/EventsPage'));
+const MembersPage            = lazy(() => import('../pages/MembersPage'));
+const StudentsPage           = lazy(() => import('../pages/StudentsPage'));
+const ResourcesPage          = lazy(() => import('../pages/ResourcesPage'));
+const ContactPage            = lazy(() => import('../pages/ContactPage'));
+const PrayGyaanPage          = lazy(() => import('../pages/PrayGyaanPage'));
+const BenevolentFundPage     = lazy(() => import('../pages/BenevolentFundPage'));
+const CA2VisionPage          = lazy(() => import('../pages/CA2VisionPage'));
+const InvestorAwarenessPage  = lazy(() => import('../pages/InvestorAwarenessPage'));
+const CareerCounsellingPage  = lazy(() => import('../pages/CareerCounsellingPage'));
+const SearchPage             = lazy(() => import('../pages/SearchPage'));
+const DashboardPage          = lazy(() => import('../pages/DashboardPage'));
+const ChecklistInstancesPage = lazy(() => import('../pages/ChecklistInstancesPage'));
+const BranchMetricsPage      = lazy(() => import('../pages/BranchMetricsPage'));
 
-import RequireEmployer from '../components/employer/RequireEmployer';
-import EmployerDashboardPage from '../pages/employer/EmployerDashboardPage';
-import EmployerPostingsPage from '../pages/employer/EmployerPostingsPage';
-import EmployerPostingFormPage from '../pages/employer/EmployerPostingFormPage';
-import EmployerProfilePage from '../pages/employer/EmployerProfilePage';
+const OnboardingPage     = lazy(() => import('../pages/auth/OnboardingPage'));
+const PhotoGalleryPage   = lazy(() => import('../pages/PhotoGalleryPage'));
+const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
+const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'));
+const RoomBookingPage    = lazy(() => import('../pages/RoomBookingPage'));
+const TrackGrievancePage = lazy(() => import('../pages/TrackGrievancePage'));
+const PrayGyaanWidget    = lazy(() => import('../components/ui/PrayGyaanWidget'));
+
+const RequireAdmin               = lazy(() => import('../components/admin/RequireAdmin'));
+const AdminDashboardPage         = lazy(() => import('../pages/admin/AdminDashboardPage'));
+const EventsAdminPage            = lazy(() => import('../pages/admin/EventsAdminPage'));
+const EventRegistrationsAdminPage = lazy(() => import('../pages/admin/EventRegistrationsAdminPage'));
+const UsersAdminPage             = lazy(() => import('../pages/admin/UsersAdminPage'));
+const CommitteesAdminPage        = lazy(() => import('../pages/admin/CommitteesAdminPage'));
+const SiteContentAdminPage       = lazy(() => import('../pages/admin/SiteContentAdminPage'));
+const SiteSettingsAdminPage      = lazy(() => import('../pages/admin/SiteSettingsAdminPage'));
+const AnnouncementsAdminPage     = lazy(() => import('../pages/admin/AnnouncementsAdminPage'));
+const ComingSoonPage             = lazy(() => import('../pages/admin/ComingSoonPage'));
+const JobPostingsAdminPage       = lazy(() => import('../pages/admin/JobPostingsAdminPage'));
+const ChecklistTemplatesAdminPage = lazy(() => import('../pages/admin/ChecklistTemplatesAdminPage'));
+const NotificationsLogAdminPage  = lazy(() => import('../pages/admin/NotificationsLogAdminPage'));
+const ApprovalsAdminPage         = lazy(() => import('../pages/admin/ApprovalsAdminPage'));
+const PaperPresentationsAdminPage = lazy(() => import('../pages/admin/PaperPresentationsAdminPage'));
+const NewslettersAdminPage       = lazy(() => import('../pages/admin/NewslettersAdminPage'));
+const GalleryAlbumsAdminPage     = lazy(() => import('../pages/admin/GalleryAlbumsAdminPage'));
+const OfficeBearersAdminPage     = lazy(() => import('../pages/admin/OfficeBearersAdminPage'));
+const AnnualReportsAdminPage     = lazy(() => import('../pages/admin/AnnualReportsAdminPage'));
+const GrievancesAdminPage        = lazy(() => import('../pages/admin/GrievancesAdminPage'));
+const GrievanceRoutesAdminPage   = lazy(() => import('../pages/admin/GrievanceRoutesAdminPage'));
+const ResourcesAdminPage         = lazy(() => import('../pages/admin/ResourcesAdminPage'));
+const QuizEditorPage             = lazy(() => import('../pages/admin/QuizEditorPage'));
+
+// Section L (Resources) — public-facing pages with slug-based detail routes.
+const ResourcePaperPage   = lazy(() => import('../pages/ResourcePaperPage'));
+const ResourceJournalPage = lazy(() => import('../pages/ResourceJournalPage'));
+const ResourceSpeakerPage = lazy(() => import('../pages/ResourceSpeakerPage'));
+const ResourceQuizPage    = lazy(() => import('../pages/ResourceQuizPage'));
+const ResourceSubmitPage  = lazy(() => import('../pages/ResourceSubmitPage'));
+const MyLibraryPage       = lazy(() => import('../pages/MyLibraryPage'));
+
+const RequireEmployer         = lazy(() => import('../components/employer/RequireEmployer'));
+const EmployerDashboardPage   = lazy(() => import('../pages/employer/EmployerDashboardPage'));
+const EmployerPostingsPage    = lazy(() => import('../pages/employer/EmployerPostingsPage'));
+const EmployerPostingFormPage = lazy(() => import('../pages/employer/EmployerPostingFormPage'));
+const EmployerProfilePage     = lazy(() => import('../pages/employer/EmployerProfilePage'));
 
 const ROUTES = {
   '/': HomePage,
@@ -89,7 +107,17 @@ const ROUTES = {
   '/members-directory': MembersDirectoryPage,
   '/book-room': RoomBookingPage,
   '/track-grievance': TrackGrievancePage,
+  '/my-library': MyLibraryPage,
+  '/resources/submit': ResourceSubmitPage,
 };
+
+// Slug-based public routes. Resolved by prefix match in resolvePublicPage().
+const SLUG_ROUTES = [
+  { prefix: '/resources/papers/',   suffix: '/quiz', Page: ResourceQuizPage },
+  { prefix: '/resources/papers/',                    Page: ResourcePaperPage },
+  { prefix: '/resources/journal/',                   Page: ResourceJournalPage },
+  { prefix: '/resources/speakers/',                  Page: ResourceSpeakerPage },
+];
 
 // Admin routes. Each is wrapped in <RequireAdmin> at render time. Placeholder
 // sections render the shared ComingSoonPage with their own title.
@@ -120,6 +148,7 @@ const ADMIN_ROUTES = {
   '/admin/annual-reports':      AnnualReportsAdminPage,
   '/admin/grievances':          GrievancesAdminPage,
   '/admin/grievance-routes':    GrievanceRoutesAdminPage,
+  '/admin/resources':           ResourcesAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);
@@ -208,13 +237,21 @@ export default function AppShell() {
   }
 
   if (isAdminPath(route.path)) {
-    const AdminPage = ADMIN_ROUTES[route.path] ?? (() => <ComingSoonPage title="Not found" description="No admin page exists at this path." />);
+    // Slug-based admin routes for quiz authoring:
+    //   /admin/resources/papers/<paperId>/quiz
+    let AdminPage = ADMIN_ROUTES[route.path];
+    if (!AdminPage && /^\/admin\/resources\/papers\/[^/]+\/quiz$/.test(route.path)) {
+      AdminPage = QuizEditorPage;
+    }
+    AdminPage = AdminPage ?? (() => <ComingSoonPage title="Not found" description="No admin page exists at this path." />);
     return (
       <>
         <ScrollToTop />
-        <RequireAdmin>
-          <AdminPage />
-        </RequireAdmin>
+        <Suspense fallback={<ShimmerFullPageSplash />}>
+          <RequireAdmin>
+            <AdminPage />
+          </RequireAdmin>
+        </Suspense>
       </>
     );
   }
@@ -224,21 +261,40 @@ export default function AppShell() {
     return (
       <>
         <ScrollToTop />
-        <RequireEmployer>
-          <EmployerPage />
-        </RequireEmployer>
+        <Suspense fallback={<ShimmerFullPageSplash />}>
+          <RequireEmployer>
+            <EmployerPage />
+          </RequireEmployer>
+        </Suspense>
       </>
     );
   }
 
-  const Page = ROUTES[route.path] ?? NotFound;
+  // Try exact match first, then slug-route prefix match (Resources pages
+  // are /resources/papers/<slug>, /resources/journal/<slug>, etc.).
+  let Page = ROUTES[route.path];
+  if (!Page) {
+    for (const r of SLUG_ROUTES) {
+      if (!route.path.startsWith(r.prefix)) continue;
+      const rest = route.path.slice(r.prefix.length);
+      if (r.suffix) {
+        if (rest.endsWith(r.suffix)) { Page = r.Page; break; }
+      } else {
+        // No suffix → match if there's a slug and no extra segments.
+        if (rest && !rest.includes('/')) { Page = r.Page; break; }
+      }
+    }
+  }
+  Page = Page ?? NotFound;
   const fullBleed = FULL_BLEED_ROUTES.has(route.path);
 
   if (fullBleed) {
     return (
       <>
         <ScrollToTop />
-        <Page />
+        <Suspense fallback={<ShimmerFullPageSplash />}>
+          <Page />
+        </Suspense>
       </>
     );
   }
@@ -249,10 +305,14 @@ export default function AppShell() {
       <Header />
       <PushPermissionBanner />
       <main style={{ flex: 1 }}>
-        <Page />
+        <Suspense fallback={<ShimmerFullPageSplash />}>
+          <Page />
+        </Suspense>
       </main>
       <Footer />
-      <PrayGyaanWidget />
+      <Suspense fallback={null}>
+        <PrayGyaanWidget />
+      </Suspense>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
+import { Shimmer } from '../../components/ui/Shimmer';
 
 const EMPTY = { subject: '', label: '', route_email: '', active: true };
 
@@ -73,7 +74,19 @@ export default function GrievanceRoutesAdminPage() {
 
       {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
-      {!items && !err && <p className="muted-text">Loading…</p>}
+      {!items && !err && (
+        <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1rem' }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
+                <Shimmer height=".9rem" width={`${40 + ((i * 13) % 35)}%`} />
+                <Shimmer height=".7rem" width="55%" />
+              </div>
+              <Shimmer height="1.1rem" width="2.5rem" radius="999px" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {items && items.length === 0 && (
         <div className="card" style={{ padding: '1.5rem', textAlign: 'center' }}>

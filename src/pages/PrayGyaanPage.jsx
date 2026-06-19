@@ -1,32 +1,154 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
-import { IconBot, IconSparkles, IconMessageSquare } from '../icons';
+import { IconBot, IconSparkles, IconMessageSquare, IconShield, IconCheck } from '../icons';
+import garudImg from '../assets/garud.png';
+import { renderMarkdown } from '../lib/markdown.jsx';
+import {
+  getAnonId, getConfig, getStarters, streamChat, sendFeedback,
+} from '../lib/pragyaan';
+
+const DEFAULT_DISCLAIMER =
+  'Pragyaan is an AI assistant that answers from the ICAI Nagpur Branch knowledge base. ' +
+  'Responses are general information, not professional, legal, or financial advice, and may be ' +
+  'incomplete or out of date. Verify important details with the branch before acting.';
+
+const LANG_LABEL = { en: 'English', hi: 'हिन्दी', mr: 'मराठी' };
+
+const ThumbsUp = ({ filled }) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill={filled ? 'currentColor' : 'none'}
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M7 10v12" /><path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l4.5-9 1.5 1.5z" />
+  </svg>
+);
+const ThumbsDown = ({ filled }) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill={filled ? 'currentColor' : 'none'}
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 14V2" /><path d="M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-4.5 9-1.5-1.5z" />
+  </svg>
+);
+
+function cryptoId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+const WELCOME = {
+  id: 'welcome',
+  role: 'assistant',
+  text:
+    "Namaste! I'm **Pragyaan**, the ICAI Nagpur Branch AI assistant. " +
+    'Ask me about CPE events, articleship, UDIN, branch services, circulars, professional standards, and more — I answer from the branch knowledge base and cite my sources.',
+  citations: [],
+  streaming: false,
+};
 
 export default function PrayGyaanPage() {
-  const [msgs, setMsgs] = useState([
-    { role: 'bot', text: "Namaste! I'm PrayGyaan. Ask me about CPE events, UDIN, articleship, or branch services." },
-  ]);
+  const [msgs, setMsgs] = useState([WELCOME]);
   const [input, setInput] = useState('');
+  const [streaming, setStreaming] = useState(false);
+  const [lang, setLang] = useState('en');
+  const [config, setConfig] = useState({ disclaimer: DEFAULT_DISCLAIMER, languages: ['en', 'hi', 'mr'] });
+  const [starters, setStarters] = useState([]);
+  const [conversationId, setConversationId] = useState(null);
+  const [feedbackState, setFeedbackState] = useState({});
 
-  const send = () => {
-    if (!input.trim()) return;
+  const bottomRef = useRef(null);
+  const streamRef = useRef(null);
+  const anonId = useMemo(() => getAnonId(), []);
+
+  useEffect(() => {
+    getConfig().then(setConfig).catch(() => { /* keep defaults */ });
+    getStarters()
+      .then((r) => setStarters(Array.isArray(r?.starters) ? r.starters : []))
+      .catch(() => setStarters([]));
+  }, []);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [msgs]);
+
+  useEffect(() => () => streamRef.current?.abort(), []);
+
+  const send = useCallback((textArg) => {
+    const q = (textArg ?? input).trim();
+    if (!q || streaming) return;
+    setInput('');
+
+    const assistantId = cryptoId();
     setMsgs((m) => [
       ...m,
-      { role: 'user', text: input },
-      { role: 'bot', text: 'Thanks — a sample response will appear here once the AI backend is connected.' },
+      { id: cryptoId(), role: 'user', text: q },
+      { id: assistantId, role: 'assistant', text: '', citations: [], streaming: true },
     ]);
-    setInput('');
-  };
+    setStreaming(true);
+
+    streamRef.current?.abort();
+    streamRef.current = streamChat(
+      { message: q, conversationId, anonId, lang },
+      {
+        onToken: (delta) => {
+          setMsgs((m) => m.map((row) => (row.id === assistantId
+            ? { ...row, text: row.text + delta }
+            : row)));
+        },
+        onDone: (final) => {
+          setMsgs((m) => m.map((row) => (row.id === assistantId
+            ? {
+              ...row,
+              streaming: false,
+              citations: final.citations || [],
+              messageId: final.messageId,
+              noAnswer: !!final.noAnswer,
+            }
+            : row)));
+          if (final.conversationId) setConversationId(final.conversationId);
+          setStreaming(false);
+        },
+        onError: (err) => {
+          setMsgs((m) => m.map((row) => (row.id === assistantId
+            ? {
+              ...row,
+              streaming: false,
+              text: row.text || `Sorry — I couldn't get an answer right now. ${err.message || ''}`.trim(),
+              error: true,
+            }
+            : row)));
+          setStreaming(false);
+        },
+      },
+    );
+  }, [input, streaming, conversationId, anonId, lang]);
+
+  const onRate = useCallback(async (messageId, rating) => {
+    if (!messageId) return;
+    setFeedbackState((s) => ({ ...s, [messageId]: 'pending' }));
+    try {
+      await sendFeedback({ messageId, rating });
+      setFeedbackState((s) => ({ ...s, [messageId]: rating }));
+    } catch {
+      setFeedbackState((s) => {
+        const next = { ...s };
+        delete next[messageId];
+        return next;
+      });
+    }
+  }, []);
+
+  const showStarters = msgs.filter((m) => m.role === 'user').length === 0;
 
   return (
     <>
-      <PageHeader title="PrayGyaan — AI Assistant" subtitle="Your 24×7 guide to ICAI services, events and resources" />
+      <PageHeader
+        title="Pragyaan — AI Assistant"
+        subtitle="Your 24×7 grounded guide to ICAI Nagpur Branch services, events, circulars, and resources."
+      />
       <section className="container" style={{ padding: '3rem 1rem', maxWidth: '64rem' }}>
+        {/* Feature cards */}
         <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
           {[
-            { Icon: IconBot, t: 'Instant Answers', d: 'Quick replies on CPE, UDIN, COP and more.' },
-            { Icon: IconSparkles, t: 'Smart Search', d: 'Find circulars, events & resources fast.' },
-            { Icon: IconMessageSquare, t: 'Always On', d: 'Available 24×7 for members & students.' },
+            { Icon: IconBot, t: 'Source-cited answers', d: 'Every reply cites the branch document or page it relied on.' },
+            { Icon: IconSparkles, t: 'Smart, scoped search', d: 'Searches branch circulars, events, FAQs and resources for you.' },
+            { Icon: IconMessageSquare, t: 'English · हिन्दी · मराठी', d: 'Ask in your language — Pragyaan replies in the same one.' },
           ].map((f) => (
             <div key={f.t} className="card">
               <f.Icon size="lg" />
@@ -36,36 +158,285 @@ export default function PrayGyaanPage() {
           ))}
         </div>
 
-        <div className="card" style={{ marginTop: '2rem', padding: 0 }}>
-          <div style={{ borderBottom: '1px solid var(--border)', padding: '.75rem 1.25rem', fontWeight: 600 }}>
-            Chat with PrayGyaan
-          </div>
-          <div style={{ height: '20rem', overflowY: 'auto', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-            {msgs.map((m, i) => (
-              <div key={i} className="row" style={{ justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                <div style={{
-                  maxWidth: '75%', padding: '.5rem 1rem', borderRadius: '.5rem', fontSize: '.875rem',
-                  background: m.role === 'user' ? 'var(--primary)' : 'var(--muted)',
-                  color: m.role === 'user' ? 'var(--primary-foreground)' : 'var(--foreground)',
-                }}>
-                  {m.text}
-                </div>
+        {/* Chat card */}
+        <div className="card" style={{ marginTop: '2rem', padding: 0, overflow: 'hidden' }}>
+          <div style={{
+            borderBottom: '1px solid var(--border)',
+            padding: '.75rem 1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '.75rem',
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem', fontWeight: 600 }}>
+              <div style={{
+                width: '1.75rem', height: '1.75rem', borderRadius: 999,
+                background: '#fff', border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+              }}>
+                <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
               </div>
-            ))}
+              Chat with Pragyaan
+            </div>
+
+            <div style={{ flex: 1 }} />
+
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.78rem', color: 'var(--muted-foreground)' }}>
+              Reply in
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value)}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: '.4rem',
+                  padding: '.25rem .45rem',
+                  fontSize: '.78rem',
+                  background: 'var(--background)',
+                  color: 'var(--foreground)',
+                  cursor: 'pointer',
+                }}
+              >
+                {(config.languages || ['en']).map((l) => (
+                  <option key={l} value={l}>{LANG_LABEL[l] || l.toUpperCase()}</option>
+                ))}
+              </select>
+            </label>
           </div>
+
+          {/* Disclaimer banner */}
+          <div style={{
+            background: 'var(--muted)',
+            color: 'var(--muted-foreground)',
+            fontSize: '.75rem',
+            lineHeight: 1.45,
+            padding: '.6rem 1.25rem',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '.5rem',
+          }}>
+            <IconShield size="sm" />
+            <span>{config.disclaimer || DEFAULT_DISCLAIMER}</span>
+          </div>
+
+          {/* Messages */}
+          <div style={{
+            height: 'min(60vh, 26rem)',
+            overflowY: 'auto',
+            padding: '1.25rem',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '.85rem',
+          }}>
+            {msgs.map((m) => (
+              <MessageRow
+                key={m.id}
+                message={m}
+                feedback={feedbackState[m.messageId]}
+                onRate={onRate}
+              />
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Starters */}
+          {showStarters && starters.length > 0 && (
+            <div style={{
+              padding: '.5rem 1.25rem 1rem',
+              display: 'flex', flexWrap: 'wrap', gap: '.4rem',
+              borderTop: '1px solid var(--border)',
+            }}>
+              <span style={{ fontSize: '.72rem', color: 'var(--muted-foreground)', alignSelf: 'center', marginRight: '.25rem' }}>
+                Try:
+              </span>
+              {starters.map((s) => (
+                <button
+                  key={s}
+                  className="btn"
+                  onClick={() => send(s)}
+                  disabled={streaming}
+                  style={{
+                    padding: '.3rem .75rem',
+                    borderRadius: 999,
+                    border: '1px solid var(--border)',
+                    background: 'var(--card)',
+                    fontSize: '.75rem',
+                    fontWeight: 500,
+                    cursor: streaming ? 'default' : 'pointer',
+                    color: 'var(--foreground)',
+                  }}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Input */}
           <div className="row gap-2" style={{ borderTop: '1px solid var(--border)', padding: '.75rem' }}>
             <input
               className="input-base"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && send()}
-              placeholder="Ask anything…"
+              onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+              placeholder={streaming ? 'Pragyaan is replying…' : 'Ask Pragyaan a question…'}
+              disabled={streaming}
               style={{ flex: 1 }}
             />
-            <button className="btn btn-primary" onClick={send}>Send</button>
+            <button
+              className="btn btn-primary"
+              onClick={() => send()}
+              disabled={!input.trim() || streaming}
+            >
+              {streaming ? 'Replying…' : 'Send'}
+            </button>
           </div>
         </div>
       </section>
     </>
+  );
+}
+
+function TypingDots() {
+  return (
+    <span style={{ display: 'inline-flex', gap: '.25rem', alignItems: 'center', marginLeft: '.2rem' }}>
+      {[0, 1, 2].map((d) => (
+        <span key={d} style={{
+          width: '.4rem', height: '.4rem', borderRadius: 999,
+          background: 'var(--muted-foreground)',
+          display: 'inline-block',
+          animation: `pgDot .9s ${d * 0.2}s ease-in-out infinite`,
+        }} />
+      ))}
+      <style>{`@keyframes pgDot { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-4px); } }`}</style>
+    </span>
+  );
+}
+
+function Citations({ items }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginTop: '.5rem' }}>
+      <div style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', marginBottom: '.3rem' }}>
+        Sources
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
+        {items.map((c, i) => {
+          const href = c.url || null;
+          const inner = (
+            <>
+              <span style={{
+                minWidth: '1.05rem', height: '1.05rem', borderRadius: 999,
+                background: 'var(--primary)', color: 'white',
+                fontSize: '.62rem', fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                padding: '0 .3rem',
+              }}>{i + 1}</span>
+              <span style={{
+                maxWidth: '14rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{c.title}</span>
+            </>
+          );
+          const style = {
+            display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+            padding: '.25rem .6rem .25rem .3rem',
+            borderRadius: 999, border: '1px solid var(--border)',
+            background: 'var(--card)', color: 'var(--foreground)',
+            fontSize: '.72rem', lineHeight: 1.2,
+            textDecoration: 'none', cursor: href ? 'pointer' : 'default',
+          };
+          return href ? (
+            <a key={c.source_id || i} href={href} target="_blank" rel="noopener noreferrer" style={style}>
+              {inner}
+            </a>
+          ) : (
+            <span key={c.source_id || i} style={style}>{inner}</span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function FeedbackButtons({ messageId, value, onRate }) {
+  if (!messageId) return null;
+  const isUp = value === 'up';
+  const isDown = value === 'down';
+  const isPending = value === 'pending';
+  const btn = (active) => ({
+    background: active ? 'var(--primary)' : 'transparent',
+    color: active ? 'white' : 'var(--muted-foreground)',
+    border: '1px solid var(--border)',
+    borderRadius: '.35rem',
+    padding: '.25rem .4rem',
+    cursor: isPending ? 'default' : 'pointer',
+    display: 'inline-flex', alignItems: 'center',
+    opacity: isPending && !active ? 0.4 : 1,
+    transition: 'all .15s',
+  });
+  return (
+    <div style={{ display: 'flex', gap: '.35rem', marginTop: '.5rem', alignItems: 'center' }}>
+      <span style={{ fontSize: '.7rem', color: 'var(--muted-foreground)' }}>Was this helpful?</span>
+      <button onClick={() => !isPending && onRate(messageId, 'up')} aria-label="Helpful" style={btn(isUp)} disabled={isPending}>
+        <ThumbsUp filled={isUp} />
+      </button>
+      <button onClick={() => !isPending && onRate(messageId, 'down')} aria-label="Not helpful" style={btn(isDown)} disabled={isPending}>
+        <ThumbsDown filled={isDown} />
+      </button>
+      {(isUp || isDown) && (
+        <span style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
+          <IconCheck size="sm" /> Thanks for the feedback
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MessageRow({ message, feedback, onRate }) {
+  const isUser = message.role === 'user';
+  const bubbleStyle = {
+    padding: '.65rem 1rem',
+    borderRadius: isUser ? '.85rem .85rem .15rem .85rem' : '.85rem .85rem .85rem .15rem',
+    fontSize: '.9rem',
+    lineHeight: 1.55,
+    background: isUser ? 'var(--primary)' : 'var(--muted)',
+    color: isUser ? 'var(--primary-foreground)' : 'var(--foreground)',
+    wordBreak: 'break-word',
+  };
+  const isStreamingEmpty = message.streaming && !message.text;
+
+  return (
+    <div className="row" style={{ justifyContent: isUser ? 'flex-end' : 'flex-start', alignItems: 'flex-start' }}>
+      {!isUser && (
+        <div style={{
+          width: '1.85rem', height: '1.85rem', borderRadius: 999,
+          background: '#fff', border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, marginRight: '.55rem', marginTop: '.15rem', overflow: 'hidden',
+        }}>
+          <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', maxWidth: isUser ? '80%' : 'min(38rem, 85%)' }}>
+        <div style={bubbleStyle}>
+          {isUser ? (
+            message.text
+          ) : isStreamingEmpty ? (
+            <TypingDots />
+          ) : (
+            <div className="pragyaan-prose">
+              {renderMarkdown(message.text)}
+              {message.streaming && <TypingDots />}
+            </div>
+          )}
+        </div>
+        {!isUser && !message.streaming && (
+          <>
+            <Citations items={message.citations} />
+            <FeedbackButtons messageId={message.messageId} value={feedback} onRate={onRate} />
+          </>
+        )}
+      </div>
+    </div>
   );
 }

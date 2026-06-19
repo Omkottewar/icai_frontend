@@ -1,6 +1,42 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
-import { IconArrowRight, IconFileText, IconBookOpen, IconDownload, IconAward, IconShield, IconSparkles, IconCalendar, IconUsers } from '../icons';
+import { useAuth } from '../context/AuthContext';
+import { IconArrowRight, IconFileText, IconBookOpen, IconDownload, IconAward, IconShield, IconSparkles, IconCalendar, IconUsers, IconPlus } from '../icons';
+import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
+
+function NewsletterShimmerGrid({ count = 6 }) {
+  return (
+    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <Shimmer width="100%" height="0" style={{ aspectRatio: '3/4', display: 'block', borderRadius: 0 }} />
+          <div style={{ padding: '.875rem 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            <Shimmer height=".6rem" width="40%" />
+            <Shimmer height=".95rem" width="80%" />
+            <Shimmer height=".75rem" width="50%" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PaperShimmerGrid({ count = 6 }) {
+  return (
+    <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }} aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="card" style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem', gap: '.6rem' }}>
+          <Shimmer height="1rem" width="3rem" radius="999px" />
+          <ShimmerLines count={2} lastWidth="65%" />
+          <div style={{ marginTop: '.4rem', display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+            <Shimmer height=".7rem" width="45%" />
+            <Shimmer height=".7rem" width="60%" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // Static category cards at the top — these are quick visual nav for national-
 // level resources the branch links to (Circulars, Standards, e-Journal, etc).
@@ -31,8 +67,12 @@ async function api(url) {
 }
 
 export default function ResourcesPage() {
+  const { user } = useAuth();
   const [papers, setPapers]           = useState(null);
   const [newsletters, setNewsletters] = useState(null);
+  // E-journal issues — same visual treatment as newsletters, separate data
+  // source per L.5 in the client brief. Optional; load is fire-and-forget.
+  const [ejournalIssues, setEjournalIssues] = useState(null);
   const [err, setErr]                 = useState('');
 
   useEffect(() => {
@@ -40,11 +80,13 @@ export default function ResourcesPage() {
     Promise.all([
       api('/api/paper-presentations'),
       api('/api/newsletters'),
+      api('/api/resources/ejournal-issues?pageSize=12').catch(() => ({ items: [] })),
     ])
-      .then(([p, n]) => {
+      .then(([p, n, j]) => {
         if (cancelled) return;
         setPapers(p.items || []);
         setNewsletters(n.items || []);
+        setEjournalIssues(j.items || []);
       })
       .catch((e) => { if (!cancelled) setErr(e.message); });
     return () => { cancelled = true; };
@@ -81,7 +123,7 @@ export default function ResourcesPage() {
         </div>
 
         {newsletters === null ? (
-          <p className="muted-text" style={{ fontSize: '.875rem' }}>Loading…</p>
+          <NewsletterShimmerGrid count={4} />
         ) : newsletters.length === 0 ? (
           <p className="muted-text" style={{ fontSize: '.875rem' }}>No newsletters published yet.</p>
         ) : (
@@ -125,6 +167,55 @@ export default function ResourcesPage() {
         )}
       </section>
 
+      {/* E-Journal Archive — same visual treatment as Branch Newsletter.
+          Shown only when there's at least one published issue so we don't
+          surface an empty section on launch day. */}
+      {ejournalIssues && ejournalIssues.length > 0 && (
+        <section className="container" style={{ padding: '2rem 1rem', borderTop: '1px solid var(--border)' }}>
+          <div style={{ marginBottom: '1.5rem' }}>
+            <div className="tiny-eyebrow">Branch publication</div>
+            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>e-Journal Archive</h2>
+            <p className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
+              Long-form articles authored by the Nagpur Branch — quarterly and special issues.
+            </p>
+          </div>
+
+          <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            {ejournalIssues.map((j) => (
+              <a
+                key={j.id}
+                href={`#/resources/journal/${j.slug}`}
+                className="card hover-lift"
+                style={{ display: 'flex', flexDirection: 'column', padding: '0', overflow: 'hidden', textDecoration: 'none', color: 'inherit' }}
+              >
+                {j.cover_url ? (
+                  <img src={j.cover_url} alt={j.title} loading="lazy"
+                       style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{
+                    width: '100%', aspectRatio: '3/4',
+                    background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '.85rem', fontWeight: 700, textAlign: 'center', padding: '1rem',
+                  }}>
+                    {j.issue_label}
+                  </div>
+                )}
+                <div style={{ padding: '.875rem 1rem 1rem' }}>
+                  <div style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
+                    {j.issue_label}
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginTop: '.15rem' }}>{j.title}</div>
+                  <div className="row gap-1" style={{ marginTop: '.5rem', color: 'var(--primary)', fontSize: '.8rem', fontWeight: 600 }}>
+                    Read issue <IconArrowRight size="sm" />
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Paper Presentations — dynamic. Mandatory disclaimer per Web-Media Policy 5p. */}
       <section className="container" style={{ padding: '2rem 1rem 4rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ marginBottom: '1.5rem' }}>
@@ -151,15 +242,23 @@ export default function ResourcesPage() {
         {err && <p style={{ color: 'var(--destructive)', fontSize: '.875rem' }}>{err}</p>}
 
         {papers === null ? (
-          <p className="muted-text" style={{ fontSize: '.875rem' }}>Loading…</p>
+          <PaperShimmerGrid count={6} />
         ) : papers.length === 0 ? (
           <p className="muted-text" style={{ fontSize: '.875rem' }}>No presentations have been published yet.</p>
         ) : (
           <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
             {papers.map((p) => {
               const meta = COMMITTEE_COLORS[p.committee_tag] || { color: '#6b7280', bg: '#f9fafb' };
+              // Outer link → detail page (where comments / share / quiz / bookmark
+              // live). Inner "Download PDF" still opens the raw file in a new tab.
+              // stopPropagation on the inner anchor prevents both navigations.
               return (
-                <div key={p.id} className="card hover-lift" style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem' }}>
+                <a
+                  key={p.id}
+                  href={p.slug ? `#/resources/papers/${p.slug}` : '#'}
+                  className="card hover-lift"
+                  style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem', textDecoration: 'none', color: 'inherit' }}
+                >
                   {p.committee_tag && (
                     <div className="row gap-2" style={{ marginBottom: '.75rem' }}>
                       <span style={{
@@ -182,6 +281,7 @@ export default function ResourcesPage() {
                   </div>
                   {p.pdf_url ? (
                     <a href={p.pdf_url} target="_blank" rel="noopener noreferrer"
+                       onClick={(e) => e.stopPropagation()}
                        className="btn btn-outline"
                        style={{ marginTop: '1rem', justifyContent: 'center', fontSize: '.8125rem', padding: '.4rem .75rem' }}>
                       <IconDownload size="sm" /> Download PDF
@@ -189,9 +289,23 @@ export default function ResourcesPage() {
                   ) : (
                     <span className="muted-text" style={{ marginTop: '1rem', fontSize: '.75rem' }}>PDF not yet uploaded</span>
                   )}
-                </div>
+                </a>
               );
             })}
+          </div>
+        )}
+
+        {/* Member CTAs — surface the new engagement features (My Library +
+            Submit a paper) for signed-in users only. Uses existing .btn
+            styles so it sits inside the page's visual language. */}
+        {user && (
+          <div className="row gap-2" style={{ marginTop: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a href="#/my-library" className="btn btn-outline">
+              <IconBookOpen size="sm" /> My Library
+            </a>
+            <a href="#/resources/submit" className="btn btn-outline">
+              <IconPlus size="sm" /> Submit a paper
+            </a>
           </div>
         )}
       </section>

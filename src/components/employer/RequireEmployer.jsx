@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { navigate } from '../../hooks/useRoute';
+import { ShimmerPageBody } from '../ui/Shimmer';
 
 // Gates every /employer/* page. Redirects unauthenticated users to /login
 // and signed-in users without primary_role='Employer' to /dashboard.
@@ -25,11 +26,7 @@ export default function RequireEmployer({ children }) {
   }, [loading, user, isEmployer, showToast]);
 
   if (loading || !user || !isEmployer) {
-    return (
-      <section className="container" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
-        <p className="muted-text">Loading…</p>
-      </section>
-    );
+    return <ShimmerPageBody cards={3} />;
   }
 
   return children;

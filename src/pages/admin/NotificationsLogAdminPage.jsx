@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAdminList, adminFetch } from '../../hooks/useAdminList';
+import { ShimmerTableRow } from '../../components/ui/Shimmer';
 
 // Notifications Log — observability for the dispatch pipeline.
 //
@@ -154,9 +155,9 @@ export default function NotificationsLogAdminPage() {
             </tr>
           </thead>
           <tbody>
-            {loading && (
-              <tr><td colSpan="6" className="nl-empty">Loading…</td></tr>
-            )}
+            {loading && Array.from({ length: 6 }).map((_, i) => (
+              <ShimmerTableRow key={i} cols={6} />
+            ))}
             {!loading && rows.length === 0 && (
               <tr><td colSpan="6" className="nl-empty">
                 No delivery attempts match your filters. Try clearing them or check that something has actually been triggered (e.g. a registration, a task assignment).

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
+import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 
 export default function EmployerProfilePage() {
   const { showToast } = useAuth();
@@ -59,7 +60,11 @@ export default function EmployerProfilePage() {
       title="Company details"
       subtitle={verified ? 'Verified employer' : 'Verification pending — admin will review your GSTIN'}
     >
-      {!form && !err && <p className="muted-text">Loading…</p>}
+      {!form && !err && (
+        <div className="card" style={{ padding: '1.5rem', maxWidth: 720 }}>
+          <ShimmerDrawerBody fields={6} cols={2} />
+        </div>
+      )}
       {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
       {form && (

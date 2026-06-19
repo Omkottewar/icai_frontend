@@ -6,6 +6,7 @@ import { invalidate } from '../../lib/apiCache';
 import { useAuth } from '../../context/AuthContext';
 import { SITE_SETTINGS } from '../../lib/siteContentSlots';
 import { SITE_SETTINGS_DEFAULTS } from '../../hooks/useSiteSettings';
+import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 
 // Group definitions in declaration order so the form is stable as keys are
 // added. SITE_SETTINGS already encodes the group per key.
@@ -64,7 +65,9 @@ export default function SiteSettingsAdminPage() {
       }
     >
       {loading ? (
-        <p className="muted-text">Loading…</p>
+        <div style={{ maxWidth: 640 }}>
+          <ShimmerDrawerBody fields={8} cols={1} />
+        </div>
       ) : (
         <div className="col gap-4" style={{ maxWidth: 640 }}>
           {Object.entries(groups).map(([group, items]) => (

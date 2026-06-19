@@ -76,6 +76,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/site-content',         label: 'Site content',         Icon: IconFileText, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/announcements',        label: 'Announcements',        Icon: IconBookOpen, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
+      { to: '/admin/resources',            label: 'Resources & quizzes',  Icon: IconBookOpen, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
       { to: '/admin/paper-presentations',  label: 'Paper presentations',  Icon: IconFileText, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
       { to: '/admin/newsletters',          label: 'Newsletter',           Icon: IconBookOpen, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/gallery',              label: 'Photo gallery',        Icon: IconFileText, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },

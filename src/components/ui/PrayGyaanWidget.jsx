@@ -1,52 +1,162 @@
-import { useState, useRef, useEffect } from 'react';
-import { IconBot, IconX, IconSparkles } from '../../icons';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { IconX, IconCheck } from '../../icons';
 import garudImg from '../../assets/garud.png';
+import { renderMarkdown } from '../../lib/markdown.jsx';
+import {
+  getAnonId, getConfig, getStarters, streamChat, sendFeedback,
+} from '../../lib/pragyaan';
 
-const SUGGESTIONS = [
-  'Upcoming CPE events',
-  'How to generate UDIN?',
-  'Articleship vacancies',
-  'Branch contact details',
-];
+// Fallback shown when /config hasn't resolved yet (or fails). The server
+// returns the canonical disclaimer at runtime.
+const DEFAULT_DISCLAIMER =
+  'Pragyaan is an AI assistant that answers from the ICAI Nagpur Branch knowledge base. ' +
+  'Responses are general information, not professional advice — verify important details with the branch.';
+
+const LANG_LABEL = { en: 'EN', hi: 'हिं', mr: 'मराठी' };
+
+// Tiny thumbs-up / thumbs-down inline SVGs — there are no equivalents in
+// icons/index.jsx and pulling in a whole icon set isn't worth it.
+const ThumbsUp = ({ filled }) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill={filled ? 'currentColor' : 'none'}
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M7 10v12" /><path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H7V10l4.5-9 1.5 1.5z" />
+  </svg>
+);
+const ThumbsDown = ({ filled }) => (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill={filled ? 'currentColor' : 'none'}
+       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 14V2" /><path d="M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H17v12l-4.5 9-1.5-1.5z" />
+  </svg>
+);
+
+function botMessage(text) {
+  return { id: cryptoId(), role: 'assistant', text, citations: [], streaming: false };
+}
+
+function userMessage(text) {
+  return { id: cryptoId(), role: 'user', text };
+}
+
+function cryptoId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 export default function PrayGyaanWidget() {
   const [open, setOpen] = useState(false);
-  const [msgs, setMsgs] = useState([
-    { role: 'bot', text: "Namaste! I'm PrayGyaan — your ICAI Nagpur Branch assistant. Ask me about CPE events, UDIN, articleship, branch services, or anything else." },
+  const [msgs, setMsgs] = useState(() => [
+    botMessage(
+      "Namaste! I'm Pragyaan — your ICAI Nagpur Branch assistant. Ask me about CPE events, articleship, branch services, circulars, and more.",
+    ),
   ]);
   const [input, setInput] = useState('');
-  const [typing, setTyping] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [lang, setLang] = useState('en');
+  const [config, setConfig] = useState({ disclaimer: DEFAULT_DISCLAIMER, languages: ['en', 'hi', 'mr'] });
+  const [starters, setStarters] = useState([]);
+  const [conversationId, setConversationId] = useState(null);
+  const [feedbackState, setFeedbackState] = useState({}); // { [messageId]: 'up' | 'down' | 'pending' }
+
   const bottomRef = useRef(null);
+  const streamRef = useRef(null);
+  const anonId = useMemo(() => getAnonId(), []);
+
+  // Load disclaimer + language list + role-keyed starters once (and again
+  // when the widget is first opened in case the session changed since mount).
+  const fetchedRef = useRef(false);
+  useEffect(() => {
+    if (!open || fetchedRef.current) return;
+    fetchedRef.current = true;
+    getConfig().then(setConfig).catch(() => { /* keep defaults */ });
+    getStarters()
+      .then((r) => setStarters(Array.isArray(r?.starters) ? r.starters : []))
+      .catch(() => setStarters([]));
+  }, [open]);
 
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [msgs, open]);
 
-  const send = (text) => {
-    const q = (text || input).trim();
-    if (!q) return;
+  // Cancel any in-flight stream when the widget unmounts.
+  useEffect(() => () => streamRef.current?.abort(), []);
+
+  const send = useCallback((textArg) => {
+    const q = (textArg ?? input).trim();
+    if (!q || streaming) return;
     setInput('');
-    setMsgs((m) => [...m, { role: 'user', text: q }]);
-    setTyping(true);
-    setTimeout(() => {
-      setTyping(false);
-      setMsgs((m) => [...m, {
-        role: 'bot',
-        text: 'Thanks for your query! This is a demo response — the AI backend will provide live answers once connected.',
-      }]);
-    }, 1000);
-  };
+
+    const assistantId = cryptoId();
+    setMsgs((m) => [
+      ...m,
+      userMessage(q),
+      { id: assistantId, role: 'assistant', text: '', citations: [], streaming: true },
+    ]);
+    setStreaming(true);
+
+    streamRef.current?.abort();
+    streamRef.current = streamChat(
+      { message: q, conversationId, anonId, lang },
+      {
+        onToken: (delta) => {
+          setMsgs((m) => m.map((row) => (row.id === assistantId
+            ? { ...row, text: row.text + delta }
+            : row)));
+        },
+        onDone: (final) => {
+          setMsgs((m) => m.map((row) => (row.id === assistantId
+            ? {
+              ...row,
+              streaming: false,
+              citations: final.citations || [],
+              messageId: final.messageId,
+              noAnswer: !!final.noAnswer,
+            }
+            : row)));
+          if (final.conversationId) setConversationId(final.conversationId);
+          setStreaming(false);
+        },
+        onError: (err) => {
+          setMsgs((m) => m.map((row) => (row.id === assistantId
+            ? {
+              ...row,
+              streaming: false,
+              text: row.text || `Sorry — I couldn't get an answer right now. ${err.message || ''}`.trim(),
+              error: true,
+            }
+            : row)));
+          setStreaming(false);
+        },
+      },
+    );
+  }, [input, streaming, conversationId, anonId, lang]);
+
+  const onRate = useCallback(async (messageId, rating) => {
+    if (!messageId) return;
+    setFeedbackState((s) => ({ ...s, [messageId]: 'pending' }));
+    try {
+      await sendFeedback({ messageId, rating });
+      setFeedbackState((s) => ({ ...s, [messageId]: rating }));
+    } catch {
+      // Roll the indicator back so the user can retry.
+      setFeedbackState((s) => {
+        const next = { ...s };
+        delete next[messageId];
+        return next;
+      });
+    }
+  }, []);
+
+  const showStarters = msgs.filter((m) => m.role === 'user').length === 0;
 
   return (
     <>
-      {/* Chat panel */}
       {open && (
         <div style={{
           position: 'fixed',
           bottom: '5.5rem',
           right: '1.5rem',
-          width: 'min(360px, calc(100vw - 2rem))',
-          height: '480px',
+          width: 'min(380px, calc(100vw - 2rem))',
+          height: '540px',
           background: 'var(--card)',
           border: '1px solid var(--border)',
           borderRadius: '1rem',
@@ -76,84 +186,71 @@ export default function PrayGyaanWidget() {
             }}>
               <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: '.9375rem', lineHeight: 1.2 }}>PrayGyaan AI</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 700, fontSize: '.9375rem', lineHeight: 1.2 }}>Pragyaan AI</div>
               <div style={{ fontSize: '.7rem', opacity: .8 }}>ICAI Nagpur Branch Assistant · 24×7</div>
             </div>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value)}
+              aria-label="Reply language"
+              style={{
+                background: 'rgba(255,255,255,.18)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '.375rem',
+                padding: '.3rem .45rem',
+                fontSize: '.72rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              {(config.languages || ['en']).map((l) => (
+                <option key={l} value={l} style={{ color: '#111' }}>{LANG_LABEL[l] || l.toUpperCase()}</option>
+              ))}
+            </select>
             <button
               onClick={() => setOpen(false)}
+              aria-label="Close chat"
               style={{ background: 'rgba(255,255,255,.15)', border: 0, color: 'white', padding: '.3rem', borderRadius: '.375rem', cursor: 'pointer', display: 'flex' }}
             >
               <IconX size="sm" />
             </button>
           </div>
 
+          {/* Disclaimer banner */}
+          <div style={{
+            background: 'var(--muted)',
+            color: 'var(--muted-foreground)',
+            fontSize: '.68rem',
+            lineHeight: 1.4,
+            padding: '.5rem .875rem',
+            borderBottom: '1px solid var(--border)',
+          }}>
+            {config.disclaimer || DEFAULT_DISCLAIMER}
+          </div>
+
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '.875rem', display: 'flex', flexDirection: 'column', gap: '.625rem' }}>
-            {msgs.map((m, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-                {m.role === 'bot' && (
-                  <div style={{
-                    width: '1.5rem', height: '1.5rem', borderRadius: 999,
-                    background: '#fff',
-                    border: '1px solid var(--border)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    flexShrink: 0, marginRight: '.5rem', marginTop: '.1rem',
-                    overflow: 'hidden',
-                  }}>
-                    <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
-                  </div>
-                )}
-                <div style={{
-                  maxWidth: '80%',
-                  padding: '.5rem .875rem',
-                  borderRadius: m.role === 'user' ? '.75rem .75rem 0 .75rem' : '.75rem .75rem .75rem 0',
-                  fontSize: '.8125rem',
-                  lineHeight: 1.5,
-                  background: m.role === 'user' ? 'var(--primary)' : 'var(--muted)',
-                  color: m.role === 'user' ? 'white' : 'var(--foreground)',
-                }}>
-                  {m.text}
-                </div>
-              </div>
+            {msgs.map((m) => (
+              <MessageBubble
+                key={m.id}
+                message={m}
+                feedback={feedbackState[m.messageId]}
+                onRate={onRate}
+              />
             ))}
-
-            {typing && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-                <div style={{
-                  width: '1.5rem', height: '1.5rem', borderRadius: 999,
-                  background: '#fff',
-                  border: '1px solid var(--border)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                  overflow: 'hidden',
-                }}>
-                  <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
-                </div>
-                <div style={{
-                  padding: '.5rem .875rem', borderRadius: '.75rem .75rem .75rem 0',
-                  background: 'var(--muted)', display: 'flex', gap: '.3rem', alignItems: 'center',
-                }}>
-                  {[0, 1, 2].map((d) => (
-                    <span key={d} style={{
-                      width: '.375rem', height: '.375rem', borderRadius: 999,
-                      background: 'var(--muted-foreground)',
-                      display: 'inline-block',
-                      animation: `typingDot .9s ${d * 0.2}s ease-in-out infinite`,
-                    }} />
-                  ))}
-                </div>
-              </div>
-            )}
             <div ref={bottomRef} />
           </div>
 
-          {/* Suggestions — only shown when no user messages yet */}
-          {msgs.length === 1 && (
+          {/* Suggestions — only while the conversation is still empty */}
+          {showStarters && starters.length > 0 && (
             <div style={{ padding: '0 .875rem .625rem', display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
-              {SUGGESTIONS.map((s) => (
+              {starters.slice(0, 6).map((s) => (
                 <button
                   key={s}
                   onClick={() => send(s)}
+                  disabled={streaming}
                   style={{
                     padding: '.3rem .7rem',
                     borderRadius: 999,
@@ -161,11 +258,11 @@ export default function PrayGyaanWidget() {
                     background: 'var(--card)',
                     fontSize: '.7rem',
                     fontWeight: 500,
-                    cursor: 'pointer',
+                    cursor: streaming ? 'default' : 'pointer',
                     color: 'var(--foreground)',
                     transition: 'all .12s',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
+                  onMouseEnter={(e) => { if (!streaming) { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; } }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--foreground)'; }}
                 >
                   {s}
@@ -179,8 +276,9 @@ export default function PrayGyaanWidget() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && send()}
-              placeholder="Ask anything…"
+              onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
+              placeholder={streaming ? 'Pragyaan is replying…' : 'Ask anything…'}
+              disabled={streaming}
               style={{
                 flex: 1, border: '1px solid var(--border)', borderRadius: '.5rem',
                 padding: '.5rem .75rem', fontSize: '.8125rem', outline: 'none',
@@ -192,17 +290,17 @@ export default function PrayGyaanWidget() {
             />
             <button
               onClick={() => send()}
-              disabled={!input.trim()}
+              disabled={!input.trim() || streaming}
               style={{
-                background: input.trim() ? 'var(--primary)' : 'var(--muted)',
-                color: input.trim() ? 'white' : 'var(--muted-foreground)',
+                background: input.trim() && !streaming ? 'var(--primary)' : 'var(--muted)',
+                color: input.trim() && !streaming ? 'white' : 'var(--muted-foreground)',
                 border: 0, borderRadius: '.5rem',
                 padding: '.5rem .875rem', fontWeight: 600, fontSize: '.8125rem',
-                cursor: input.trim() ? 'pointer' : 'default',
+                cursor: input.trim() && !streaming ? 'pointer' : 'default',
                 transition: 'all .15s',
               }}
             >
-              Send
+              {streaming ? '…' : 'Send'}
             </button>
           </div>
         </div>
@@ -211,7 +309,7 @@ export default function PrayGyaanWidget() {
       {/* Floating trigger button */}
       <button
         onClick={() => setOpen((v) => !v)}
-        title="Chat with PrayGyaan AI"
+        title="Chat with Pragyaan AI"
         style={{
           position: 'fixed',
           bottom: '1.5rem',
@@ -244,7 +342,6 @@ export default function PrayGyaanWidget() {
           />
         )}
 
-        {/* Pulse ring when closed */}
         {!open && (
           <span style={{
             position: 'absolute', inset: 0, borderRadius: 999,
@@ -271,5 +368,156 @@ export default function PrayGyaanWidget() {
         }
       `}</style>
     </>
+  );
+}
+
+function TypingDots() {
+  return (
+    <span style={{ display: 'inline-flex', gap: '.25rem', alignItems: 'center', marginLeft: '.15rem' }}>
+      {[0, 1, 2].map((d) => (
+        <span key={d} style={{
+          width: '.35rem', height: '.35rem', borderRadius: 999,
+          background: 'var(--muted-foreground)',
+          display: 'inline-block',
+          animation: `typingDot .9s ${d * 0.2}s ease-in-out infinite`,
+        }} />
+      ))}
+    </span>
+  );
+}
+
+function Citations({ items }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginTop: '.5rem', display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
+      {items.map((c, i) => {
+        const href = c.url || null;
+        const body = (
+          <>
+            <span style={{
+              minWidth: '1rem', height: '1rem', borderRadius: 999,
+              background: 'var(--primary)', color: 'white',
+              fontSize: '.6rem', fontWeight: 700,
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 .3rem',
+            }}>{i + 1}</span>
+            <span style={{
+              maxWidth: '11rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>{c.title}</span>
+          </>
+        );
+        const style = {
+          display: 'inline-flex', alignItems: 'center', gap: '.3rem',
+          padding: '.2rem .5rem .2rem .25rem',
+          borderRadius: 999, border: '1px solid var(--border)',
+          background: 'var(--card)', color: 'var(--foreground)',
+          fontSize: '.65rem', lineHeight: 1.2, textDecoration: 'none',
+          cursor: href ? 'pointer' : 'default',
+        };
+        return href ? (
+          <a key={c.source_id || i} href={href} target="_blank" rel="noopener noreferrer" style={style}>
+            {body}
+          </a>
+        ) : (
+          <span key={c.source_id || i} style={style}>{body}</span>
+        );
+      })}
+    </div>
+  );
+}
+
+function FeedbackButtons({ messageId, value, onRate }) {
+  if (!messageId) return null;
+  const isUp = value === 'up';
+  const isDown = value === 'down';
+  const isPending = value === 'pending';
+  const btn = (active) => ({
+    background: active ? 'var(--primary)' : 'transparent',
+    color: active ? 'white' : 'var(--muted-foreground)',
+    border: '1px solid var(--border)',
+    borderRadius: '.35rem',
+    padding: '.2rem .35rem',
+    cursor: isPending ? 'default' : 'pointer',
+    display: 'inline-flex', alignItems: 'center',
+    opacity: isPending && !active ? 0.4 : 1,
+    transition: 'all .15s',
+  });
+  return (
+    <div style={{ display: 'flex', gap: '.25rem', marginTop: '.4rem', alignItems: 'center' }}>
+      <button
+        onClick={() => !isPending && onRate(messageId, 'up')}
+        aria-label="Helpful"
+        style={btn(isUp)}
+        disabled={isPending}
+      >
+        <ThumbsUp filled={isUp} />
+      </button>
+      <button
+        onClick={() => !isPending && onRate(messageId, 'down')}
+        aria-label="Not helpful"
+        style={btn(isDown)}
+        disabled={isPending}
+      >
+        <ThumbsDown filled={isDown} />
+      </button>
+      {(isUp || isDown) && (
+        <span style={{ fontSize: '.65rem', color: 'var(--muted-foreground)', display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
+          <IconCheck size="sm" /> Thanks
+        </span>
+      )}
+    </div>
+  );
+}
+
+function MessageBubble({ message, feedback, onRate }) {
+  const isUser = message.role === 'user';
+  const bubbleStyle = {
+    maxWidth: '80%',
+    padding: '.5rem .875rem',
+    borderRadius: isUser ? '.75rem .75rem 0 .75rem' : '.75rem .75rem .75rem 0',
+    fontSize: '.8125rem',
+    lineHeight: 1.5,
+    background: isUser ? 'var(--primary)' : 'var(--muted)',
+    color: isUser ? 'white' : 'var(--foreground)',
+    wordBreak: 'break-word',
+  };
+  const text = message.text;
+  const isStreamingEmpty = message.streaming && !text;
+
+  return (
+    <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+      {!isUser && (
+        <div style={{
+          width: '1.5rem', height: '1.5rem', borderRadius: 999,
+          background: '#fff',
+          border: '1px solid var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, marginRight: '.5rem', marginTop: '.1rem',
+          overflow: 'hidden',
+        }}>
+          <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
+        </div>
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '85%' }}>
+        <div style={bubbleStyle}>
+          {isUser ? (
+            text
+          ) : isStreamingEmpty ? (
+            <TypingDots />
+          ) : (
+            <div className="pragyaan-prose" style={{ display: 'inline-block' }}>
+              {renderMarkdown(text)}
+              {message.streaming && <TypingDots />}
+            </div>
+          )}
+        </div>
+        {!isUser && !message.streaming && (
+          <>
+            <Citations items={message.citations} />
+            <FeedbackButtons messageId={message.messageId} value={feedback} onRate={onRate} />
+          </>
+        )}
+      </div>
+    </div>
   );
 }
