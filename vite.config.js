@@ -1,10 +1,31 @@
-import { defineConfig } from 'vite';
+import { defineConfig, createLogger } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// Filter the noisy "ws proxy socket error: write ECONNABORTED" lines.
+// Vite attaches its error listener directly on the per-upgrade socket
+// inside `proxyReqWs` — that listener can't be removed from the proxy
+// object, so the only clean way to silence the noise is to wrap the
+// logger Vite uses. These errors are harmless races between the
+// backend's rejection response and the browser tearing down the WS
+// upgrade attempt; the chat client handles them via WS close + backoff.
+const quietLogger = createLogger();
+const originalError = quietLogger.error.bind(quietLogger);
+quietLogger.error = (msg, options) => {
+  if (typeof msg === 'string' && (
+    msg.includes('ws proxy socket error') ||
+    msg.includes('ECONNABORTED') ||
+    msg.includes('socket hang up')
+  )) {
+    return;
+  }
+  originalError(msg, options);
+};
 
 // Proxy /api/* to the Express server so the browser sees a single origin.
 // This means session cookies "just work" without cross-origin / SameSite drama.
 export default defineConfig({
+  customLogger: quietLogger,
   plugins: [
     react(),
     // Installable-shell PWA.
@@ -79,11 +100,47 @@ export default defineConfig({
       },
       // WebSocket upgrade path for the event chat. `ws: true` forwards the
       // HTTP/1.1 Upgrade handshake to the API server.
+      //
+      // The `configure` hook silences the noisy "write ECONNABORTED"
+      // proxy errors that fire whenever the backend rejects a WS upgrade
+      // (401/403/404 from eventChatSocket.ts). The backend writes a
+      // proper HTTP rejection response onto the upstream socket; by the
+      // time the proxy tries to forward it downstream, the browser has
+      // already torn down the WS attempt — ECONNABORTED. Harmless: the
+      // chat client sees the WS close and either retries with backoff
+      // or gives up via MAX_WS_ATTEMPTS. We just don't need the stack
+      // trace in the dev log every few seconds.
+      //
+      // We defer attaching our own handler with setImmediate so it runs
+      // AFTER Vite has installed its built-in error logger; the strategy
+      // is "remove Vite's loud handler, install our quiet one."
       '/ws': {
         target: 'ws://localhost:4000',
         ws: true,
         changeOrigin: true,
         rewriteWsOrigin: true,
+        configure: (proxy) => {
+          setImmediate(() => {
+            proxy.removeAllListeners('error');
+            proxy.on('error', (err) => {
+              const code = err?.code || '';
+              const msg  = err?.message || '';
+              // Benign races during upgrade rejection:
+              if (
+                code === 'ECONNABORTED' ||
+                code === 'ECONNRESET'   ||
+                code === 'EPIPE'        ||
+                msg.includes('ECONNABORTED') ||
+                msg.includes('socket hang up')
+              ) {
+                return;
+              }
+              // Real proxy error — keep one line, no stack.
+              // eslint-disable-next-line no-console
+              console.warn('[ws proxy]', msg || code);
+            });
+          });
+        },
       },
     },
   },

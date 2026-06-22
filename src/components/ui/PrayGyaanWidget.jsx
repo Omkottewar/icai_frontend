@@ -108,6 +108,7 @@ export default function PrayGyaanWidget() {
               ...row,
               streaming: false,
               citations: final.citations || [],
+              followUps: final.follow_ups || [],
               messageId: final.messageId,
               noAnswer: !!final.noAnswer,
             }
@@ -178,13 +179,11 @@ export default function PrayGyaanWidget() {
             gap: '.75rem',
           }}>
             <div style={{
-              width: '2.25rem', height: '2.25rem', borderRadius: 999,
-              background: '#fff',
+              width: '2.25rem', height: '2.25rem',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
-              overflow: 'hidden',
             }}>
-              <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
+              <img src={garudImg} alt="Garud" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: '.9375rem', lineHeight: 1.2 }}>Pragyaan AI</div>
@@ -238,6 +237,8 @@ export default function PrayGyaanWidget() {
                 message={m}
                 feedback={feedbackState[m.messageId]}
                 onRate={onRate}
+                onAsk={send}
+                streaming={streaming}
               />
             ))}
             <div ref={bottomRef} />
@@ -314,14 +315,15 @@ export default function PrayGyaanWidget() {
           position: 'fixed',
           bottom: '1.5rem',
           right: '1.5rem',
-          width: '3.5rem',
-          height: '3.5rem',
+          width: '5.5rem',
+          height: '5.5rem',
           borderRadius: 999,
-          background: open ? 'var(--primary-darker)' : '#fff',
+          background: open ? 'var(--primary-darker)' : 'transparent',
           color: open ? 'white' : 'var(--primary)',
-          border: open ? 0 : '1px solid var(--border)',
-          overflow: 'hidden',
-          boxShadow: '0 6px 24px rgba(0,0,0,.22)',
+          border: 0,
+          overflow: 'visible',
+          boxShadow: open ? '0 6px 24px rgba(0,0,0,.22)' : 'none',
+          padding: 0,
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
@@ -329,8 +331,14 @@ export default function PrayGyaanWidget() {
           zIndex: 201,
           transition: 'transform .15s, box-shadow .15s',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,.28)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,.22)'; }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.08)';
+          if (open) e.currentTarget.style.boxShadow = '0 8px 32px rgba(0,0,0,.28)';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)';
+          if (open) e.currentTarget.style.boxShadow = '0 6px 24px rgba(0,0,0,.22)';
+        }}
       >
         {open ? (
           <IconX />
@@ -338,17 +346,8 @@ export default function PrayGyaanWidget() {
           <img
             src={garudImg}
             alt="Garud"
-            style={{ width: '110%', height: '110%', objectFit: 'contain', display: 'block' }}
+            style={{ width: '130%', height: '130%', objectFit: 'contain', display: 'block' }}
           />
-        )}
-
-        {!open && (
-          <span style={{
-            position: 'absolute', inset: 0, borderRadius: 999,
-            border: '2px solid var(--primary)',
-            animation: 'pulseRing 2s ease-out infinite',
-            pointerEvents: 'none',
-          }} />
         )}
       </button>
 
@@ -356,11 +355,6 @@ export default function PrayGyaanWidget() {
         @keyframes widgetSlideUp {
           from { opacity: 0; transform: translateY(12px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0)  scale(1); }
-        }
-        @keyframes pulseRing {
-          0%   { transform: scale(1);    opacity: .6; }
-          70%  { transform: scale(1.45); opacity: 0;  }
-          100% { transform: scale(1.45); opacity: 0;  }
         }
         @keyframes typingDot {
           0%, 60%, 100% { transform: translateY(0); }
@@ -386,42 +380,45 @@ function TypingDots() {
   );
 }
 
-function Citations({ items }) {
+// Follow-up question chips — replaces the old citation chips (which
+// looked like buttons but only led to the home page). After each
+// answer the backend suggests 3 short related questions; clicking a
+// chip submits it as the next turn.
+function FollowUps({ items, onPick, disabled }) {
   if (!items || items.length === 0) return null;
   return (
     <div style={{ marginTop: '.5rem', display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
-      {items.map((c, i) => {
-        const href = c.url || null;
-        const body = (
-          <>
-            <span style={{
-              minWidth: '1rem', height: '1rem', borderRadius: 999,
-              background: 'var(--primary)', color: 'white',
-              fontSize: '.6rem', fontWeight: 700,
-              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              padding: '0 .3rem',
-            }}>{i + 1}</span>
-            <span style={{
-              maxWidth: '11rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>{c.title}</span>
-          </>
-        );
-        const style = {
-          display: 'inline-flex', alignItems: 'center', gap: '.3rem',
-          padding: '.2rem .5rem .2rem .25rem',
-          borderRadius: 999, border: '1px solid var(--border)',
-          background: 'var(--card)', color: 'var(--foreground)',
-          fontSize: '.65rem', lineHeight: 1.2, textDecoration: 'none',
-          cursor: href ? 'pointer' : 'default',
-        };
-        return href ? (
-          <a key={c.source_id || i} href={href} target="_blank" rel="noopener noreferrer" style={style}>
-            {body}
-          </a>
-        ) : (
-          <span key={c.source_id || i} style={style}>{body}</span>
-        );
-      })}
+      {items.map((q, i) => (
+        <button
+          key={i}
+          type="button"
+          disabled={disabled}
+          onClick={() => onPick?.(q)}
+          style={{
+            display: 'inline-flex', alignItems: 'center',
+            padding: '.25rem .65rem',
+            borderRadius: 999, border: '1px solid var(--border)',
+            background: 'var(--card)', color: 'var(--foreground)',
+            fontSize: '.7rem', lineHeight: 1.2,
+            cursor: disabled ? 'not-allowed' : 'pointer',
+            opacity: disabled ? 0.55 : 1,
+            textAlign: 'left',
+            transition: 'background .12s, border-color .12s',
+          }}
+          onMouseEnter={(e) => {
+            if (!disabled) {
+              e.currentTarget.style.borderColor = 'var(--primary)';
+              e.currentTarget.style.background = 'oklch(0.96 0.04 255 / .5)';
+            }
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = 'var(--border)';
+            e.currentTarget.style.background = 'var(--card)';
+          }}
+        >
+          {q}
+        </button>
+      ))}
     </div>
   );
 }
@@ -469,7 +466,7 @@ function FeedbackButtons({ messageId, value, onRate }) {
   );
 }
 
-function MessageBubble({ message, feedback, onRate }) {
+function MessageBubble({ message, feedback, onRate, onAsk, streaming }) {
   const isUser = message.role === 'user';
   const bubbleStyle = {
     maxWidth: '80%',
@@ -488,14 +485,11 @@ function MessageBubble({ message, feedback, onRate }) {
     <div style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
       {!isUser && (
         <div style={{
-          width: '1.5rem', height: '1.5rem', borderRadius: 999,
-          background: '#fff',
-          border: '1px solid var(--border)',
+          width: '1.5rem', height: '1.5rem',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0, marginRight: '.5rem', marginTop: '.1rem',
-          overflow: 'hidden',
         }}>
-          <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
+          <img src={garudImg} alt="Garud" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: '85%' }}>
@@ -513,7 +507,7 @@ function MessageBubble({ message, feedback, onRate }) {
         </div>
         {!isUser && !message.streaming && (
           <>
-            <Citations items={message.citations} />
+            <FollowUps items={message.followUps} onPick={onAsk} disabled={streaming} />
             <FeedbackButtons messageId={message.messageId} value={feedback} onRate={onRate} />
           </>
         )}

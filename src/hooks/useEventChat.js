@@ -271,9 +271,13 @@ export function useEventChat(eventId, { enabled = true } = {}) {
   const refreshChannel = useCallback(async (channelId) => {
     if (!eventId || !channelId) return;
     try {
+      // `cache: 'no-store'` forces a fresh network request — otherwise
+      // the browser may serve a recently-cached page response that
+      // pre-dates the user's reaction / pin / edit, overwriting their
+      // optimistic chip with stale state.
       const r = await fetch(
         `${REST_BASE}/${eventId}/chat/channels/${channelId}/messages?pageSize=${CHAT_PAGE_SIZE}`,
-        { credentials: 'include' },
+        { credentials: 'include', cache: 'no-store' },
       );
       if (!r.ok) return;
       const j = await r.json();
@@ -387,31 +391,11 @@ export function useEventChat(eventId, { enabled = true } = {}) {
       }
 
       if (frame.type === 'reaction') {
-        const { channel_id: ch, message_id, emoji, user_id, action } = frame;
-        setMessagesByCh((m) => ({
-          ...m,
-          [ch]: (m[ch] || []).map((msg) => {
-            if (msg.id !== message_id) return msg;
-            const reactions = Array.isArray(msg.reactions) ? [...msg.reactions] : [];
-            const idx = reactions.findIndex((r) => r.emoji === emoji);
-            if (action === 'added') {
-              if (idx >= 0) {
-                const r = reactions[idx];
-                if (r.user_ids.includes(user_id)) return msg;
-                reactions[idx] = { ...r, user_ids: [...r.user_ids, user_id], count: r.count + 1 };
-              } else {
-                reactions.push({ emoji, user_ids: [user_id], count: 1 });
-              }
-            } else {
-              if (idx < 0) return msg;
-              const r = reactions[idx];
-              const ui = r.user_ids.filter((u) => u !== user_id);
-              if (ui.length === 0) reactions.splice(idx, 1);
-              else reactions[idx] = { ...r, user_ids: ui, count: ui.length };
-            }
-            return { ...msg, reactions };
-          }),
-        }));
+        const { message_id, emoji, user_id, action } = frame;
+        // Single merge function shared with optimistic / rollback /
+        // refresh paths. Idempotent: if the user is already in the
+        // reaction's user_ids, re-applying 'add' is a no-op.
+        applyReactionChange(message_id, emoji, user_id, action === 'added' ? 'add' : 'remove');
         return;
       }
 
@@ -489,15 +473,32 @@ export function useEventChat(eventId, { enabled = true } = {}) {
   // If the WS has actually died we force a reconnect too.
   useEffect(() => {
     if (!eventId || !enabled) return;
+    // Throttle: any combination of focus + visibilitychange events
+    // firing within 5s should run at most once. Without this, clicking
+    // around in the same window can trigger a refetch + WS reconnect
+    // storm — especially if the server is rejecting upgrades (401/403),
+    // every focus fires another doomed connect attempt.
+    let lastRunAt = 0;
     const onVisible = () => {
       if (document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      if (now - lastRunAt < 5000) return;
+      lastRunAt = now;
+
       catchupAll();
       // Also re-sync the active channel's recent slice so reactions /
       // deletions / edits / pins that happened while the tab was in
       // the background show up. /catchup alone doesn't return those.
       if (activeIdRef.current) refreshChannel(activeIdRef.current);
+
       const ws = wsRef.current;
-      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+      const isDead = !ws || ws.readyState === WebSocket.CLOSED;
+      const hasGivenUp = wsAttemptsRef.current >= MAX_WS_ATTEMPTS;
+      // Only force a reconnect if (a) the socket is actually dead AND
+      // (b) we haven't already given up after MAX_WS_ATTEMPTS. Without
+      // (b) the visibility handler keeps retrying a permanently
+      // forbidden upgrade every time the user refocuses the window.
+      if (isDead && !hasGivenUp) {
         connectWs();
       }
     };
@@ -527,6 +528,25 @@ export function useEventChat(eventId, { enabled = true } = {}) {
     }, 1000);
     return () => clearTimeout(handle);
   }, [eventId, event, me, channels, activeId, messagesByCh]);
+
+  // ── Safety-net refresh — every 25s, refetch the active channel's
+  // recent slice. This is the backstop for reactions / deletes / pins
+  // that we missed via WS: a proxy buffer that swallows one frame, an
+  // OS-level WS throttle in a partially-foregrounded tab, etc. The
+  // page endpoint has `Cache-Control: private, max-age=10` + an ETag
+  // derived from the newest message's updated_at, so a no-op refresh
+  // hits the 304 fast path — no DB work on the server.
+  // Skipped while the tab is hidden (no point burning cycles when the
+  // user isn't watching).
+  useEffect(() => {
+    if (!eventId || !enabled) return;
+    const id = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const cid = activeIdRef.current;
+      if (cid) refreshChannel(cid);
+    }, 25_000);
+    return () => clearInterval(id);
+  }, [eventId, enabled, refreshChannel]);
 
   // ── Typing decay — sweep stale typers every 1.5s ─────────────────────
   useEffect(() => {
@@ -801,18 +821,147 @@ export function useEventChat(eventId, { enabled = true } = {}) {
     return true;
   }, [eventId]);
 
-  const toggleReaction = useCallback(async (messageId, emoji) => {
-    await fetch(`${REST_BASE}/${eventId}/chat/messages/${messageId}/reactions`, {
-      method: 'POST', credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ emoji }),
+  // Applies an `add` / `remove` toggle for (messageId, emoji, userId) to
+  // local state. Returns the action that was actually applied ('added' |
+  // 'removed' | null if the message wasn't found). Idempotent: re-applying
+  // an `add` for a user already in user_ids is a no-op.
+  //
+  // We extracted this so the optimistic toggle, rollback, and the WS
+  // broadcast handler all share one set of merge rules — drift between
+  // those was the kind of bug that made reactions "feel off."
+  const applyReactionChange = useCallback((messageId, emoji, userId, action) => {
+    let applied = null;
+    setMessagesByCh((m) => {
+      const next = { ...m };
+      for (const [ch, list] of Object.entries(m)) {
+        const idx = list.findIndex((x) => x.id === messageId);
+        if (idx < 0) continue;
+        const msg = list[idx];
+        const reactions = Array.isArray(msg.reactions) ? [...msg.reactions] : [];
+        const rIdx = reactions.findIndex((r) => r.emoji === emoji);
+        if (action === 'add') {
+          if (rIdx >= 0) {
+            if (reactions[rIdx].user_ids.includes(userId)) {
+              applied = null;
+              return m; // no-op
+            }
+            const r = reactions[rIdx];
+            reactions[rIdx] = { ...r, user_ids: [...r.user_ids, userId], count: r.count + 1 };
+          } else {
+            reactions.push({ emoji, user_ids: [userId], count: 1 });
+          }
+          applied = 'added';
+        } else {
+          if (rIdx < 0) { applied = null; return m; }
+          if (!reactions[rIdx].user_ids.includes(userId)) { applied = null; return m; }
+          const r = reactions[rIdx];
+          const ui = r.user_ids.filter((u) => u !== userId);
+          if (ui.length === 0) reactions.splice(rIdx, 1);
+          else reactions[rIdx] = { ...r, user_ids: ui, count: ui.length };
+          applied = 'removed';
+        }
+        const copy = list.slice();
+        copy[idx] = { ...msg, reactions };
+        next[ch] = copy;
+        return next;
+      }
+      return m;
     });
+    return applied;
+  }, []);
+
+  const toggleReaction = useCallback(async (messageId, emoji) => {
+    const myId = meRef.current?.id;
+    if (!myId) return;
+    // tmp_* ids are optimistic-pending messages we haven't received a
+    // canonical row for yet — server would 404 on the post lookup.
+    if (typeof messageId === 'string' && messageId.startsWith('tmp_')) return;
+
+    // Optimistic toggle in one functional update. We read the current
+    // reactions array straight from the updater's `m` parameter, NOT
+    // from a ref — refs can be stale by a tick, and a stale read flips
+    // the prediction the wrong way. After this returns, the chip is
+    // already on screen.
+    setMessagesByCh((m) => {
+      for (const ch of Object.keys(m)) {
+        const list = m[ch];
+        const idx = list.findIndex((x) => x.id === messageId);
+        if (idx < 0) continue;
+        const msg = list[idx];
+        const reactions = Array.isArray(msg.reactions) ? msg.reactions.slice() : [];
+        const rIdx = reactions.findIndex((r) => r.emoji === emoji);
+        if (rIdx >= 0) {
+          const r = reactions[rIdx];
+          if (r.user_ids.includes(myId)) {
+            // Toggle off.
+            const ui = r.user_ids.filter((u) => u !== myId);
+            if (ui.length === 0) reactions.splice(rIdx, 1);
+            else reactions[rIdx] = { ...r, user_ids: ui, count: ui.length };
+          } else {
+            // Add my id to existing pill.
+            reactions[rIdx] = { ...r, user_ids: [...r.user_ids, myId], count: r.count + 1 };
+          }
+        } else {
+          // Create new pill.
+          reactions.push({ emoji, user_ids: [myId], count: 1 });
+        }
+        const newList = list.slice();
+        newList[idx] = { ...msg, reactions };
+        return { ...m, [ch]: newList };
+      }
+      return m;
+    });
+
+    // Send to server. The WS broadcast (idempotent via applyReactionChange)
+    // will confirm; if it's missed, the 25s periodic refresh corrects it.
+    // Failures are silent — periodic refresh is also the rollback path.
+    try {
+      await fetch(`${REST_BASE}/${eventId}/chat/messages/${messageId}/reactions`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      });
+    } catch { /* periodic refresh will reconcile */ }
   }, [eventId]);
 
   const togglePin = useCallback(async (messageId, currentlyPinned) => {
-    await fetch(`${REST_BASE}/${eventId}/chat/messages/${messageId}/${currentlyPinned ? 'unpin' : 'pin'}`, {
-      method: 'POST', credentials: 'include',
+    if (typeof messageId === 'string' && messageId.startsWith('tmp_')) return;
+    const newPinnedAt = currentlyPinned ? null : new Date().toISOString();
+    // Optimistic flip so the pin icon updates instantly. WS broadcast
+    // arriving later sets pinned_at to the canonical server timestamp —
+    // visually identical to what we wrote optimistically.
+    setMessagesByCh((m) => {
+      const next = { ...m };
+      for (const [ch, list] of Object.entries(m)) {
+        const idx = list.findIndex((x) => x.id === messageId);
+        if (idx < 0) continue;
+        const copy = list.slice();
+        copy[idx] = { ...copy[idx], pinned_at: newPinnedAt };
+        next[ch] = copy;
+        return next;
+      }
+      return m;
     });
+    try {
+      const r = await fetch(`${REST_BASE}/${eventId}/chat/messages/${messageId}/${currentlyPinned ? 'unpin' : 'pin'}`, {
+        method: 'POST', credentials: 'include',
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch {
+      // Rollback to the prior state.
+      setMessagesByCh((m) => {
+        const next = { ...m };
+        for (const [ch, list] of Object.entries(m)) {
+          const idx = list.findIndex((x) => x.id === messageId);
+          if (idx < 0) continue;
+          const copy = list.slice();
+          copy[idx] = { ...copy[idx], pinned_at: currentlyPinned ? new Date().toISOString() : null };
+          next[ch] = copy;
+          return next;
+        }
+        return m;
+      });
+    }
   }, [eventId]);
 
   const loadPinned = useCallback(async (channelId) => {

@@ -97,6 +97,7 @@ export default function PrayGyaanPage() {
               ...row,
               streaming: false,
               citations: final.citations || [],
+              followUps: final.follow_ups || [],
               messageId: final.messageId,
               noAnswer: !!final.noAnswer,
             }
@@ -170,11 +171,10 @@ export default function PrayGyaanPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '.55rem', fontWeight: 600 }}>
               <div style={{
-                width: '1.75rem', height: '1.75rem', borderRadius: 999,
-                background: '#fff', border: '1px solid var(--border)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                width: '1.75rem', height: '1.75rem',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
-                <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
+                <img src={garudImg} alt="Garud" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               Chat with Pragyaan
             </div>
@@ -234,6 +234,8 @@ export default function PrayGyaanPage() {
                 message={m}
                 feedback={feedbackState[m.messageId]}
                 onRate={onRate}
+                onAsk={send}
+                streaming={streaming}
               />
             ))}
             <div ref={bottomRef} />
@@ -313,50 +315,57 @@ function TypingDots() {
   );
 }
 
-function Citations({ items }) {
+// Follow-up question chips — replaces the old citation chips. After
+// each answer the backend suggests 3 short related questions; clicking
+// a chip pre-fills the composer and submits.
+function FollowUps({ items, onPick, disabled }) {
   if (!items || items.length === 0) return null;
   return (
-    <div style={{ marginTop: '.5rem' }}>
+    <div style={{ marginTop: '.6rem' }}>
       <div style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', marginBottom: '.3rem' }}>
-        Sources
+        Ask next
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
-        {items.map((c, i) => {
-          const href = c.url || null;
-          const inner = (
-            <>
-              <span style={{
-                minWidth: '1.05rem', height: '1.05rem', borderRadius: 999,
-                background: 'var(--primary)', color: 'white',
-                fontSize: '.62rem', fontWeight: 700,
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                padding: '0 .3rem',
-              }}>{i + 1}</span>
-              <span style={{
-                maxWidth: '14rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{c.title}</span>
-            </>
-          );
-          const style = {
-            display: 'inline-flex', alignItems: 'center', gap: '.35rem',
-            padding: '.25rem .6rem .25rem .3rem',
-            borderRadius: 999, border: '1px solid var(--border)',
-            background: 'var(--card)', color: 'var(--foreground)',
-            fontSize: '.72rem', lineHeight: 1.2,
-            textDecoration: 'none', cursor: href ? 'pointer' : 'default',
-          };
-          return href ? (
-            <a key={c.source_id || i} href={href} target="_blank" rel="noopener noreferrer" style={style}>
-              {inner}
-            </a>
-          ) : (
-            <span key={c.source_id || i} style={style}>{inner}</span>
-          );
-        })}
+        {items.map((q, i) => (
+          <button
+            key={i}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick?.(q)}
+            style={{
+              display: 'inline-flex', alignItems: 'center',
+              padding: '.3rem .75rem',
+              borderRadius: 999,
+              border: '1px solid var(--border)',
+              background: 'var(--card)',
+              color: 'var(--foreground)',
+              fontSize: '.78rem', lineHeight: 1.3,
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              opacity: disabled ? 0.55 : 1,
+              textAlign: 'left',
+              maxWidth: '100%',
+              transition: 'background .12s, border-color .12s, transform .12s',
+            }}
+            onMouseEnter={(e) => {
+              if (!disabled) {
+                e.currentTarget.style.borderColor = 'var(--primary)';
+                e.currentTarget.style.background = 'oklch(0.96 0.04 255 / .5)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border)';
+              e.currentTarget.style.background = 'var(--card)';
+            }}
+          >
+            {q}
+          </button>
+        ))}
       </div>
     </div>
   );
 }
+
+
 
 function FeedbackButtons({ messageId, value, onRate }) {
   if (!messageId) return null;
@@ -392,7 +401,7 @@ function FeedbackButtons({ messageId, value, onRate }) {
   );
 }
 
-function MessageRow({ message, feedback, onRate }) {
+function MessageRow({ message, feedback, onRate, onAsk, streaming }) {
   const isUser = message.role === 'user';
   const bubbleStyle = {
     padding: '.65rem 1rem',
@@ -409,12 +418,11 @@ function MessageRow({ message, feedback, onRate }) {
     <div className="row" style={{ justifyContent: isUser ? 'flex-end' : 'flex-start', alignItems: 'flex-start' }}>
       {!isUser && (
         <div style={{
-          width: '1.85rem', height: '1.85rem', borderRadius: 999,
-          background: '#fff', border: '1px solid var(--border)',
+          width: '1.85rem', height: '1.85rem',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, marginRight: '.55rem', marginTop: '.15rem', overflow: 'hidden',
+          flexShrink: 0, marginRight: '.55rem', marginTop: '.15rem',
         }}>
-          <img src={garudImg} alt="Garud" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
+          <img src={garudImg} alt="Garud" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', maxWidth: isUser ? '80%' : 'min(38rem, 85%)' }}>
@@ -432,7 +440,7 @@ function MessageRow({ message, feedback, onRate }) {
         </div>
         {!isUser && !message.streaming && (
           <>
-            <Citations items={message.citations} />
+            <FollowUps items={message.followUps} onPick={onAsk} disabled={streaming} />
             <FeedbackButtons messageId={message.messageId} value={feedback} onRate={onRate} />
           </>
         )}

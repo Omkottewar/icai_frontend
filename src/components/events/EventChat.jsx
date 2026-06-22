@@ -753,7 +753,13 @@ function MessageItem({
           </button>
         )}
 
-        <div className={'ec-bubble' + (isDeleted ? ' is-deleted-bubble' : '') + (message.status === 'pending' ? ' is-pending' : '') + (message.status === 'failed' ? ' is-failed' : '')}>
+        <div className={
+          'ec-bubble'
+          + (isDeleted ? ' is-deleted-bubble' : '')
+          + (message.status === 'pending' ? ' is-pending' : '')
+          + (message.status === 'failed' ? ' is-failed' : '')
+          + (!isDeleted && meId && Array.isArray(message.mention_user_ids) && message.mention_user_ids.includes(meId) ? ' is-mentioned-me' : '')
+        }>
           {isDeleted ? (
             <div className="ec-bubble-body ec-deleted-text">This message was deleted</div>
           ) : (
@@ -1692,6 +1698,15 @@ function ChatStyles() {
         background: transparent;
         border: 1px dashed var(--border);
         box-shadow: none;
+      }
+
+      /* "You were mentioned" highlight — a soft amber band along the
+         left edge of the bubble + a subtle background tint, so the
+         message visibly stands out in a busy channel. */
+      .ec-bubble.is-mentioned-me {
+        background: oklch(0.96 0.07 90 / .55);
+        border-left: 3px solid #f59e0b;
+        padding-left: calc(.6rem - 3px);
       }
 
       /* No content-visibility on .ec-row: paint containment clipped
