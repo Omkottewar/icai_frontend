@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useEventChat } from '../../hooks/useEventChat';
 import {
   IconArrowLeft, IconArrowRight, IconSearch, IconPlus, IconX,
@@ -324,18 +324,36 @@ export default function EventChat({ event, onClose }) {
   }, [isFullScreen]);
 
   // Auto-scroll to bottom on new messages if we were already near bottom.
+  //
+  // Uses `useLayoutEffect` rather than `useEffect`, and writes scrollTop
+  // SYNCHRONOUSLY (no requestAnimationFrame wrap). Reason: the chat
+  // re-renders 2–4 times in quick succession during boot (cache prime,
+  // network bootstrap settles, WS catchup, periodic refresh). With
+  // useEffect+RAF the browser paints once with scrollTop=0 between each
+  // re-render and the snap-to-bottom, producing a visible "jump to top
+  // and back" flicker on initial load. Layout effects run between the
+  // DOM commit and the browser paint, so writing scrollTop here means
+  // the user never sees the intermediate top position.
   const scrollerRef = useRef(null);
   const lastMessageIdRef = useRef(null);
-  useEffect(() => {
+  // Suppresses scroll-driven side effects (load-older) until the first
+  // bottom-snap has happened — otherwise the snap itself can trigger
+  // onScroll with scrollTop=0 and kick off a load-older the user didn't
+  // ask for.
+  const initialSettledRef = useRef(false);
+  // Prevents stacking loadOlder calls on fast scrolls — see onScroll below.
+  const loadingOlderRef = useRef(false);
+  useLayoutEffect(() => {
     const el = scrollerRef.current;
-    if (!el) return;
+    if (!el || messages.length === 0) return;
     const last = messages[messages.length - 1];
     const newest = last?.id;
-    if (newest === lastMessageIdRef.current) return;
+    if (newest === lastMessageIdRef.current && initialSettledRef.current) return;
     const wasNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    const wasFirstLoad = lastMessageIdRef.current === null;
+    const wasFirstLoad = !initialSettledRef.current;
     if (wasNearBottom || wasFirstLoad) {
-      requestAnimationFrame(() => { el.scrollTop = el.scrollHeight; });
+      el.scrollTop = el.scrollHeight;
+      initialSettledRef.current = true;
     }
     lastMessageIdRef.current = newest;
   }, [messages]);
@@ -345,25 +363,49 @@ export default function EventChat({ event, onClose }) {
   // otherwise be invisible.
   function onScroll(e) {
     const el = e.currentTarget;
+    // Skip until the initial bottom-snap has happened. The layout effect
+    // sets scrollTop synchronously, but the browser can still emit a
+    // single scroll event during boot — without this guard that event
+    // races into "scrollTop near 0 → loadOlder()" and we end up
+    // prepending older messages the user never asked for.
+    if (!initialSettledRef.current) return;
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     setShowJumpBtn(distFromBottom > 240);
     if (distFromBottom <= 240) setPendingNewCount(0);
-    if (hasMore && el.scrollTop < 80) {
+    // Single-flight loadOlder. Without this guard, fast inertial
+    // scrolling near the top can fire onScroll many times before the
+    // first fetch resolves — each one calls loadOlder, each one
+    // prepends a page, and the scroll anchor logic compounds, throwing
+    // the user well past where they wanted to be.
+    if (hasMore && el.scrollTop < 80 && !loadingOlderRef.current) {
+      loadingOlderRef.current = true;
       const prevHeight = el.scrollHeight;
-      loadOlder().then(() => {
-        requestAnimationFrame(() => {
-          const newHeight = el.scrollHeight;
-          el.scrollTop = newHeight - prevHeight;
-        });
-      });
+      loadOlder()
+        .then(() => {
+          requestAnimationFrame(() => {
+            const newHeight = el.scrollHeight;
+            el.scrollTop = newHeight - prevHeight;
+          });
+        })
+        .finally(() => { loadingOlderRef.current = false; });
     }
   }
 
   // Bump the "X new messages" counter when a message arrives while we're
-  // scrolled away from the bottom.
+  // scrolled away from the bottom. Tracks the previous message count so
+  // we only add the *delta* — without this, every state update that
+  // didn't change the message count was still hitting `n + 1` (channel
+  // switch reset to 0 then immediately bumped; reaction frames don't
+  // change length but were still triggering re-runs of the effect).
+  const prevLenRef = useRef(0);
   useEffect(() => {
-    if (!showJumpBtn) return;
-    setPendingNewCount((n) => n + 1);
+    if (!showJumpBtn) {
+      prevLenRef.current = messages.length;
+      return;
+    }
+    const delta = messages.length - prevLenRef.current;
+    if (delta > 0) setPendingNewCount((n) => n + delta);
+    prevLenRef.current = messages.length;
   }, [messages.length, showJumpBtn]);
 
   function jumpToBottom() {
@@ -405,6 +447,11 @@ export default function EventChat({ event, onClose }) {
     setSearchOpen(false);
     setSearchQ('');
     setSearchResults([]);
+    // Channel switch = treat as a fresh load. Both refs get reset so
+    // the layout effect snaps to the bottom of the new channel on its
+    // first render and the load-older guard re-arms.
+    initialSettledRef.current = false;
+    lastMessageIdRef.current = null;
   }, [activeChannelId]);
 
   // Capture the unread-anchor exactly once per channel switch — the first
@@ -601,7 +648,13 @@ export default function EventChat({ event, onClose }) {
               const mine = me && item.created_by === me.id;
               const prev = grouped[i - 1];
               const showAuthor = !prev || prev.kind !== 'msg' || prev.created_by !== item.created_by;
-              const parent = item.parent_post_id ? messages.find((m) => m.id === item.parent_post_id) : null;
+              // Reply-quote parent. If the parent was deleted after the
+              // reply was posted we don't want to render a quote referencing
+              // a tombstone — surface a small "(message deleted)" line in
+              // the MessageItem instead, which it handles when parent is
+              // null but the row still carries parent_post_id.
+              const parentRaw = item.parent_post_id ? messages.find((m) => m.id === item.parent_post_id) : null;
+              const parent = parentRaw && !parentRaw.deleted_at ? parentRaw : null;
               return (
                 <Fragment key={item.id}>
                   {unreadAnchor === item.id && (
@@ -780,6 +833,15 @@ function MessageItem({
             <span className="ec-reply-ref-author">{parent.author_name}</span>
             <span className="ec-reply-ref-body">{parent.body.slice(0, 100)}{parent.body.length > 100 ? '…' : ''}</span>
           </button>
+        )}
+        {/* Reply to a parent that has since been deleted — small italic
+            hint, not a clickable button (nothing to scroll to). */}
+        {!isDeleted && !parent && message.parent_post_id && (
+          <div className="ec-reply-ref ec-reply-ref-orphan">
+            <span className="ec-reply-ref-body" style={{ fontStyle: 'italic' }}>
+              Replying to a deleted message
+            </span>
+          </div>
         )}
 
         <div className={

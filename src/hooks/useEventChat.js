@@ -224,22 +224,34 @@ export function useEventChat(eventId, { enabled = true } = {}) {
   // does NOT return state changes on older messages (reactions, pins,
   // edits, deletes). For those, refreshChannel() below re-fetches the
   // recent slice so any mutation on already-loaded rows surfaces.
+  // Re-entrancy guard: if WS reconnects fire two catchupAll's
+  // concurrently (e.g. ws.onopen + visibilitychange firing in the same
+  // tick), the older one can land AFTER the newer one and append
+  // already-seen messages. Single-flight per channel via a small
+  // in-flight set keyed by channel id.
+  const catchupInFlight = useRef(new Set());
   const catchupAll = useCallback(async () => {
     if (!eventId) return;
     const watermarks = lastSeenAtByCh.current;
     const channelIds = Object.keys(watermarks);
-    for (const ch of channelIds) {
+    await Promise.all(channelIds.map(async (ch) => {
+      if (catchupInFlight.current.has(ch)) return;
+      catchupInFlight.current.add(ch);
       try {
         const since = watermarks[ch];
-        if (!since) continue;
+        if (!since) return;
         const r = await fetch(
           `${REST_BASE}/${eventId}/chat/channels/${ch}/catchup?since=${encodeURIComponent(since)}`,
-          { credentials: 'include' },
+          { credentials: 'include', cache: 'no-store' },
         );
-        if (!r.ok) continue;
+        if (!r.ok) return;
         const j = await r.json();
         const fresh = j.messages || [];
-        if (fresh.length === 0) continue;
+        if (fresh.length === 0) return;
+        // Re-check watermark in case the WS frame arrived during our
+        // fetch — `fresh` is already strictly newer than `since`, but
+        // some of those messages may have arrived via WS already; the
+        // id-dedup below handles that without us needing to filter.
         setMessagesByCh((m) => {
           const cur = m[ch] || [];
           const ids = new Set(cur.map((x) => x.id));
@@ -247,9 +259,15 @@ export function useEventChat(eventId, { enabled = true } = {}) {
           if (added.length === 0) return m;
           return { ...m, [ch]: [...cur, ...added] };
         });
-        lastSeenAtByCh.current[ch] = fresh[fresh.length - 1].created_at;
+        // Only advance watermark if the new tail is strictly newer.
+        const newestTs = fresh[fresh.length - 1].created_at;
+        const cur = lastSeenAtByCh.current[ch];
+        if (!cur || new Date(newestTs).getTime() > new Date(cur).getTime()) {
+          lastSeenAtByCh.current[ch] = newestTs;
+        }
       } catch { /* ignore per-channel catchup failures */ }
-    }
+      finally { catchupInFlight.current.delete(ch); }
+    }));
   }, [eventId]);
 
   // Re-fetch the most-recent slice of a channel and merge it into local
@@ -371,6 +389,10 @@ export function useEventChat(eventId, { enabled = true } = {}) {
 
       if (frame.type === 'message:edited') {
         const { channel_id: ch, message_id, body, edited_at } = frame;
+        // Guard against malformed frames — a missing channel_id used
+        // to crash here when `(m[undefined] || []).map(...)` returned
+        // [] and then assigned to `m[undefined]` polluting state.
+        if (!ch || !message_id) return;
         setMessagesByCh((m) => ({
           ...m,
           [ch]: (m[ch] || []).map((msg) => msg.id === message_id ? { ...msg, body, edited_at } : msg),
@@ -380,6 +402,7 @@ export function useEventChat(eventId, { enabled = true } = {}) {
 
       if (frame.type === 'message:deleted') {
         const { channel_id: ch, message_id } = frame;
+        if (!ch || !message_id) return;
         const deletedAt = new Date().toISOString();
         setMessagesByCh((m) => ({
           ...m,
@@ -392,6 +415,7 @@ export function useEventChat(eventId, { enabled = true } = {}) {
 
       if (frame.type === 'reaction') {
         const { message_id, emoji, user_id, action } = frame;
+        if (!message_id || !emoji || !user_id) return;
         // Single merge function shared with optimistic / rollback /
         // refresh paths. Idempotent: if the user is already in the
         // reaction's user_ids, re-applying 'add' is a no-op.
@@ -401,6 +425,7 @@ export function useEventChat(eventId, { enabled = true } = {}) {
 
       if (frame.type === 'pin:added' || frame.type === 'pin:removed') {
         const { channel_id: ch, message_id, pinned_at } = frame;
+        if (!ch || !message_id) return;
         const update = (msg) => msg.id === message_id ? { ...msg, pinned_at } : msg;
         setMessagesByCh((m) => ({ ...m, [ch]: (m[ch] || []).map(update) }));
         setPinnedByCh((p) => ({ ...p, [ch]: undefined })); // refetch on next view
@@ -664,9 +689,17 @@ export function useEventChat(eventId, { enabled = true } = {}) {
         body: JSON.stringify(payload),
       });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok) return { ok: false, error: new Error(j.error || `HTTP ${r.status}`) };
+      if (!r.ok) {
+        const err = new Error(j.error || `HTTP ${r.status}`);
+        // Surface the status so the retry loop can skip pointless
+        // re-attempts on 4xx (mute, frozen channel, body too long,
+        // rate limit, etc — server's answer won't change).
+        err.status = r.status;
+        return { ok: false, error: err };
+      }
       return { ok: true, message: j };
     } catch (e) {
+      // Network-level error has no http status; retry is appropriate.
       return { ok: false, error: e };
     }
   }, [eventId]);
@@ -741,6 +774,13 @@ export function useEventChat(eventId, { enabled = true } = {}) {
           return;
         }
         lastError = res.error;
+        // Stop retrying on 4xx — those are determinate ("you're muted",
+        // "channel frozen", "body too long", "rate limit"). The server's
+        // answer won't change in 4 seconds, so keep punching the same
+        // wall just wastes bandwidth and the rate-limit window. 5xx
+        // and network errors keep retrying as before.
+        const status = lastError?.status;
+        if (status && status >= 400 && status < 500) break;
       }
       setMessagesByCh((m) => {
         const cur = m[ch] || [];
