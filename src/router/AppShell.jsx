@@ -99,6 +99,8 @@ const ResourceQuizPage    = lazy(() => import('../pages/ResourceQuizPage'));
 const ResourceSubmitPage  = lazy(() => import('../pages/ResourceSubmitPage'));
 const MyLibraryPage       = lazy(() => import('../pages/MyLibraryPage'));
 const MockTestsPage       = lazy(() => import('../pages/MockTestsPage'));
+const MockTestAttemptPage = lazy(() => import('../pages/MockTestAttemptPage'));
+const MockTestQuestionsAdminPage = lazy(() => import('../pages/admin/MockTestQuestionsAdminPage'));
 
 const RequireEmployer         = lazy(() => import('../components/employer/RequireEmployer'));
 const EmployerDashboardPage   = lazy(() => import('../pages/employer/EmployerDashboardPage'));
@@ -144,6 +146,10 @@ const SLUG_ROUTES = [
   { prefix: '/resources/papers/',                    Page: ResourcePaperPage },
   { prefix: '/resources/journal/',                   Page: ResourceJournalPage },
   { prefix: '/resources/speakers/',                  Page: ResourceSpeakerPage },
+  // Mock-test online attempts. /mock-tests/<id>/attempt boots a new
+  // attempt and forwards to /attempts/<aid> which is the live UI.
+  { prefix: '/mock-tests/',         suffix: '/attempt', Page: MockTestAttemptPage },
+  { prefix: '/attempts/',                              Page: MockTestAttemptPage },
 ];
 
 // Admin routes. Each is wrapped in <RequireAdmin> at render time. Placeholder
@@ -270,6 +276,9 @@ export default function AppShell() {
     let AdminPage = ADMIN_ROUTES[route.path];
     if (!AdminPage && /^\/admin\/resources\/papers\/[^/]+\/quiz$/.test(route.path)) {
       AdminPage = QuizEditorPage;
+    }
+    if (!AdminPage && /^\/admin\/mock-tests\/[^/]+\/questions$/.test(route.path)) {
+      AdminPage = MockTestQuestionsAdminPage;
     }
     AdminPage = AdminPage ?? (() => <ComingSoonPage title="Not found" description="No admin page exists at this path." />);
     // RequireAdmin gates the shell once on entry. AdminShell sits INSIDE

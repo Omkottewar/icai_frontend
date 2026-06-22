@@ -72,6 +72,7 @@ const EMPTY_FORM = {
   fee_paise: 0,
   max_score: 100,
   status: 'scheduled',
+  supports_online: false,
   practice_paper_file_id: null,
   practice_paper_url: null,
   answer_key_file_id: null,
@@ -183,6 +184,7 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
       fee_paise: Number(form.fee_paise) || 0,
       max_score: Number(form.max_score) || 100,
       status: form.status,
+      supports_online: !!form.supports_online,
       practice_paper_file_id: form.practice_paper_file_id ?? null,
       answer_key_file_id: form.answer_key_file_id ?? null,
     };
@@ -378,7 +380,32 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
           <FormField label="Max score">
             <input className="input-base" type="number" min="1" value={form.max_score} onChange={(e) => set('max_score', e.target.value)} />
           </FormField>
-          <FormField label="" />
+
+          {/* Online-attempt opt-in */}
+          <FormField label="Online MCQ test" span={2}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.55rem', fontSize: '.85rem' }}>
+              <input
+                type="checkbox"
+                checked={!!form.supports_online}
+                onChange={(e) => set('supports_online', e.target.checked)}
+              />
+              <span>
+                <strong>Enable online attempt</strong>
+                <span className="muted-text" style={{ display: 'block', fontSize: '.78rem' }}>
+                  Students see a "Take test online" button. Add questions via the link below.
+                </span>
+              </span>
+            </label>
+            {!isNew && form.supports_online && (
+              <a
+                href={`#/admin/mock-tests/${form.id}/questions`}
+                className="btn btn-outline"
+                style={{ marginTop: '.5rem', display: 'inline-flex' }}
+              >
+                Manage questions →
+              </a>
+            )}
+          </FormField>
 
           {/* PDF uploads */}
           <FormField label="Practice paper PDF (visible from the moment registration opens)" span={2}>

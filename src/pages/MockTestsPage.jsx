@@ -282,6 +282,15 @@ function MockTestCard({ test, myReg, openExpanded, onRegister, onCancel }) {
         {myStatus === 'registered' && !completed && (
           <>
             <span className="mt-pill mt-pill-success"><IconCheckCircle size="sm" /> Registered</span>
+            {test.supports_online && (
+              <a
+                href={`#/mock-tests/${test.id}/attempt`}
+                className="btn btn-primary"
+                style={{ padding: '.35rem .8rem', fontSize: '.82rem' }}
+              >
+                Take test online <IconArrowRight size="sm" />
+              </a>
+            )}
             <button type="button" className="btn btn-ghost" onClick={onCancel} style={{ padding: '.3rem .55rem', fontSize: '.76rem', color: 'var(--destructive)' }}>
               <IconX size="sm" /> Cancel
             </button>
