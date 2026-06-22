@@ -276,15 +276,22 @@ export default function EventChat({ event, onClose }) {
 
   // Tell the Pragyaan AI widget to hide itself while the event chat is
   // open — two floating chat surfaces on the same screen is confusing
-  // UX. A global flag on `window` + a custom event lets the widget
-  // react without coupling it to React context. On unmount we clear
-  // the flag and fire again, so the widget re-appears the moment the
-  // user closes (or the panel is unmounted by navigation).
+  // UX. Three coordinated signals so the hide works regardless of
+  // bundle load order or React state propagation timing:
+  //   1. `window.__icaiEventChatOpen` flag — read on widget mount.
+  //   2. CustomEvent — picked up by an already-mounted widget.
+  //   3. `body.icai-event-chat-open` class — pure CSS fallback that
+  //      hides the FAB via the global selector below even if the
+  //      widget bundle is still loading or its React listener hasn't
+  //      attached yet (relevant on mobile where the PWA service
+  //      worker can serve a stale widget chunk).
   useEffect(() => {
     window.__icaiEventChatOpen = true;
+    document.body.classList.add('icai-event-chat-open');
     window.dispatchEvent(new CustomEvent('icai:event-chat-toggle', { detail: { open: true } }));
     return () => {
       window.__icaiEventChatOpen = false;
+      document.body.classList.remove('icai-event-chat-open');
       window.dispatchEvent(new CustomEvent('icai:event-chat-toggle', { detail: { open: false } }));
     };
   }, []);
@@ -1214,6 +1221,18 @@ function CollapseIcon() {
 function ChatStyles() {
   return (
     <style>{`
+      /* CSS fallback that hides the Pragyaan AI floating widget while
+         the event chat is open. The widget's React early-return is
+         the primary path; this is a defence against the widget
+         bundle being served stale by the PWA service worker, where
+         the listener might not exist yet but the FAB still renders.
+         Targets both id and the legacy positional selector so it
+         catches the widget regardless of code version. */
+      body.icai-event-chat-open #icai-pragyaan-fab,
+      body.icai-event-chat-open #icai-pragyaan-panel {
+        display: none !important;
+      }
+
       .ec-root {
         position: fixed; top: 0; bottom: 0; left: 0;
         z-index: 200;

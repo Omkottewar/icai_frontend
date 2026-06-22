@@ -175,7 +175,7 @@ export default function PrayGyaanWidget() {
   return (
     <>
       {open && (
-        <div style={{
+        <div id="icai-pragyaan-panel" style={{
           position: 'fixed',
           bottom: '5.5rem',
           right: '1.5rem',
@@ -332,6 +332,7 @@ export default function PrayGyaanWidget() {
 
       {/* Floating trigger button */}
       <button
+        id="icai-pragyaan-fab"
         onClick={() => setOpen((v) => !v)}
         title="Chat with Pragyaan AI"
         style={{
