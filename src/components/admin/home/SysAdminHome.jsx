@@ -1,4 +1,3 @@
-import { useAdminStats } from '../../../hooks/useAdminStats';
 import { useAdminList } from '../../../hooks/useAdminList';
 import { navigate } from '../../../hooks/useRoute';
 import { Shimmer, ShimmerStatTile } from '../../ui/Shimmer';
@@ -39,22 +38,30 @@ function fmtINR(paise) {
 }
 
 export default function SysAdminHome({ data }) {
-  const { data: stats, loading } = useAdminStats();
-  const { data: eventsData, loading: eventsLoading } = useAdminList('/api/admin/events', { page: 1, pageSize: 5 });
+  // Previously this component fired its own /api/admin/stats call (and
+  // polled it every 60s) on top of the /api/admin/home call its parent
+  // already makes. Both endpoints returned the same headline counts —
+  // duplicate work. We now read the counts straight off `data.stats`
+  // (populated by /api/admin/home) so the page renders with a single
+  // round-trip instead of two.
+  const stats = data?.stats ?? {};
   const inbox = data?.inbox ?? [];
+  const statsReady = !!data;
+
+  const { data: eventsData, loading: eventsLoading } = useAdminList('/api/admin/events', { page: 1, pageSize: 5 });
 
   return (
     <>
       <div className="admin-stat-grid">
-        {loading ? (
+        {!statsReady ? (
           Array.from({ length: 6 }).map((_, i) => <ShimmerStatTile key={i} />)
         ) : (
           <>
-            <StatTile icon={IconUsers} label="Members" value={(stats?.members ?? 0).toLocaleString('en-IN')} />
-            <StatTile icon={IconGraduationCap} label="Students" value={(stats?.students ?? 0).toLocaleString('en-IN')} />
-            <StatTile icon={IconCalendar} label="Upcoming events" value={stats?.upcoming_events ?? 0} tone="primary" />
-            <StatTile icon={IconAward} label="Total events" value={stats?.total_events ?? 0} />
-            <StatTile icon={IconTrending} label="Registrations (7d)" value={stats?.registrations_week ?? 0} />
+            <StatTile icon={IconUsers} label="Members" value={(stats.members ?? 0).toLocaleString('en-IN')} />
+            <StatTile icon={IconGraduationCap} label="Students" value={(stats.students ?? 0).toLocaleString('en-IN')} />
+            <StatTile icon={IconCalendar} label="Upcoming events" value={stats.upcoming_events ?? 0} tone="primary" />
+            <StatTile icon={IconAward} label="Events this month" value={stats.events_this_month ?? 0} />
+            <StatTile icon={IconTrending} label="Registrations (month)" value={stats.registrations_month ?? 0} />
             <StatTile icon={IconCheckCircle} label="Pending decisions" value={inbox.length} tone={inbox.length > 0 ? 'primary' : 'default'} />
           </>
         )}

@@ -38,6 +38,9 @@ export default function StudentsPage() {
 
         {/* Quick access row */}
         <div className="row gap-3" style={{ marginBottom: '2.5rem', flexWrap: 'wrap' }}>
+          <a href="#/mock-tests" className="btn btn-primary" style={{ gap: '.5rem' }}>
+            <IconGraduationCap size="sm" /> Mock tests
+          </a>
           <a href="#/job-vacancies?type=articleship" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconBriefcase size="sm" /> Articleship Vacancies
           </a>

@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { navigate } from '../../hooks/useRoute';
+import { navigate, useRoute } from '../../hooks/useRoute';
 import { Shimmer, ShimmerStatTile, ShimmerStyles } from '../ui/Shimmer';
 
 // Roles that should be allowed to open the /admin shell at all. Each one
@@ -23,18 +23,42 @@ const ADMIN_GATE_ROLES = new Set([
 ]);
 
 // Wraps every admin page. Redirects unauthenticated users to /login and
-// users without any office-bearer / admin role to /dashboard. The role
-// check trusts `user.roles[].code` — populated by /api/auth/me which
-// queries user_role_assignments directly.
+// users without any office-bearer / admin role to /dashboard.
+//
+// Role-revocation hardening: we force a `/api/auth/me` refresh on mount
+// AND on every admin route change so a revoked role is caught before
+// rendering admin content for it. Crucially, only the FIRST verify (on
+// mount) gates the UI with a boot skeleton — subsequent route changes
+// inside /admin re-fetch in the background but keep the existing admin
+// shell visible. Without that distinction every sidebar click would flash
+// a full-page skeleton because Suspense + the previous "verified=false on
+// every nav" combo made navigation feel like a full reload.
+//
+// If the background refresh reveals the user lost the role, the
+// `isAllowed` effect below picks it up and redirects to /dashboard.
 export default function RequireAdmin({ children }) {
-  const { user, loading, showToast } = useAuth();
+  const { user, loading, refresh, showToast } = useAuth();
+  const route = useRoute();
+  const [verified, setVerified] = useState(false);
+
+  // Re-fetch /me on each admin route change to catch role revocations.
+  // We *don't* flip verified back to false here — keeping the shell
+  // visible during the background refresh is the whole point.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await refresh();
+      if (!cancelled) setVerified(true);
+    })();
+    return () => { cancelled = true; };
+  }, [route.path, refresh]);
 
   const isAllowed = !!user
     && Array.isArray(user.roles)
     && user.roles.some((r) => ADMIN_GATE_ROLES.has(r.code));
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || !verified) return;
     if (!user) {
       navigate('/login');
       return;
@@ -43,9 +67,9 @@ export default function RequireAdmin({ children }) {
       showToast?.('Admin access required', 'error');
       navigate('/dashboard');
     }
-  }, [loading, user, isAllowed, showToast]);
+  }, [loading, verified, user, isAllowed, showToast]);
 
-  if (loading || !user || !isAllowed) {
+  if (loading || !verified || !user || !isAllowed) {
     return <AdminBootSkeleton />;
   }
 

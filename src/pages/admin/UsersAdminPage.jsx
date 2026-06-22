@@ -282,13 +282,19 @@ function UserDrawer({ userId, lookups, onClose, onSaved, showToast }) {
           )}
 
           {!isNew && (
-            <RolesSection
-              userId={userId}
-              assignments={detail?.role_assignments ?? []}
-              lookups={lookups}
-              onChanged={reloadDetail}
-              showToast={showToast}
-            />
+            <>
+              <RolesSection
+                userId={userId}
+                assignments={detail?.role_assignments ?? []}
+                lookups={lookups}
+                onChanged={reloadDetail}
+                showToast={showToast}
+              />
+              <OpenAssignmentsSection
+                userId={userId}
+                showToast={showToast}
+              />
+            </>
           )}
         </>
       )}
@@ -474,6 +480,137 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
           border: 1px dashed var(--border);
         }
       `}</style>
+    </>
+  );
+}
+
+// ─── Open-checklist assignments sub-panel ────────────────────────────────
+//
+// Lists every non-approved checklist where this user is currently the
+// filler, the reviewer, or a section assignee. Mounted under RolesSection
+// in the user drawer.
+//
+// Why: when an office bearer's role is revoked (via End term above, or
+// via /admin/office-bearers), checklist rows that point at them by user-id
+// don't auto-clear. The ex-treasurer keeps seeing them on their member
+// dashboard until they're reassigned. This panel makes the bulk reassign
+// a one-click action — pick a target user, confirm, done.
+function OpenAssignmentsSection({ userId, showToast }) {
+  const [data, setData] = useState(null);   // null = loading, {} = loaded
+  const [err, setErr] = useState('');
+  const [showPicker, setShowPicker] = useState(false);
+  const [toUserId, setToUserId] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  // Lazy: only fetch when the section first mounts. Refresh after a
+  // successful reassign so the list reflects reality.
+  async function load() {
+    setData(null); setErr('');
+    try {
+      const j = await adminFetch(`/api/admin/users/${userId}/open-checklists`);
+      setData(j);
+    } catch (e) {
+      setErr(e.message || 'Could not load assignments');
+      setData({ direct: [], sections: [], total: 0 });
+    }
+  }
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [userId]);
+
+  async function reassign() {
+    if (!toUserId) { showToast?.('Pick a target user', 'error'); return; }
+    if (toUserId === userId) { showToast?.('Pick a different user', 'error'); return; }
+    if (!confirm(`Move every open assignment to user ${toUserId}? This cannot be undone via this screen.`)) return;
+    setBusy(true);
+    try {
+      const r = await adminFetch(`/api/admin/users/${userId}/reassign-checklists`, {
+        method: 'POST',
+        body: { to_user_id: toUserId },
+      });
+      showToast?.(`Reassigned ${r.total} assignment${r.total === 1 ? '' : 's'} to ${r.to_user?.name || 'user'}`, 'success');
+      setShowPicker(false); setToUserId('');
+      await load();
+    } catch (e) {
+      showToast?.(e.message, 'error');
+    } finally { setBusy(false); }
+  }
+
+  const total = data?.total ?? 0;
+
+  return (
+    <>
+      <div className="admin-section-title" style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Open checklists ({total})</span>
+        {total > 0 && !showPicker && (
+          <button type="button" className="btn btn-outline" onClick={() => setShowPicker(true)} style={{ padding: '.25rem .6rem', fontSize: '.75rem' }}>
+            Reassign all…
+          </button>
+        )}
+      </div>
+
+      {data === null && <p className="muted-text" style={{ fontSize: '.8125rem' }}>Loading assignments…</p>}
+      {err && <p style={{ color: 'var(--destructive)', fontSize: '.8125rem' }}>{err}</p>}
+      {data && total === 0 && (
+        <p className="muted-text" style={{ fontSize: '.8125rem' }}>No open assignments — nothing to reassign.</p>
+      )}
+
+      {data && total > 0 && (
+        <ul className="role-list" style={{ marginTop: '.4rem' }}>
+          {(data.direct ?? []).map((d) => (
+            <li key={`d-${d.instance_id}-${d.role}`} className="role-list-item">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {d.title || 'Untitled checklist'}
+                </div>
+                <div className="muted-text" style={{ fontSize: '.72rem' }}>
+                  Assigned as <strong>{d.role}</strong> · status <strong>{d.status}</strong>
+                </div>
+              </div>
+              <a href={`#/my-checklists?id=${d.instance_id}`} className="btn btn-ghost" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }}>
+                View
+              </a>
+            </li>
+          ))}
+          {(data.sections ?? []).map((s) => (
+            <li key={`s-${s.instance_id}`} className="role-list-item">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, fontSize: '.875rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {s.title || 'Untitled checklist'}
+                </div>
+                <div className="muted-text" style={{ fontSize: '.72rem' }}>
+                  Section assignee · {s.section_count} section{s.section_count === 1 ? '' : 's'} · status <strong>{s.status}</strong>
+                </div>
+              </div>
+              <a href={`#/my-checklists?id=${s.instance_id}`} className="btn btn-ghost" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }}>
+                View
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {showPicker && (
+        <div className="role-add-card">
+          <FormField label="Reassign every open checklist to user ID" required>
+            <input
+              className="input-base"
+              placeholder="Paste a user id (UUID) from /admin/users"
+              value={toUserId}
+              onChange={(e) => setToUserId(e.target.value.trim())}
+            />
+            <p className="muted-text" style={{ fontSize: '.72rem', marginTop: '.35rem' }}>
+              Tip: open the destination user in another tab, copy their id from the URL after <code>?edit=</code>.
+            </p>
+          </FormField>
+          <div className="row gap-2" style={{ justifyContent: 'flex-end', marginTop: '.75rem' }}>
+            <button type="button" className="btn btn-ghost" onClick={() => { setShowPicker(false); setToUserId(''); }} disabled={busy} style={{ padding: '.4rem .75rem' }}>
+              Cancel
+            </button>
+            <button type="button" className="btn btn-primary" onClick={reassign} disabled={busy || !toUserId} style={{ padding: '.4rem .85rem' }}>
+              {busy ? 'Reassigning…' : `Reassign ${total} item${total === 1 ? '' : 's'}`}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

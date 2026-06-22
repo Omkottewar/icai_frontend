@@ -5,7 +5,28 @@ import caIndiaLogo from '../assets/CA India Logo.png';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import PushPermissionBanner from '../components/PushPermissionBanner';
-import { ShimmerFullPageSplash } from '../components/ui/Shimmer';
+import { ShimmerFullPageSplash, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
+
+// Inner Suspense fallback used for the admin content region only — the
+// sidebar/topbar stay visible because they live in AdminShell above this
+// boundary. Lighter weight than ShimmerFullPageSplash since the user is
+// already inside the admin shell.
+function AdminContentShimmer() {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }} aria-hidden="true">
+      <Shimmer height="1.2rem" width="40%" />
+      <Shimmer height=".75rem" width="60%" />
+      <div style={{ marginTop: '.5rem', display: 'grid', gap: '.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Shimmer key={i} height="6rem" width="100%" radius=".5rem" />
+        ))}
+      </div>
+      <div style={{ marginTop: '.5rem' }}>
+        <ShimmerLines count={3} />
+      </div>
+    </div>
+  );
+}
 
 // Eagerly loaded — the entry point and auth surfaces. Splitting these would
 // just delay the first interaction visitors care about.
@@ -44,6 +65,7 @@ const TrackGrievancePage = lazy(() => import('../pages/TrackGrievancePage'));
 const PrayGyaanWidget    = lazy(() => import('../components/ui/PrayGyaanWidget'));
 
 const RequireAdmin               = lazy(() => import('../components/admin/RequireAdmin'));
+const AdminShell                 = lazy(() => import('../components/admin/AdminShell'));
 const AdminDashboardPage         = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const EventsAdminPage            = lazy(() => import('../pages/admin/EventsAdminPage'));
 const EventRegistrationsAdminPage = lazy(() => import('../pages/admin/EventRegistrationsAdminPage'));
@@ -66,14 +88,17 @@ const GrievancesAdminPage        = lazy(() => import('../pages/admin/GrievancesA
 const GrievanceRoutesAdminPage   = lazy(() => import('../pages/admin/GrievanceRoutesAdminPage'));
 const ResourcesAdminPage         = lazy(() => import('../pages/admin/ResourcesAdminPage'));
 const QuizEditorPage             = lazy(() => import('../pages/admin/QuizEditorPage'));
+const MockTestsAdminPage         = lazy(() => import('../pages/admin/MockTestsAdminPage'));
 
 // Section L (Resources) — public-facing pages with slug-based detail routes.
 const ResourcePaperPage   = lazy(() => import('../pages/ResourcePaperPage'));
+const PaperReaderPage     = lazy(() => import('../pages/PaperReaderPage'));
 const ResourceJournalPage = lazy(() => import('../pages/ResourceJournalPage'));
 const ResourceSpeakerPage = lazy(() => import('../pages/ResourceSpeakerPage'));
 const ResourceQuizPage    = lazy(() => import('../pages/ResourceQuizPage'));
 const ResourceSubmitPage  = lazy(() => import('../pages/ResourceSubmitPage'));
 const MyLibraryPage       = lazy(() => import('../pages/MyLibraryPage'));
+const MockTestsPage       = lazy(() => import('../pages/MockTestsPage'));
 
 const RequireEmployer         = lazy(() => import('../components/employer/RequireEmployer'));
 const EmployerDashboardPage   = lazy(() => import('../pages/employer/EmployerDashboardPage'));
@@ -109,10 +134,12 @@ const ROUTES = {
   '/track-grievance': TrackGrievancePage,
   '/my-library': MyLibraryPage,
   '/resources/submit': ResourceSubmitPage,
+  '/mock-tests': MockTestsPage,
 };
 
 // Slug-based public routes. Resolved by prefix match in resolvePublicPage().
 const SLUG_ROUTES = [
+  { prefix: '/resources/papers/',   suffix: '/read', Page: PaperReaderPage },
   { prefix: '/resources/papers/',   suffix: '/quiz', Page: ResourceQuizPage },
   { prefix: '/resources/papers/',                    Page: ResourcePaperPage },
   { prefix: '/resources/journal/',                   Page: ResourceJournalPage },
@@ -149,6 +176,7 @@ const ADMIN_ROUTES = {
   '/admin/grievances':          GrievancesAdminPage,
   '/admin/grievance-routes':    GrievanceRoutesAdminPage,
   '/admin/resources':           ResourcesAdminPage,
+  '/admin/mock-tests':          MockTestsAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);
@@ -244,12 +272,21 @@ export default function AppShell() {
       AdminPage = QuizEditorPage;
     }
     AdminPage = AdminPage ?? (() => <ComingSoonPage title="Not found" description="No admin page exists at this path." />);
+    // RequireAdmin gates the shell once on entry. AdminShell sits INSIDE
+    // RequireAdmin's verified branch but OUTSIDE the inner Suspense, so
+    // its sidebar + topbar survive admin-to-admin route changes — only the
+    // lazy page chunk swaps via the inner Suspense. This is what makes
+    // navigation feel instant instead of "full page reload".
     return (
       <>
         <ScrollToTop />
         <Suspense fallback={<ShimmerFullPageSplash />}>
           <RequireAdmin>
-            <AdminPage />
+            <AdminShell>
+              <Suspense fallback={<AdminContentShimmer />}>
+                <AdminPage />
+              </Suspense>
+            </AdminShell>
           </RequireAdmin>
         </Suspense>
       </>

@@ -18,6 +18,18 @@ const FIELDS = [
   ]},
   { name: 'role_code',    label: 'Role code (canonical)', type: 'select', options: ROLE_CODES },
   { name: 'person_name',  label: 'Person name', type: 'text', required: true },
+  // Link this entry to a real user account so portal access stays in sync.
+  // Backend: when this email matches a user AND role_code maps to an ACL
+  // role (chairman / vice_chairman / secretary / treasurer / managing_
+  // committee), the matching user_role_assignment is created on save and
+  // ended when this row is hidden / deleted / unlinked.
+  {
+    name: 'linked_user_email',
+    label: 'Link user (by email)',
+    type: 'email',
+    placeholder: 'leave blank for a display-only entry',
+    help: 'When linked, removing or hiding this row also revokes the user\'s portal access for the matching role. Leave blank for historical office bearers without a portal account.',
+  },
   { name: 'photo_file_id', label: 'Photo',      type: 'file', accept: 'image/*', bucket: 'office_bearers' },
   { name: 'bio',          label: 'Bio (optional)', type: 'textarea', rows: 4 },
   { type: 'group', children: [
@@ -40,6 +52,13 @@ const COLUMNS = [
   { key: 'person_name', label: 'Person', render: (r) => <strong>{r.person_name}</strong> },
   { key: 'role_label', label: 'Role' },
   { key: 'tenure', label: 'Tenure', render: (r) => `${fmt(r.tenure_start)} → ${fmt(r.tenure_end)}` },
+  {
+    key: 'linked_user_email',
+    label: 'Portal user',
+    render: (r) => r.linked_user_email
+      ? <span title="Portal access syncs with this entry" style={{ color: 'var(--primary)' }}>{r.linked_user_email}</span>
+      : <span className="muted-text" title="Display-only — does not grant portal access">—</span>,
+  },
   { key: 'is_current', label: 'Current?', render: (r) => r.is_current ? '✓' : '' },
   { key: 'hidden', label: 'Status', render: (r) => r.hidden ? 'Hidden' : 'Live' },
 ];

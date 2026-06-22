@@ -171,10 +171,15 @@ export default function ResourcePaperPage() {
           </div>
         )}
 
-        {/* Action bar — download, bookmark, share */}
+        {/* Action bar — read in app, download, bookmark, share */}
         <div className="pp-actions">
           {paper.pdf_url && (
-            <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+            <a href={`#/resources/papers/${paper.slug}/read`} className="btn btn-primary">
+              <IconBookOpen size="sm" /> <span>Read in app</span>
+            </a>
+          )}
+          {paper.pdf_url && (
+            <a href={paper.pdf_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
               <IconDownload size="sm" /> <span>Download PDF</span>
             </a>
           )}

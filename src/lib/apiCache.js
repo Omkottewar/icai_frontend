@@ -29,10 +29,29 @@ function buildUrl(path, qs) {
   return params ? `${path}?${params}` : path;
 }
 
+// Fires when any cached/written request comes back with a forbidden
+// response — typically because a role assignment was revoked between
+// page loads. AuthContext listens and re-fetches /api/auth/me, which
+// causes role-gated components (RequireAdmin, RequireEmployer, the
+// dashboard's office-bearer CTA) to re-evaluate.
+function signalRoleChange() {
+  if (typeof window === 'undefined') return;
+  try { window.dispatchEvent(new Event('auth:revalidate')); } catch { /* old browser */ }
+}
+
 async function rawFetch(url, opts = {}) {
   const r = await fetch(url, { credentials: 'include', ...opts });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
+    // 403 from any endpoint is a strong "your roles changed" signal —
+    // the user's session is still valid (else we'd get 401), but they
+    // no longer have permission for this resource. Bust any cached
+    // entries for this URL so we don't keep serving stale 200s from
+    // before the role change, and ask AuthContext to re-read /me.
+    if (r.status === 403) {
+      CACHE.delete(url);
+      signalRoleChange();
+    }
     const err = new Error(j.error || j.message || `HTTP ${r.status}`);
     err.status = r.status;
     throw err;
@@ -101,6 +120,7 @@ export async function apiWrite(path, opts = {}) {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
+    if (r.status === 403) signalRoleChange();
     const err = new Error(j.error || j.message || `HTTP ${r.status}`);
     err.status = r.status;
     throw err;

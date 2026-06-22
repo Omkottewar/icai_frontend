@@ -52,11 +52,13 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
   const isFull = cap > 0 && reg >= cap;
   const isAlmostFull = cap > 0 && seatsLeft !== null && seatsLeft <= Math.max(5, Math.floor(cap * 0.1));
 
-  // Registered users: clicking the row jumps straight to the WhatsApp-style
-  // event chat. Unregistered users still get the accordion + Register CTA.
+  // Tapping the row toggles the accordion for EVERYONE, registered or
+  // not — users who've signed up still want to revisit event details
+  // (time, venue, speaker, highlights) without being thrown straight
+  // into chat. The "Open chat" button inside the accordion body remains
+  // the explicit way for registered users to jump to chat.
   function handleHeaderClick() {
-    if (isRegistered) setShowChat(true);
-    else setOpen((o) => !o);
+    setOpen((o) => !o);
   }
 
   return (
@@ -65,7 +67,7 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
         type="button"
         className="event-acc-head"
         onClick={handleHeaderClick}
-        aria-expanded={isRegistered ? undefined : open}
+        aria-expanded={open}
       >
         <div className="event-acc-titleblock">
           <div className="event-acc-title">{e.title}</div>
@@ -102,11 +104,9 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
             </span>
           ) : null}
           <span className="event-acc-date">{e.date}</span>
-          {!isRegistered && (
-            <span className="event-acc-chevron" aria-hidden="true">
-              <IconChevronDown size="sm" />
-            </span>
-          )}
+          <span className="event-acc-chevron" aria-hidden="true">
+            <IconChevronDown size="sm" />
+          </span>
         </div>
       </button>
 

@@ -124,6 +124,43 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; };
   }, [refresh]);
 
+  // ─── Live role revalidation ──────────────────────────────────────────
+  //
+  // When the admin revokes a role (e.g. removes someone as treasurer), the
+  // affected user's browser keeps the stale role array in memory + the
+  // localStorage cache until they reload. They'd keep seeing the treasurer
+  // dashboard frame even though every /api/admin/* call would 403.
+  //
+  // To close that gap we revalidate /api/auth/me on three triggers:
+  //   1. The tab regaining focus (`visibilitychange`) — catches the most
+  //      common case: admin changes a role in tab A, user has tab B open.
+  //   2. Every SPA route change (`hashchange`) — anyone navigating into an
+  //      admin route gets a fresh role check before the gate evaluates.
+  //   3. A periodic poll (every 5 min) — for the "tab open all day" case.
+  //
+  // We also expose a global event `auth:revalidate` that callers anywhere
+  // in the app (e.g. apiCache when it hits a 403) can dispatch to force a
+  // refresh out-of-band.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const onHashChange = () => { refresh(); };
+    const onForceRevalidate = () => { refresh(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('auth:revalidate', onForceRevalidate);
+    const poll = setInterval(() => {
+      if (document.visibilityState === 'visible') refresh();
+    }, 5 * 60 * 1000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('auth:revalidate', onForceRevalidate);
+      clearInterval(poll);
+    };
+  }, [refresh]);
+
   const showToast = (text, kind = 'success') => {
     setToast({ text, kind });
     setTimeout(() => setToast(null), 2800);
@@ -190,6 +227,10 @@ export function AuthProvider({ children }) {
       user, loading,
       login, signup, socialLogin, forgotPassword,
       logout, showToast,
+      // Exposed so gate components (RequireAdmin/RequireEmployer) can force
+      // a fresh /me before evaluating their role checks, and so any caller
+      // that detects a 403 can bring the auth state back in sync.
+      refresh,
     }}>
       {children}
       {toast && (

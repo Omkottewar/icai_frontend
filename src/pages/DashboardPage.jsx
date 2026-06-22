@@ -9,6 +9,7 @@ import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
 import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
+import MemberDashboard from '../components/dashboard/MemberDashboard';
 import InsightsStyles from '../components/dashboard/insights/insightsStyles';
 import Sparkline from '../components/dashboard/insights/Sparkline';
 import {
@@ -76,6 +77,38 @@ export default function DashboardPage() {
   const memberNo       = isMember ? profile?.mrn : (isStudent ? profile?.srn : null);
   const memberSince    = isMember ? profile?.member_since : (isStudent ? profile?.articleship_start : null);
   const memberNoLabel  = isMember ? 'Membership No.' : 'SRO No.';
+
+  // Office bearer entry-point card — same markup for both layouts (member
+  // dashboard slots it in below the identity header; the legacy layout
+  // surfaces it under the welcome row).
+  const officeBearerNode = (isOfficeBearer && officeBearerCard)
+    ? <OfficeBearerCTA labels={officeBearerCard} />
+    : null;
+
+  // For members we delegate to a richer, purpose-built dashboard. Students
+  // and non-office-bearer/chairmen keep the legacy layout below.
+  if (isMember) {
+    return (
+      <>
+        {dashError && (
+          <div className="container" style={{ padding: '1rem' }}>
+            <div className="card" style={{ borderColor: 'var(--destructive)' }}>
+              <p style={{ color: 'var(--destructive)', fontSize: '.875rem' }}>
+                Couldn't load your dashboard. Please refresh the page.
+              </p>
+            </div>
+          </div>
+        )}
+        <MemberDashboard
+          user={user}
+          data={data}
+          logout={logout}
+          pendingBadge={<PendingInstancesBadge />}
+          officeBearerCard={officeBearerNode}
+        />
+      </>
+    );
+  }
 
   return (
     <section className="container" style={{ padding: '1.5rem 1rem' }} data-dash>
@@ -459,6 +492,46 @@ function BicMiniKpi({ label, value, sub, accent = 'primary', highlight }) {
       <div className="bic-mini-value">{value}</div>
       {sub && <div className="bic-mini-sub">{sub}</div>}
     </div>
+  );
+}
+
+// Reusable office-bearer CTA — same dark gradient card used by both the
+// member dashboard and the legacy student/other layout. labels = { title, desc }.
+function OfficeBearerCTA({ labels }) {
+  return (
+    <a href="#/admin" className="admin-cta-card">
+      <div className="admin-cta-icon"><IconShield /></div>
+      <div className="admin-cta-body">
+        <div className="admin-cta-eyebrow">Your workspace</div>
+        <div className="admin-cta-title">{labels.title}</div>
+        <div className="admin-cta-desc">{labels.desc}</div>
+      </div>
+      <span className="admin-cta-arrow"><IconArrowRight /></span>
+      <style>{`
+        .admin-cta-card {
+          display: flex; align-items: center; gap: 1rem;
+          margin-top: 1rem; padding: 1rem 1.25rem;
+          background: linear-gradient(135deg, #0f172a, #1e293b);
+          color: white; border-radius: .75rem; text-decoration: none;
+          border: 1px solid rgba(255,255,255,.08);
+          transition: transform .12s, box-shadow .12s;
+        }
+        .admin-cta-card:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(15,23,42,.25); }
+        .admin-cta-icon {
+          width: 2.5rem; height: 2.5rem; flex-shrink: 0;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(255,255,255,.08); border-radius: .5rem;
+        }
+        .admin-cta-body { flex: 1; min-width: 0; }
+        .admin-cta-eyebrow {
+          font-size: .6875rem; font-weight: 600; text-transform: uppercase;
+          letter-spacing: .08em; color: rgba(255,255,255,.55);
+        }
+        .admin-cta-title { font-size: 1rem; font-weight: 700; margin-top: .15rem; }
+        .admin-cta-desc { font-size: .8125rem; color: rgba(255,255,255,.7); margin-top: .15rem; }
+        .admin-cta-arrow { color: rgba(255,255,255,.6); }
+      `}</style>
+    </a>
   );
 }
 
