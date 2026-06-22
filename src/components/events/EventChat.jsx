@@ -629,7 +629,14 @@ export default function EventChat({ event, onClose }) {
           uploadAttachment={uploadAttachment}
           emitTyping={emitTyping}
           searchParticipants={searchParticipants}
-          disabled={status === 'forbidden' || status === 'error' || !activeChannelId}
+          // Composer only disables on hard blocks: not registered for the
+          // event (forbidden) or no channel selected. WS status ('error' /
+          // 'reconnecting') does NOT disable — sending is a REST POST,
+          // independent of the WS that delivers live updates. Mobile
+          // networks blip often; on a flaky link the user can still
+          // send and read their own messages, and live updates resume
+          // when the WS reconnects.
+          disabled={status === 'forbidden' || !activeChannelId}
         />
       </section>
 

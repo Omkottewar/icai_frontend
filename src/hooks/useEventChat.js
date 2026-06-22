@@ -425,14 +425,14 @@ export function useEventChat(eventId, { enabled = true } = {}) {
     ws.onerror = () => { /* close handler owns reconnect */ };
     ws.onclose = () => {
       if (!aliveRef.current) return;
-      if (wsAttemptsRef.current >= MAX_WS_ATTEMPTS) {
-        setStatus('error');
-        setError((prev) => prev || new Error('Live updates unavailable — message history is still shown.'));
-        return;
-      }
-      // Debounce the "reconnecting…" pill — a brief network blip that
-      // reconnects within ~1.5s shouldn't flash the badge at the user.
-      // We only surface the status if the WS hasn't come back in time.
+      // Never permanently give up. Mobile networks blip constantly
+      // (screen lock, app background, Wi-Fi ↔ data handoff) — five
+      // failures used to flip status to 'error' forever, which then
+      // disabled the composer despite REST sends still working. Now
+      // we just back off harder past the soft cap (60s ceiling after
+      // 5 fast retries) and keep trying. The visibility-change
+      // handler also force-reconnects on tab refocus, so users
+      // recover the moment they're actively looking at the chat.
       if (reconnectStatusTimerRef.current) clearTimeout(reconnectStatusTimerRef.current);
       reconnectStatusTimerRef.current = setTimeout(() => {
         if (aliveRef.current && wsRef.current?.readyState !== 1) {
@@ -441,7 +441,13 @@ export function useEventChat(eventId, { enabled = true } = {}) {
       }, 1500);
 
       const delay = backoffRef.current;
-      backoffRef.current = Math.min(8000, delay * 2);
+      // Fast cap for the first few attempts (1s → 2s → 4s → 8s),
+      // then a long cap for prolonged outages (cap at 60s) so we
+      // don't pound the server while the user is offline.
+      const next = delay * 2;
+      backoffRef.current = wsAttemptsRef.current >= MAX_WS_ATTEMPTS
+        ? Math.min(60000, next)
+        : Math.min(8000, next);
       reconnectTimerRef.current = setTimeout(() => {
         if (aliveRef.current) connectWs();
       }, delay);
@@ -493,12 +499,12 @@ export function useEventChat(eventId, { enabled = true } = {}) {
 
       const ws = wsRef.current;
       const isDead = !ws || ws.readyState === WebSocket.CLOSED;
-      const hasGivenUp = wsAttemptsRef.current >= MAX_WS_ATTEMPTS;
-      // Only force a reconnect if (a) the socket is actually dead AND
-      // (b) we haven't already given up after MAX_WS_ATTEMPTS. Without
-      // (b) the visibility handler keeps retrying a permanently
-      // forbidden upgrade every time the user refocuses the window.
-      if (isDead && !hasGivenUp) {
+      // Force an immediate reconnect when the user comes back and
+      // the WS is dead — reset the backoff so we don't make them
+      // wait the full long-backoff interval. They're engaged again.
+      if (isDead) {
+        backoffRef.current = 1000;
+        wsAttemptsRef.current = 0;
         connectWs();
       }
     };
