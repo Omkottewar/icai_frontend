@@ -274,6 +274,21 @@ export default function EventChat({ event, onClose }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // Tell the Pragyaan AI widget to hide itself while the event chat is
+  // open — two floating chat surfaces on the same screen is confusing
+  // UX. A global flag on `window` + a custom event lets the widget
+  // react without coupling it to React context. On unmount we clear
+  // the flag and fire again, so the widget re-appears the moment the
+  // user closes (or the panel is unmounted by navigation).
+  useEffect(() => {
+    window.__icaiEventChatOpen = true;
+    window.dispatchEvent(new CustomEvent('icai:event-chat-toggle', { detail: { open: true } }));
+    return () => {
+      window.__icaiEventChatOpen = false;
+      window.dispatchEvent(new CustomEvent('icai:event-chat-toggle', { detail: { open: false } }));
+    };
+  }, []);
+
   // Click-outside-to-close (panel mode only). In full-screen mode the
   // chat fills the viewport so there's nothing to click outside of.
   // We use a ref on the root container and listen on the document so

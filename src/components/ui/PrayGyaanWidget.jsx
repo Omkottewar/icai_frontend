@@ -149,6 +149,29 @@ export default function PrayGyaanWidget() {
 
   const showStarters = msgs.filter((m) => m.role === 'user').length === 0;
 
+  // Hide the widget while an event chat is open — two floating chat
+  // surfaces on the same screen is confusing. We listen for the toggle
+  // event dispatched by EventChat on mount/unmount, plus seed from a
+  // global flag so the widget hides correctly even if EventChat
+  // mounted before this listener attached.
+  const [eventChatOpen, setEventChatOpen] = useState(
+    typeof window !== 'undefined' && !!window.__icaiEventChatOpen,
+  );
+  useEffect(() => {
+    const onToggle = (e) => setEventChatOpen(!!(e?.detail?.open));
+    window.addEventListener('icai:event-chat-toggle', onToggle);
+    return () => window.removeEventListener('icai:event-chat-toggle', onToggle);
+  }, []);
+
+  // When the event chat opens while ours is open, close ours so the
+  // user isn't left with a stale panel hovering. The state is
+  // suppressed, not destroyed — conversationId / messages stay.
+  useEffect(() => {
+    if (eventChatOpen && open) setOpen(false);
+  }, [eventChatOpen, open]);
+
+  if (eventChatOpen) return null;
+
   return (
     <>
       {open && (
