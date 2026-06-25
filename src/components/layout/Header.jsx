@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useLang, LANGS } from '../../context/LanguageContext';
 import { navigate } from '../../hooks/useRoute';
 import Link from '../ui/Link';
 import { NAV, SOCIALS } from '../../data/constants';
@@ -14,6 +15,7 @@ import {
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const { lang, setLang, t } = useLang();
   const { settings } = useSiteSettings();
   const [open, setOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -70,6 +72,28 @@ export default function Header() {
             )}
           </div>
           <div className="row gap-3" style={{ color: 'var(--primary)', opacity: .9 }}>
+            {/* Language toggle */}
+            <div style={{ display: 'flex', border: '1px solid var(--border)', borderRadius: '.375rem', overflow: 'hidden' }}>
+              {LANGS.map((l, i) => (
+                <button
+                  key={l.code}
+                  onClick={() => setLang(l.code)}
+                  title={l.native}
+                  style={{
+                    padding: '.25rem .4375rem',
+                    fontSize: '.6875rem',
+                    fontWeight: lang === l.code ? 700 : 400,
+                    background: lang === l.code ? 'var(--primary)' : 'transparent',
+                    color: lang === l.code ? 'white' : 'var(--primary)',
+                    borderRight: i < LANGS.length - 1 ? '1px solid var(--border)' : 'none',
+                    transition: 'background .15s, color .15s',
+                    lineHeight: 1,
+                  }}
+                >
+                  {l.label}
+                </button>
+              ))}
+            </div>
             {SOCIALS.map((s) => (
               <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" aria-label={s.label} style={{ color: 'var(--primary)' }}><s.Icon size="sm" /></a>
             ))}
@@ -92,7 +116,7 @@ export default function Header() {
         <nav className="row gap-1" style={{ display: 'none' }} data-desktop-nav>
           {NAV.map((n) => (
             <Link key={n.to} to={n.to} className="nav-link" activeClassName="nav-link-active">
-              {n.label}
+              {t(`ui.nav.${n.label.toLowerCase()}`, n.label)}
             </Link>
           ))}
         </nav>
@@ -185,7 +209,7 @@ export default function Header() {
           <nav className="col" style={{ borderTop: '1px solid var(--border)', paddingTop: '.5rem' }}>
             {NAV.map((n) => (
               <a key={n.to} href={'#' + n.to} onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 500 }}>
-                {n.label}
+                {t(`ui.nav.${n.label.toLowerCase()}`, n.label)}
               </a>
             ))}
             <a href="#/praygyaan" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--secondary)' }}>PrayGyaan AI</a>

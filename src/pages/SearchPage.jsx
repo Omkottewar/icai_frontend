@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useRoute, navigate } from '../hooks/useRoute';
 import PageHeader from '../components/layout/PageHeader';
+import { useLang } from '../context/LanguageContext';
 import EventCard from '../components/ui/EventCard';
 import { HOME_EVENTS } from '../data/constants';
 import { IconSearch } from '../icons';
 
 export default function SearchPage() {
+  const { t } = useLang();
   const route = useRoute();
   const q = route.query.q || '';
   const [query, setQuery] = useState(q);
@@ -21,8 +23,8 @@ export default function SearchPage() {
   return (
     <>
       <PageHeader
-        title="Search"
-        subtitle={query ? `Results for "${query}"` : 'Search events, services and resources'}
+        title={t('ui.search.page_title', 'Search')}
+        subtitle={query ? `Results for "${query}"` : t('ui.search.page_subtitle_empty', 'Search events, services and resources')}
       />
       <section className="container" style={{ padding: '3rem 1rem', maxWidth: '56rem' }}>
         <form
@@ -34,16 +36,16 @@ export default function SearchPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search…"
+              placeholder={t('ui.search.placeholder', 'Search…')}
               style={{ flex: 1, background: 'transparent', border: 0, outline: 'none' }}
             />
           </div>
-          <button className="btn btn-primary">Search</button>
+          <button className="btn btn-primary">{t('ui.search.btn', 'Search')}</button>
         </form>
         <div style={{ marginTop: '2rem', display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           {matches.map((e) => <EventCard key={e.title} event={e} />)}
           {query && matches.length === 0 && (
-            <p className="muted-text">No events matched "{query}". Try the events page or browse by committee.</p>
+            <p className="muted-text">{t('ui.search.no_results', 'No events matched. Try the events page or browse by committee.')}</p>
           )}
         </div>
       </section>

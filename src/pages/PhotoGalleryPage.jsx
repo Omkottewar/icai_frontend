@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
+import { useLang } from '../context/LanguageContext';
 import { IconCalendar, IconX } from '../icons';
 
-const ALL_COMMITTEES = ['All', 'CPE', 'WICASA', 'GST', 'Direct Tax', 'Audit', 'IT', 'Branch'];
+const ALL_COMMITTEES = ['CPE', 'WICASA', 'GST', 'Direct Tax', 'Audit', 'IT', 'Branch'];
 
 const COMMITTEE_COLORS = {
   GST:          { color: '#16a34a', bg: '#f0fdf4' },
@@ -25,9 +26,8 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-// Full-screen zoom of one photo with ← → keyboard nav. Lives nested inside
-// the album lightbox so the user can browse the album without dismissing.
 function ZoomLightbox({ photos, index, onClose, onIndex }) {
+  const { t } = useLang();
   const p = photos[index];
   useEffect(() => {
     function onKey(e) {
@@ -61,17 +61,17 @@ function ZoomLightbox({ photos, index, onClose, onIndex }) {
         </div>
       )}
       <div style={{ color: 'rgba(255,255,255,.65)', fontSize: '.7rem', marginTop: '.5rem' }}>
-        {index + 1} / {photos.length} · ← → to navigate, Esc to close
+        {index + 1} / {photos.length} · {t('ui.gallery.nav_hint', '← → to navigate, Esc to close')}
       </div>
     </div>
   );
 }
 
-// Lightbox grid of real photos for an album. Lazy-loaded from /api on open.
 function AlbumLightbox({ album, onClose }) {
+  const { t } = useLang();
   const [photos, setPhotos] = useState(null);
   const [err, setErr] = useState('');
-  const [zoom, setZoom] = useState(null); // index into photos[]
+  const [zoom, setZoom] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,9 +137,9 @@ function AlbumLightbox({ album, onClose }) {
         {err && <p style={{ color: 'var(--destructive)', fontSize: '.875rem' }}>{err}</p>}
 
         {photos === null ? (
-          <p className="muted-text" style={{ fontSize: '.875rem' }}>Loading photos…</p>
+          <p className="muted-text" style={{ fontSize: '.875rem' }}>{t('ui.gallery.loading_photos', 'Loading photos…')}</p>
         ) : photos.length === 0 ? (
-          <p className="muted-text" style={{ fontSize: '.875rem' }}>No photos uploaded for this album yet.</p>
+          <p className="muted-text" style={{ fontSize: '.875rem' }}>{t('ui.gallery.no_photos', 'No photos uploaded for this album yet.')}</p>
         ) : (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.5rem' }}>
@@ -148,7 +148,7 @@ function AlbumLightbox({ album, onClose }) {
                 className="btn btn-outline"
                 style={{ fontSize: '.8rem', padding: '.4rem .75rem' }}
               >
-                Download album (.zip)
+                {t('ui.gallery.download_album', 'Download album (.zip)')}
               </a>
             </div>
             <div style={{ display: 'grid', gap: '.5rem', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))' }}>
@@ -185,7 +185,6 @@ function AlbumLightbox({ album, onClose }) {
           </>
         )}
 
-        {/* Nested full-size zoom modal with ← → keyboard nav */}
         {zoom !== null && photos && photos[zoom] && (
           <ZoomLightbox
             photos={photos}
@@ -200,6 +199,7 @@ function AlbumLightbox({ album, onClose }) {
 }
 
 export default function PhotoGalleryPage() {
+  const { t } = useLang();
   const [filter, setFilter] = useState('All');
   const [open, setOpen]     = useState(null);
   const [albums, setAlbums] = useState(null);
@@ -217,34 +217,43 @@ export default function PhotoGalleryPage() {
     (a) => filter === 'All' || a.committee_tag === filter,
   );
 
+  const filterAll = t('ui.gallery.filter_all', 'All');
+  const filters = [filterAll, ...ALL_COMMITTEES];
+
   return (
     <>
-      <PageHeader title="Photo Gallery" subtitle="Event photos from programmes organised by the Nagpur Branch" />
+      <PageHeader
+        title={t('ui.gallery.page_title', 'Photo Gallery')}
+        subtitle={t('ui.gallery.page_subtitle', 'Event photos from programmes organised by the Nagpur Branch')}
+      />
 
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
 
         <div className="row gap-2" style={{ flexWrap: 'wrap', marginBottom: '2rem' }}>
-          {ALL_COMMITTEES.map((c) => (
-            <button
-              key={c}
-              onClick={() => setFilter(c)}
-              className={'btn ' + (filter === c ? 'btn-primary' : 'btn-outline')}
-              style={{ padding: '.35rem .9rem', borderRadius: 999, fontSize: '.8125rem' }}
-            >
-              {c}
-            </button>
-          ))}
+          {filters.map((c) => {
+            const filterKey = c === filterAll ? 'All' : c;
+            return (
+              <button
+                key={c}
+                onClick={() => setFilter(filterKey)}
+                className={'btn ' + (filter === filterKey ? 'btn-primary' : 'btn-outline')}
+                style={{ padding: '.35rem .9rem', borderRadius: 999, fontSize: '.8125rem' }}
+              >
+                {c}
+              </button>
+            );
+          })}
         </div>
 
         {err && <p style={{ color: 'var(--destructive)', fontSize: '.875rem' }}>{err}</p>}
 
         {albums === null ? (
-          <p className="muted-text">Loading albums…</p>
+          <p className="muted-text">{t('ui.gallery.loading', 'Loading albums…')}</p>
         ) : visible.length === 0 ? (
           <p className="muted-text">
             {albums.length === 0
-              ? 'No albums published yet. Photos will appear here once the office uploads them.'
-              : 'No albums found for this committee.'}
+              ? t('ui.gallery.no_albums', 'No albums published yet. Photos will appear here once the office uploads them.')
+              : t('ui.gallery.no_albums_filter', 'No albums found for this committee.')}
           </p>
         ) : (
           <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>

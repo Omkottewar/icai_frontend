@@ -68,6 +68,10 @@ export default defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true,
       },
+      '/locales': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
       // WebSocket upgrade path for the event chat. `ws: true` forwards the
       // HTTP/1.1 Upgrade handshake to the API server.
       '/ws': {

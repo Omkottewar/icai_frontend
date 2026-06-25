@@ -1,22 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
+import { useLang } from '../context/LanguageContext';
 import { useRoute } from '../hooks/useRoute';
 import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap } from '../icons';
-
-const NOTICE = (
-  <div style={{
-    background: 'oklch(0.36 0.13 255 / 0.06)',
-    border: '1px solid oklch(0.36 0.13 255 / 0.15)',
-    borderRadius: '.5rem',
-    padding: '.875rem 1rem',
-    marginBottom: '2rem',
-    fontSize: '.8125rem',
-    color: 'var(--foreground)',
-  }}>
-    <strong>Notice:</strong> These vacancies are posted by member firms and organisations in Nagpur / Vidarbha region.
-    The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.
-  </div>
-);
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -45,41 +31,59 @@ function usePostings(type) {
 }
 
 export default function JobVacanciesPage() {
+  const { t } = useLang();
   const route = useRoute();
   const isArticleship = route.query.type === 'articleship';
   const postingType = isArticleship ? 'articleship' : 'job';
   const { rows, loading, error } = usePostings(postingType);
   const [enquiryTarget, setEnquiryTarget] = useState(null);
 
+  const notice = (
+    <div style={{
+      background: 'oklch(0.36 0.13 255 / 0.06)',
+      border: '1px solid oklch(0.36 0.13 255 / 0.15)',
+      borderRadius: '.5rem',
+      padding: '.875rem 1rem',
+      marginBottom: '2rem',
+      fontSize: '.8125rem',
+      color: 'var(--foreground)',
+    }}>
+      <strong>{t('ui.jobs.notice_bold', 'Notice:')}</strong>{' '}
+      {t('ui.jobs.notice_text', 'These vacancies are posted by member firms and organisations in Nagpur / Vidarbha region. The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.')}
+    </div>
+  );
+
   return (
     <>
       <PageHeader
-        title={isArticleship ? 'Articleship Vacancies' : 'Job Vacancies'}
+        title={isArticleship ? t('ui.jobs.articleship_title', 'Articleship Vacancies') : t('ui.jobs.job_title', 'Job Vacancies')}
         subtitle={isArticleship
-          ? 'Articleship openings posted by member firms in Nagpur / Vidarbha'
-          : 'Member job opportunities in Nagpur / Vidarbha region'}
+          ? t('ui.jobs.articleship_subtitle', 'Articleship openings posted by member firms in Nagpur / Vidarbha')
+          : t('ui.jobs.job_subtitle', 'Member job opportunities in Nagpur / Vidarbha region')}
       />
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
-        {NOTICE}
+        {notice}
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <div className="tiny-eyebrow">{isArticleship ? 'For CA Students' : 'For CA Members'}</div>
+          <div className="tiny-eyebrow">
+            {isArticleship ? t('ui.jobs.for_students', 'For CA Students') : t('ui.jobs.for_members', 'For CA Members')}
+          </div>
           <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
-            {isArticleship ? 'Articleship Vacancies' : 'Member Job Vacancies'}
+            {isArticleship ? t('ui.jobs.articleship_title', 'Articleship Vacancies') : t('ui.jobs.job_title', 'Member Job Vacancies')}
           </h2>
           <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>
             {isArticleship
-              ? 'Member firms in Nagpur seeking articles for practical training.'
-              : 'Positions in industry, corporates and practice firms seeking qualified Chartered Accountants.'}
+              ? t('ui.jobs.articleship_firms', 'Member firms in Nagpur seeking articles for practical training.')
+              : t('ui.jobs.job_firms', 'Positions in industry, corporates and practice firms seeking qualified Chartered Accountants.')}
           </p>
         </div>
 
         {loading && <LoadingGrid count={3} />}
-        {error && <ErrorMessage message={error} />}
+        {error && <ErrorMessage message={`${t('ui.jobs.error_load', 'Could not load postings')} — ${error}`} />}
         {!loading && !error && rows?.length === 0 && (
           <EmptyState message={isArticleship
-            ? 'No articleship vacancies at the moment. Check back soon.'
-            : 'No job vacancies at the moment. Check back soon.'} />
+            ? t('ui.jobs.no_articleship', 'No articleship vacancies at the moment. Check back soon.')
+            : t('ui.jobs.no_jobs', 'No job vacancies at the moment. Check back soon.')} />
         )}
         {!loading && !error && rows?.length > 0 && (
           <div style={{ display: 'grid', gap: '1.25rem' }}>
@@ -103,18 +107,15 @@ export default function JobVacanciesPage() {
 }
 
 function PostingCard({ posting: v, isArticleship, onEnquire }) {
+  const { t } = useLang();
   return (
     <div className="card" style={{ padding: '1.5rem' }}>
-      {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
-          {/* Org name */}
           <div style={{ fontSize: '.8125rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '.25rem' }}>
             {orgName(v)}
           </div>
-          {/* Title */}
           <h3 style={{ fontWeight: 700, fontSize: '1.0625rem', margin: 0 }}>{v.title}</h3>
-          {/* Meta chips */}
           <div className="row gap-3" style={{ marginTop: '.625rem', flexWrap: 'wrap' }}>
             {v.experience_required && (
               <span style={{
@@ -132,18 +133,16 @@ function PostingCard({ posting: v, isArticleship, onEnquire }) {
           className="btn btn-primary"
           style={{ padding: '.45rem 1rem', fontSize: '.8125rem', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '.375rem' }}
         >
-          <IconMail size="sm" /> {isArticleship ? 'Apply' : 'Enquire'}
+          <IconMail size="sm" /> {isArticleship ? t('ui.jobs.apply_btn', 'Apply') : t('ui.jobs.enquire_btn', 'Enquire')}
         </button>
       </div>
 
-      {/* Description */}
       {v.description && (
         <p style={{ margin: '.875rem 0 0', fontSize: '.875rem', color: 'var(--muted-foreground)', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
           {v.description}
         </p>
       )}
 
-      {/* Footer meta */}
       <div className="row gap-4" style={{ marginTop: '1rem', flexWrap: 'wrap', borderTop: '1px solid var(--border)', paddingTop: '.875rem' }}>
         {v.location && (
           <span className="row gap-1 muted-text" style={{ fontSize: '.8125rem' }}>
@@ -156,11 +155,11 @@ function PostingCard({ posting: v, isArticleship, onEnquire }) {
             : <><IconBriefcase size="sm" /> {v.seat_count} position{v.seat_count !== 1 ? 's' : ''}</>}
         </span>
         <span className="row gap-1 muted-text" style={{ fontSize: '.8125rem' }}>
-          <IconCalendar size="sm" /> Posted {fmtDate(v.created_at)}
+          <IconCalendar size="sm" /> {t('ui.jobs.posted', 'Posted')} {fmtDate(v.created_at)}
         </span>
         {v.expires_at && (
           <span className="muted-text" style={{ fontSize: '.8125rem' }}>
-            Expires {fmtDate(v.expires_at)}
+            {t('ui.jobs.expires', 'Expires')} {fmtDate(v.expires_at)}
           </span>
         )}
       </div>
@@ -169,6 +168,7 @@ function PostingCard({ posting: v, isArticleship, onEnquire }) {
 }
 
 function EnquiryModal({ posting, onClose }) {
+  const { t } = useLang();
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [resumeFile, setResumeFile] = useState(null);
   const [sent, setSent] = useState(false);
@@ -208,7 +208,6 @@ function EnquiryModal({ posting, onClose }) {
         display: 'flex', flexDirection: 'column',
         maxHeight: '90vh', overflow: 'hidden',
       }}>
-        {/* Titlebar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '.875rem 1.25rem',
@@ -217,7 +216,7 @@ function EnquiryModal({ posting, onClose }) {
           borderRadius: '.75rem .75rem 0 0',
         }}>
           <span style={{ fontWeight: 700, fontSize: '.9375rem' }}>
-            {sent ? 'Enquiry sent' : 'New Enquiry'}
+            {sent ? t('ui.jobs.enquiry_sent', 'Enquiry sent') : t('ui.jobs.new_enquiry', 'New Enquiry')}
           </span>
           <button onClick={onClose} style={{ background: 'none', border: 0, cursor: 'pointer', color: 'var(--muted-foreground)', padding: '.25rem', borderRadius: '.25rem', display: 'flex' }}>
             <IconX />
@@ -227,17 +226,18 @@ function EnquiryModal({ posting, onClose }) {
         {sent ? (
           <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', flex: 1 }}>
             <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>✓</div>
-            <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: '.375rem' }}>Enquiry submitted</div>
+            <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: '.375rem' }}>
+              {t('ui.jobs.enquiry_submitted', 'Enquiry submitted')}
+            </div>
             <div className="muted-text" style={{ fontSize: '.875rem' }}>
               Your enquiry for <strong>{posting.title}</strong> has been received. {org} will reach out to you.
             </div>
             <button onClick={onClose} className="btn btn-primary" style={{ marginTop: '1.5rem', padding: '.5rem 1.5rem' }}>
-              Close
+              {t('ui.jobs.close', 'Close')}
             </button>
           </div>
         ) : (
           <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            {/* Email header fields */}
             <div style={{ borderBottom: '1px solid var(--border)' }}>
               <EmailRow label="To">
                 <span style={{ fontSize: '.875rem', color: 'var(--foreground)' }}>{org}</span>
@@ -249,14 +249,14 @@ function EnquiryModal({ posting, onClose }) {
                 <div style={{ display: 'flex', gap: '.625rem', flex: 1, flexWrap: 'wrap' }}>
                   <input
                     required
-                    placeholder="Your name"
+                    placeholder={t('ui.jobs.your_name', 'Your name')}
                     value={form.name}
                     onChange={(e) => set('name', e.target.value)}
                     style={inputStyle}
                   />
                   <input
                     required type="email"
-                    placeholder="Your email"
+                    placeholder={t('ui.jobs.your_email', 'Your email')}
                     value={form.email}
                     onChange={(e) => set('email', e.target.value)}
                     style={inputStyle}
@@ -266,7 +266,7 @@ function EnquiryModal({ posting, onClose }) {
               <EmailRow label="Phone">
                 <input
                   type="tel"
-                  placeholder="Your phone number"
+                  placeholder={t('ui.jobs.your_phone', 'Your phone number')}
                   value={form.phone}
                   onChange={(e) => set('phone', e.target.value)}
                   style={{ ...inputStyle, maxWidth: 220 }}
@@ -274,7 +274,6 @@ function EnquiryModal({ posting, onClose }) {
               </EmailRow>
             </div>
 
-            {/* Message body */}
             <textarea
               required
               placeholder={`Write your message to ${org}…`}
@@ -288,7 +287,6 @@ function EnquiryModal({ posting, onClose }) {
               }}
             />
 
-            {/* Footer */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '.75rem',
               padding: '.875rem 1.25rem',
@@ -297,10 +295,9 @@ function EnquiryModal({ posting, onClose }) {
               borderRadius: '0 0 .75rem .75rem',
               flexWrap: 'wrap',
             }}>
-              {/* Attach resume */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '.375rem', cursor: 'pointer', fontSize: '.8125rem', color: 'var(--muted-foreground)', padding: '.375rem .625rem', borderRadius: '.375rem', border: '1px solid var(--border)', background: 'var(--card)' }}>
                 <span>📎</span>
-                <span>{resumeFile ? resumeFile.name : 'Attach resume'}</span>
+                <span>{resumeFile ? resumeFile.name : t('ui.jobs.attach_resume', 'Attach resume')}</span>
                 <input
                   ref={fileRef}
                   type="file"
@@ -318,10 +315,10 @@ function EnquiryModal({ posting, onClose }) {
 
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
                 <button type="button" onClick={onClose} className="btn btn-outline" style={{ padding: '.4rem .875rem', fontSize: '.8125rem' }}>
-                  Cancel
+                  {t('ui.jobs.cancel', 'Cancel')}
                 </button>
                 <button type="submit" className="btn btn-primary" style={{ padding: '.4rem .875rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.375rem' }}>
-                  <IconMail size="sm" /> Send
+                  <IconMail size="sm" /> {t('ui.jobs.send', 'Send')}
                 </button>
               </div>
             </div>
@@ -377,7 +374,7 @@ function EmptyState({ message }) {
 function ErrorMessage({ message }) {
   return (
     <div style={{ padding: '1rem', background: '#fee2e2', color: '#991b1b', borderRadius: '.5rem', fontSize: '.875rem' }}>
-      Could not load postings — {message}
+      {message}
     </div>
   );
 }

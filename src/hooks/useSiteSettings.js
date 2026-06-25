@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cachedGet } from '../lib/apiCache';
+import { useLang } from '../context/LanguageContext';
+
+const TRANSLATABLE_SETTING_KEYS = ['branch_address', 'branch_hours', 'footer_disclaimer'];
 
 // Defaults mirror the values that are hardcoded in Header / Footer /
 // ContactPage today, so a fresh install renders correctly before admin seeds
@@ -23,6 +26,7 @@ export const SITE_SETTINGS_DEFAULTS = {
 export function useSiteSettings() {
   const [settings, setSettings] = useState(SITE_SETTINGS_DEFAULTS);
   const [loading, setLoading] = useState(true);
+  const { localeData } = useLang();
 
   useEffect(() => {
     let cancelled = false;
@@ -37,5 +41,17 @@ export function useSiteSettings() {
     return () => { cancelled = true; };
   }, []);
 
-  return { settings, loading };
+  // Overlay locale translations for the subset of settings that are plain text
+  // (address, hours, disclaimer). URL/phone/email settings are never translated.
+  const translatedSettings = useMemo(() => {
+    if (!localeData || Object.keys(localeData).length === 0) return settings;
+    const out = { ...settings };
+    for (const key of TRANSLATABLE_SETTING_KEYS) {
+      const tv = localeData[`settings.${key}`];
+      if (tv) out[key] = tv;
+    }
+    return out;
+  }, [settings, localeData]);
+
+  return { settings: translatedSettings, loading };
 }

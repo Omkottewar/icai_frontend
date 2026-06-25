@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { cachedGet } from '../lib/apiCache';
+import { useLang } from '../context/LanguageContext';
 
 // Bake the existing hardcoded copy into the defaults map so a fresh install
 // (no site_content rows in the DB) still renders the same page. Once admin
@@ -66,16 +67,40 @@ function useAllSiteContent() {
 
 // Returns merged { default, ...db } payload for a single slot. While the
 // initial fetch is in flight the default fires immediately so the page
-// doesn't shimmer.
+// doesn't shimmer. Translations from the active locale are overlaid on top
+// when a non-English language is selected.
 export function useSiteContent(slug) {
   const all = useAllSiteContent();
+  const { localeData } = useLang();
 
   return useMemo(() => {
     const fallback = SITE_CONTENT_DEFAULTS[slug] || {};
     const row = all?.rows?.find((r) => r.slug === slug);
     const data = row?.data || {};
-    // shallow merge — fallback fills gaps when the DB row is partial (e.g.
-    // admin only set the quote, didn't upload a photo yet).
-    return { ...fallback, ...data };
-  }, [all, slug]);
+    // shallow merge — fallback fills gaps when the DB row is partial.
+    const merged = { ...fallback, ...data };
+
+    if (!localeData || Object.keys(localeData).length === 0) return merged;
+
+    // Overlay locale translations: content IDs are "<slug>.<field>".
+    const out = { ...merged };
+    for (const [key, val] of Object.entries(merged)) {
+      const cid = `${slug}.${key}`;
+      if (typeof val === 'string' && localeData[cid]) {
+        out[key] = localeData[cid];
+      } else if (Array.isArray(val)) {
+        // Stats-style arrays: [{k, v}, …] — translate k and v individually.
+        out[key] = val.map((item, i) => {
+          if (!item || typeof item !== 'object') return item;
+          const t = { ...item };
+          for (const sub of ['k', 'v']) {
+            const tv = localeData[`${cid}.${i}.${sub}`];
+            if (tv) t[sub] = tv;
+          }
+          return t;
+        });
+      }
+    }
+    return out;
+  }, [all, slug, localeData]);
 }
