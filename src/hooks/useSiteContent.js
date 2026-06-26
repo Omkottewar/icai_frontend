@@ -79,6 +79,15 @@ export const SITE_CONTENT_DEFAULTS = {
     title:          'Circulars, standards & e-Journal',
     view_all_label: 'All resources →',
   },
+  home_wicasa_card: {
+    eyebrow:             'STUDENT WING',
+    title:               'WICASA — Nagpur Branch',
+    body:                "The Nagpur Branch CA Students' Association supports articleship trainees through orientation courses, mock tests, soft-skills training and the annual festival.",
+    updates_heading:     'New updates',
+    suggestions_heading: 'Student suggestions',
+    signin_hint:         'Sign in to upvote',
+    resources_label:     'STUDENT RESOURCES',
+  },
   about_vision: {
     body: 'To be a leading branch dedicated to the holistic development of members and students through quality education, networking, and innovative initiatives.',
   },

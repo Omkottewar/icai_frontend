@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { navigate } from '../../hooks/useRoute';
+import { useSiteContent } from '../../hooks/useSiteContent';
+import { renderMarkdown } from '../../lib/markdown.jsx';
 import { IconArrowRight, IconChevronDown } from '../../icons';
 
 const UPDATES = [
@@ -18,6 +20,9 @@ const SUGGESTIONS = [
 export default function WicasaCard() {
   const { user } = useAuth();
   const [upvoted, setUpvoted] = useState({});
+  // Editable labels (UPDATES + SUGGESTIONS list bodies stay hardcoded
+  // per the design — only the labels around them are admin-managed).
+  const t = useSiteContent('home_wicasa_card');
 
   const scoreFor = (id) => {
     const base = SUGGESTIONS.find((s) => s.id === id).votes;
@@ -37,17 +42,16 @@ export default function WicasaCard() {
 
   return (
     <div className="card wicasa-card">
-      <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>STUDENT WING</div>
+      <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>{t.eyebrow}</div>
       <h3 style={{ marginTop: '.25rem', fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>
-        WICASA — Nagpur Branch
+        {t.title}
       </h3>
-      <p className="muted-text" style={{ marginTop: '.5rem', lineHeight: 1.6 }}>
-        The Nagpur Branch CA Students' Association supports articleship trainees through
-        orientation courses, mock tests, soft-skills training and the annual festival.
-      </p>
+      <div className="muted-text" style={{ marginTop: '.5rem', lineHeight: 1.6 }}>
+        {renderMarkdown(t.body)}
+      </div>
 
       {/* New updates */}
-      <div className="wicasa-subhead">New updates</div>
+      <div className="wicasa-subhead">{t.updates_heading}</div>
       <ul className="wicasa-updates">
         {UPDATES.map((u) => (
           <li key={u}>
@@ -59,8 +63,8 @@ export default function WicasaCard() {
 
       {/* Student suggestions — Reddit-style upvotes */}
       <div className="wicasa-subhead">
-        <span>Student suggestions</span>
-        {!user && <span className="wicasa-signin-hint">Sign in to upvote</span>}
+        <span>{t.suggestions_heading}</span>
+        {!user && <span className="wicasa-signin-hint">{t.signin_hint}</span>}
       </div>
       <ul className="wicasa-suggestions">
         {ranked.map((s) => {
@@ -88,7 +92,7 @@ export default function WicasaCard() {
       </ul>
 
       <a href="#/students" className="wicasa-resources">
-        STUDENT RESOURCES <IconArrowRight size="sm" />
+        {t.resources_label} <IconArrowRight size="sm" />
       </a>
     </div>
   );
