@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle, IconMessageSquare } from '../../icons';
+import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle, IconMessageSquare, IconCalendar } from '../../icons';
 import EventRegisterModal from '../events/EventRegisterModal';
 import EventChat from '../events/EventChat';
 import { useMyRegistrations } from '../../hooks/useMyRegistrations';
+import { googleCalendarEventUrl } from '../../lib/googleCalendar';
 
 function getMode(venue) {
   const v = (venue || '').toLowerCase();
@@ -153,6 +154,24 @@ export default function EventRow({ event: e, href = '#/events', detailed = false
                   )}
                   <div className="event-acc-actions">
                     {e.cpe > 0 && <span className="badge badge-accent">{e.cpe} CPE hrs</span>}
+                    {/* Add to Google Calendar — opens calendar.google.com
+                        with the event prefilled in a new tab. Avoids the
+                        .ics download path (which triggers a Microsoft Store
+                        prompt on Windows machines with no calendar app
+                        installed). */}
+                    {googleCalendarEventUrl(e) && (
+                      <a
+                        href={googleCalendarEventUrl(e)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline"
+                        style={{ padding: '.45rem 1.1rem' }}
+                        onClick={(ev) => ev.stopPropagation()}
+                        aria-label="Add this event to my Google Calendar"
+                      >
+                        <IconCalendar size="sm" /> Add to Google Calendar
+                      </a>
+                    )}
                     {isRegistered ? (
                       <>
                         <span

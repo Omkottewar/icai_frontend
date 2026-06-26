@@ -69,15 +69,16 @@ export const QUESTION_LIBRARY = [
 // underneath it. Vastly faster than asking a non-tech user to build the
 // same section from scratch.
 //
-// Schema: each preset is { key, icon, title, owner_role, questions[] }
+// Schema: each preset is { key, icon, title, questions[] }
 // where questions[] follow the newQuestion() shape (type + overrides).
+// Per F21, presets no longer carry an `owner_role` — filler / approver
+// are decided at event-checklist creation, not on the template.
 export const SECTION_PRESETS = [
   {
     key: 'event_basics',
     icon: '📌',
     title: 'Event basics',
     description: 'Title, type, description, date, time',
-    owner_role: 'committee_chairman',
     questions: [
       { type: 'short_text', overrides: { label: 'Event title', required: true } },
       { type: 'dropdown',   overrides: {
@@ -101,7 +102,6 @@ export const SECTION_PRESETS = [
     icon: '📍',
     title: 'Venue & logistics',
     description: 'Mode, venue / URL, capacity, banner',
-    owner_role: 'committee_chairman',
     questions: [
       { type: 'dropdown', overrides: {
           label: 'Mode', required: true,
@@ -121,7 +121,6 @@ export const SECTION_PRESETS = [
     icon: '🎤',
     title: 'Speakers & agenda',
     description: 'Speaker info, agenda, CPE — Vice-Chairman reviews',
-    owner_role: 'branch_vice_chairman',
     questions: [
       { type: 'short_text', overrides: { label: 'Speaker name & designation', required: true } },
       { type: 'long_text',  overrides: { label: 'Speaker bio (1–2 sentences)', required: true } },
@@ -143,7 +142,6 @@ export const SECTION_PRESETS = [
     icon: '🎟️',
     title: 'Registration & pricing',
     description: 'Fees by audience, capacity, spot registration',
-    owner_role: 'committee_chairman',
     questions: [
       { type: 'money',  overrides: { label: 'Fee — Members', required: true } },
       { type: 'money',  overrides: { label: 'Fee — Students', required: true } },
@@ -158,7 +156,6 @@ export const SECTION_PRESETS = [
     icon: '💰',
     title: 'Budget & IUT',
     description: 'Excel-style budget table + IUT details — Treasurer fills',
-    owner_role: 'branch_treasurer',
     questions: [
       // The headline question — the spreadsheet-style budget table. Auto-
       // computes subtotals + net + deficit/surplus.
@@ -175,7 +172,6 @@ export const SECTION_PRESETS = [
     icon: '⚖️',
     title: 'Compliance & disclaimers',
     description: 'GST, consent, refund policy',
-    owner_role: 'committee_chairman',
     questions: [
       { type: 'yes_no', overrides: { label: 'GST applicable on fees?', required: true } },
       { type: 'yes_no', overrides: { label: 'Photography / video consent collected?', required: true } },
@@ -188,7 +184,6 @@ export const SECTION_PRESETS = [
     icon: '📣',
     title: 'Promotion',
     description: 'Launch date, channels, budget',
-    owner_role: 'committee_chairman',
     questions: [
       { type: 'date',     overrides: { label: 'Date public registration opens', required: true } },
       { type: 'checkbox', overrides: {
@@ -210,7 +205,6 @@ export const SECTION_PRESETS = [
     icon: '✅',
     title: 'Tasks to assign',
     description: 'Task list with assignees + due dates',
-    owner_role: 'committee_chairman',
     questions: [
       { type: 'task_list', overrides: { label: 'Pre-event task list', required: true, help_text: 'Add one row per task. Pick the assignee and the due date.' } },
     ],
@@ -234,6 +228,29 @@ export const ROLE_OPTIONS = [
   { code: 'accountant',             label: 'Accountant' },
   { code: 'branch_manager',         label: 'Branch Manager' },
 ];
+
+// Role codes that constitute the Managing Committee + elected office-bearers
+// — used by the checklist filler / reviewer pickers to keep the dropdown
+// scoped to people who could plausibly be assigned to run an event's
+// pre-event checklist. Excludes 'committee_member' (too broad — generic
+// volunteer slot) and 'accountant' / 'branch_manager' (operational staff,
+// not elected committee).
+export const MCM_ROLE_CODES = [
+  'committee_chairman',
+  'committee_convener',
+  'committee_co_convener',
+  'mcm',
+  'branch_chairman',
+  'branch_vice_chairman',
+  'branch_secretary',
+  'branch_treasurer',
+];
+
+// Lookup: role_code → human label, used by the user picker to show
+// "Akshara Soni · Committee Chairman" next to each name.
+export const ROLE_CODE_LABEL = Object.fromEntries(
+  ROLE_OPTIONS.filter((r) => r.code).map((r) => [r.code, r.label]),
+);
 
 // Common category strings so the non-tech user doesn't have to invent and
 // remember their own naming. Free-text "Other" still available via a

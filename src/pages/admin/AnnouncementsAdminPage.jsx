@@ -3,6 +3,8 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 function CardListShimmer({ count = 5 }) {
   return (
@@ -23,10 +25,14 @@ function CardListShimmer({ count = 5 }) {
 const AUDIENCES = ['all', 'members', 'students', 'employers'];
 const EMPTY = {
   title: '', body: '', link_url: '',
+  // file_id is the FK into the files table; file_url + file_name are the
+  // resolved details the form shows ("Currently attached: foo.pdf").
+  file_id: null, file_url: null, file_name: null,
   audience: 'all',
   starts_at: '', ends_at: '',
   display_order: 0,
 };
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
 
 function fmt(d) {
   if (!d) return '—';
@@ -40,6 +46,7 @@ export default function AnnouncementsAdminPage() {
   const [form, setForm] = useState(EMPTY);
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const load = async () => {
     try {
@@ -61,6 +68,9 @@ export default function AnnouncementsAdminPage() {
       title: row.title,
       body: row.body ?? '',
       link_url: row.link_url ?? '',
+      file_id: row.file_id ?? null,
+      file_url: row.file_url ?? null,
+      file_name: row.file_name ?? null,
       audience: row.audience ?? 'all',
       starts_at: row.starts_at ? row.starts_at.slice(0, 16) : '',
       ends_at:   row.ends_at   ? row.ends_at.slice(0, 16)   : '',
@@ -70,6 +80,54 @@ export default function AnnouncementsAdminPage() {
   };
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // PDF upload — base64-posts to /api/admin/files with bucket="banners"
+  // (the generic public bucket; same one circulars + paper presentations
+  // use for their PDFs). On success we store the returned file id +
+  // build the public URL via the returned `url` field for preview.
+  const onPickPdf = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+      showToast?.('Please choose a PDF file.', 'error');
+      return;
+    }
+    if (file.size > MAX_PDF_BYTES) {
+      showToast?.(`PDF is too large (max ${Math.round(MAX_PDF_BYTES / (1024 * 1024))} MB).`, 'error');
+      return;
+    }
+    setUploading(true);
+    try {
+      const data_base64 = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).replace(/^data:[^;]+;base64,/, ''));
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+      const r = await fetch('/api/admin/files', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          name: file.name,
+          mime_type: 'application/pdf',
+          bucket: 'banners',
+          data_base64,
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error || 'Upload failed');
+      setForm((f) => ({ ...f, file_id: j.id, file_url: j.url, file_name: file.name }));
+      showToast?.('PDF attached', 'success');
+    } catch (ex) {
+      showToast?.(ex.message || 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const clearPdf = () => setForm((f) => ({ ...f, file_id: null, file_url: null, file_name: null }));
 
   const save = async () => {
     setSaving(true); setErr('');
@@ -93,7 +151,13 @@ export default function AnnouncementsAdminPage() {
   };
 
   const del = async (row) => {
-    if (!confirm(`Delete "${row.title}"?`)) return;
+    const ok = await dialog.confirm({
+      title: 'Delete announcement?',
+      message: `Delete "${row.title}"?`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const r = await fetch(`/api/admin/announcements/${row.id}`, { method: 'DELETE', credentials: 'include' });
     if (r.ok) { showToast?.('Deleted', 'success'); load(); }
     else      { showToast?.('Could not delete', 'error'); }
@@ -132,7 +196,15 @@ export default function AnnouncementsAdminPage() {
                 <tr key={row.id} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '.75rem' }}>
                     <div style={{ fontWeight: 600 }}>{row.title}</div>
-                    {row.link_url && <a href={row.link_url} className="muted-text" style={{ fontSize: '.75rem' }} target="_blank" rel="noreferrer">{row.link_url}</a>}
+                    {row.file_url && (
+                      <a href={row.file_url} target="_blank" rel="noreferrer"
+                        style={{ fontSize: '.75rem', color: 'var(--primary)', display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+                        📎 {row.file_name || 'View PDF'}
+                      </a>
+                    )}
+                    {!row.file_url && row.link_url && (
+                      <a href={row.link_url} className="muted-text" style={{ fontSize: '.75rem' }} target="_blank" rel="noreferrer">{row.link_url}</a>
+                    )}
                   </td>
                   <td style={{ padding: '.75rem' }}>{row.audience}</td>
                   <td style={{ padding: '.75rem', fontSize: '.8rem' }}>
@@ -171,10 +243,36 @@ export default function AnnouncementsAdminPage() {
                   onChange={(e) => update('body', e.target.value)} />
               </div>
               <div>
-                <label className="field-label">Link URL (optional)</label>
+                <label className="field-label">Attach PDF (optional)</label>
+                {form.file_url ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap',
+                                padding: '.55rem .75rem', border: '1px solid var(--border)', borderRadius: '.375rem', background: 'var(--muted)' }}>
+                    <a href={form.file_url} target="_blank" rel="noreferrer"
+                       style={{ color: 'var(--primary)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '.35rem' }}>
+                      📎 {form.file_name || 'View attached PDF'}
+                    </a>
+                    <span style={{ flex: 1 }} />
+                    <button type="button" className="btn btn-ghost" onClick={clearPdf} style={{ padding: '.25rem .55rem', fontSize: '.8rem' }}>
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <label className="btn btn-outline" style={{ cursor: uploading ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '.5rem' }}>
+                    {uploading ? 'Uploading…' : '📎 Choose PDF'}
+                    <input type="file" accept="application/pdf,.pdf" onChange={onPickPdf}
+                           disabled={uploading} style={{ display: 'none' }} />
+                  </label>
+                )}
+                <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.35rem' }}>
+                  Members will be able to open this PDF from the announcements page. Max 10 MB.
+                </p>
+              </div>
+              <div>
+                <label className="field-label">External link URL (optional — used when no PDF is attached)</label>
                 <input className="input-base" type="url" value={form.link_url}
                   onChange={(e) => update('link_url', e.target.value)}
-                  placeholder="https://…" />
+                  placeholder="https://…"
+                  disabled={!!form.file_url} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>
                 <div>
@@ -205,9 +303,9 @@ export default function AnnouncementsAdminPage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', marginTop: '1.25rem' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+              <Button className="btn btn-primary" onClick={save} loading={saving}>
                 {saving ? 'Saving…' : 'Save'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

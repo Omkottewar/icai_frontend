@@ -6,6 +6,8 @@ import FormField from '../../components/admin/FormField';
 import { useAdminList, adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { ShimmerFormField } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 const EMPTY_FORM = {
   name: '',
@@ -233,9 +235,9 @@ function UserDrawer({ userId, lookups, onClose, onSaved, showToast }) {
       footer={
         <>
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving || loading} style={{ padding: '.5rem 1rem' }}>
+          <Button className="btn btn-primary" onClick={save} disabled={loading} loading={saving} style={{ padding: '.5rem 1rem' }}>
             {saving ? 'Saving…' : (isNew ? 'Create user' : 'Save changes')}
-          </button>
+          </Button>
         </>
       }
     >
@@ -362,7 +364,13 @@ function RolesSection({ userId, assignments, lookups, onChanged, showToast }) {
   }
 
   async function endTerm(assignmentId) {
-    if (!confirm('End this role assignment as of today?')) return;
+    const ok = await dialog.confirm({
+      title: 'End role assignment?',
+      message: 'End this role assignment as of today?',
+      confirmText: 'End assignment',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await adminFetch(`/api/admin/users/${userId}/roles/${assignmentId}`, { method: 'DELETE' });
@@ -519,7 +527,13 @@ function OpenAssignmentsSection({ userId, showToast }) {
   async function reassign() {
     if (!toUserId) { showToast?.('Pick a target user', 'error'); return; }
     if (toUserId === userId) { showToast?.('Pick a different user', 'error'); return; }
-    if (!confirm(`Move every open assignment to user ${toUserId}? This cannot be undone via this screen.`)) return;
+    const ok = await dialog.confirm({
+      title: 'Reassign all?',
+      message: `Move every open assignment to user ${toUserId}? This cannot be undone via this screen.`,
+      confirmText: 'Reassign',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       const r = await adminFetch(`/api/admin/users/${userId}/reassign-checklists`, {

@@ -14,7 +14,7 @@ import InsightsStyles from '../components/dashboard/insights/insightsStyles';
 import Sparkline from '../components/dashboard/insights/Sparkline';
 import {
   IconAward, IconShield, IconCalendar, IconBookOpen, IconUsers,
-  IconBot, IconArrowRight, IconUser, IconSettings, IconLogOut, IconBriefcase, IconHandshake,
+  IconBot, IconArrowRight, IconLogOut, IconBriefcase, IconHandshake,
 } from '../icons';
 
 const DATE_FMT = new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -40,7 +40,7 @@ const REGISTRATION_LABELS = {
 
 export default function DashboardPage() {
   const { user, loading: authLoading, logout } = useAuth();
-  const { data, loading: dashLoading, error: dashError } = useDashboard();
+  const { data, loading: dashLoading, error: dashError, refresh: refreshDashboard } = useDashboard();
   const roles = useRoleFlags();
 
   useEffect(() => {
@@ -103,6 +103,7 @@ export default function DashboardPage() {
           user={user}
           data={data}
           logout={logout}
+          onRefresh={refreshDashboard}
           pendingBadge={<PendingInstancesBadge />}
           officeBearerCard={officeBearerNode}
         />
@@ -141,38 +142,34 @@ export default function DashboardPage() {
       )}
 
       {isOfficeBearer && officeBearerCard && (
-        <a href="#/admin" className="admin-cta-card">
+        <a href="#/admin" className="admin-cta-card" title={officeBearerCard.desc}>
           <div className="admin-cta-icon"><IconShield /></div>
           <div className="admin-cta-body">
-            <div className="admin-cta-eyebrow">Your workspace</div>
             <div className="admin-cta-title">{officeBearerCard.title}</div>
-            <div className="admin-cta-desc">
-              {officeBearerCard.desc}
-            </div>
           </div>
           <span className="admin-cta-arrow"><IconArrowRight /></span>
           <style>{`
+            /* Single-line, compact CTA — was a 3-line block with eyebrow
+               + title + description that ate ~110px of vertical space and
+               competed with the identity card for attention. Now it's a
+               slim link bar; the full description is in the title tooltip. */
             .admin-cta-card {
-              display: flex; align-items: center; gap: 1rem;
-              margin-top: 1rem; padding: 1rem 1.25rem;
+              display: flex; align-items: center; gap: .75rem;
+              margin-top: 1.25rem; margin-bottom: .25rem;
+              padding: .65rem 1rem;
               background: linear-gradient(135deg, #0f172a, #1e293b);
-              color: white; border-radius: .75rem; text-decoration: none;
+              color: white; border-radius: .5rem; text-decoration: none;
               border: 1px solid rgba(255,255,255,.08);
               transition: transform .12s, box-shadow .12s;
             }
-            .admin-cta-card:hover { transform: translateY(-1px); box-shadow: 0 10px 30px rgba(15,23,42,.25); }
+            .admin-cta-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(15,23,42,.22); }
             .admin-cta-icon {
-              width: 2.5rem; height: 2.5rem; flex-shrink: 0;
+              width: 1.85rem; height: 1.85rem; flex-shrink: 0;
               display: flex; align-items: center; justify-content: center;
-              background: rgba(255,255,255,.08); border-radius: .5rem;
+              background: rgba(255,255,255,.08); border-radius: .4rem;
             }
             .admin-cta-body { flex: 1; min-width: 0; }
-            .admin-cta-eyebrow {
-              font-size: .6875rem; font-weight: 600; text-transform: uppercase;
-              letter-spacing: .08em; color: rgba(255,255,255,.55);
-            }
-            .admin-cta-title { font-size: 1rem; font-weight: 700; margin-top: .15rem; }
-            .admin-cta-desc { font-size: .8125rem; color: rgba(255,255,255,.7); margin-top: .15rem; }
+            .admin-cta-title { font-size: .9rem; font-weight: 600; }
             .admin-cta-arrow { color: rgba(255,255,255,.6); }
           `}</style>
         </a>
@@ -196,18 +193,28 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Two-column body */}
-      <div style={{ marginTop: '1.25rem', display: 'grid', gap: '1rem', gridTemplateColumns: '1fr' }} data-dash-body>
-        {/* Main column */}
-        <div className="col gap-3">
-          {/* Role-conditional chairman widgets — sit at the top so the work
-              you're accountable for is the first thing you see. Admin is
-              intentionally excluded (separation of duties: admin builds the
-              checklist; chairmen fill and approve it). */}
+      {/* Chairman / committee widgets sit ABOVE the tabs — they're admin
+          entry points, not student-dashboard content. */}
+      {(isBranchChairman || isCommitteeChairman) && (
+        <div className="col gap-3" style={{ marginTop: '1.25rem' }}>
           {isBranchChairman && <BranchInsightsCard />}
           {isBranchChairman && <ApprovalsQueueCard />}
           {isCommitteeChairman && <CommitteeChecklistsCard />}
+        </div>
+      )}
 
+      {/* For students, swap the long-scroll layout for a 3-tab view so the
+          page fits without scrolling on most screens. */}
+      {isStudent ? (
+        <StudentTabbedBody
+          data={data}
+          user={user}
+          logout={logout}
+        />
+      ) : (
+      <div style={{ marginTop: '1.25rem', display: 'grid', gap: '1rem', gridTemplateColumns: '1fr' }} data-dash-body>
+        {/* Main column */}
+        <div className="col gap-3">
           {isMember && cpe && (
             <div className="card">
               <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -273,21 +280,26 @@ export default function DashboardPage() {
             <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Quick actions</h3>
             <div style={{ marginTop: '.75rem', display: 'grid', gap: '.625rem', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
               {(isMember ? [
-                { Icon: IconShield, t: 'Generate UDIN', to: '/members' },
-                { Icon: IconAward, t: 'View CPE certificates', to: '/members' },
-                { Icon: IconBriefcase, t: 'Update firm details', to: '/members' },
-                { Icon: IconHandshake, t: 'Contribute to CABF', to: '/benevolent-fund' },
+                { Icon: IconShield,    t: 'Generate UDIN',          to: 'https://udin.icai.org/',        external: true },
+                { Icon: IconAward,     t: 'View CPE certificates',  to: 'https://cpeapp.icai.org/',      external: true },
+                { Icon: IconBriefcase, t: 'Update firm details',    to: 'https://eservices.icai.org/',   external: true },
+                { Icon: IconHandshake, t: 'Contribute to CABF',     to: '/benevolent-fund' },
               ] : [
-                { Icon: IconBookOpen, t: 'Take a mock test', to: '/students' },
-                { Icon: IconBriefcase, t: 'Articleship vacancies', to: '/students' },
-                { Icon: IconUsers, t: 'Book a mentor', to: '/career-counselling' },
-                { Icon: IconAward, t: 'View certificates', to: '/students' },
-              ]).map((a) => (
-                <a key={a.t} href={'#' + a.to} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
-                  <a.Icon size="sm" /> {a.t}
-                  <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
-                </a>
-              ))}
+                { Icon: IconBookOpen,  t: 'Take a mock test',       to: '/mock-tests' },
+                { Icon: IconBriefcase, t: 'Articleship vacancies',  to: '/job-vacancies?type=articleship' },
+                { Icon: IconUsers,     t: 'Book a mentor (soon)',   to: '/career-counselling' },
+                { Icon: IconBookOpen,  t: 'Study material',         to: '/resources' },
+              ]).map((a) => {
+                const linkProps = a.external
+                  ? { href: a.to, target: '_blank', rel: 'noopener noreferrer' }
+                  : { href: '#' + a.to };
+                return (
+                  <a key={a.t} {...linkProps} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
+                    <a.Icon size="sm" /> {a.t}{a.external && <span aria-hidden style={{ opacity: .6 }}>↗</span>}
+                    <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
+                  </a>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -306,8 +318,6 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="col gap-2" style={{ marginTop: '1rem' }}>
-              <button className="btn btn-outline" style={{ justifyContent: 'flex-start' }}><IconUser size="sm" /> Edit profile</button>
-              <button className="btn btn-outline" style={{ justifyContent: 'flex-start' }}><IconSettings size="sm" /> Account settings</button>
               <button onClick={logout} className="btn btn-outline" style={{ justifyContent: 'flex-start', color: 'var(--destructive)', borderColor: 'oklch(0.577 0.245 27.325 / 0.3)' }}>
                 <IconLogOut size="sm" /> Sign out
               </button>
@@ -317,6 +327,7 @@ export default function DashboardPage() {
           <NotificationSettingsCard />
         </div>
       </div>
+      )}
 
       <style>{`
         [data-dash] .card { padding: 1.15rem; }
@@ -327,8 +338,163 @@ export default function DashboardPage() {
         @media (min-width: 960px) {
           [data-dash-body] { grid-template-columns: 1fr 320px !important; }
         }
+
+        /* ── Student dashboard tabs ─────────────────────────────────── */
+        .sd-tabs {
+          display: flex; gap: .25rem; overflow-x: auto;
+          margin-top: 1.25rem; padding-bottom: 0;
+          border-bottom: 1px solid var(--border);
+        }
+        .sd-tab {
+          appearance: none; background: transparent;
+          border: 0; border-bottom: 2px solid transparent;
+          padding: .65rem 1rem; cursor: pointer;
+          font-size: .85rem; font-weight: 600; color: var(--muted-foreground);
+          white-space: nowrap;
+          transition: color .15s, border-color .15s;
+          border-radius: 0;
+        }
+        .sd-tab:hover { color: var(--foreground); }
+        .sd-tab.is-active { color: var(--primary); border-bottom-color: var(--primary); }
+        .sd-tab:focus-visible {
+          outline: 2px solid var(--primary);
+          outline-offset: -2px;
+          border-radius: .25rem;
+        }
+        .sd-tab-body {
+          margin-top: 1rem;
+          display: flex; flex-direction: column; gap: 1rem;
+        }
+        .sd-tab-body-grid {
+          margin-top: 1rem;
+          display: grid; gap: 1rem;
+          grid-template-columns: 1fr;
+        }
+        @media (min-width: 720px) {
+          .sd-tab-body-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+        }
       `}</style>
     </section>
+  );
+}
+
+// ─── Student tabbed body ────────────────────────────────────────────────
+// Three tabs (Events / Resources / Settings) keep the page short. Avoids
+// the 3-screen scroll the legacy single-column layout caused.
+function StudentTabbedBody({ data, user, logout }) {
+  const TABS = [
+    { id: 'events',    label: 'My events' },
+    { id: 'actions',   label: 'Quick actions' },
+    { id: 'settings',  label: 'Profile & settings' },
+  ];
+  const [tab, setTab] = useState(() => {
+    const h = window.location.hash.replace('#', '');
+    return TABS.some((t) => t.id === h) ? h : 'events';
+  });
+  useEffect(() => {
+    if (window.location.hash.replace('#', '') !== tab) {
+      window.history.replaceState(null, '', `#${tab}`);
+    }
+  }, [tab]);
+
+  const upcomingEvents = data?.upcomingEvents ?? [];
+
+  return (
+    <>
+      <div role="tablist" aria-label="Dashboard sections" className="sd-tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            className={'sd-tab' + (tab === t.id ? ' is-active' : '')}
+            onClick={() => setTab(t.id)}
+          >{t.label}</button>
+        ))}
+      </div>
+
+      {tab === 'events' && (
+        <div role="tabpanel" className="sd-tab-body">
+          <div className="card">
+            <div className="row" style={{ justifyContent: 'space-between' }}>
+              <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>My upcoming events</h2>
+              <a href="#/events" style={{ color: 'var(--primary)', fontSize: '.875rem', fontWeight: 600 }}>Find more →</a>
+            </div>
+            {upcomingEvents.length === 0 ? (
+              <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.75rem' }}>
+                No upcoming events. <a href="#/events" style={{ color: 'var(--primary)' }}>Browse what's on →</a>
+              </p>
+            ) : (
+              <ul className="col" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
+                {upcomingEvents.map((e) => {
+                  const palette = REGISTRATION_STYLES[e.status] ?? REGISTRATION_STYLES.registered;
+                  return (
+                    <li key={e.id} className="row" style={{ justifyContent: 'space-between', padding: '.75rem 0', borderBottom: '1px solid var(--border)', gap: '1rem' }}>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '.875rem' }}>{e.title}</div>
+                        <div className="row gap-3 muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+                          <span className="row gap-1"><IconCalendar size="sm" /> {formatDate(e.starts_at)}</span>
+                          {Number(e.cpe_hours) > 0 && (
+                            <span className="row gap-1"><IconAward size="sm" /> {Number(e.cpe_hours)} CPE</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="badge" style={{ background: palette.bg, color: palette.fg }}>
+                        {REGISTRATION_LABELS[e.status] ?? e.status}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'actions' && (
+        <div role="tabpanel" className="sd-tab-body">
+          <div className="card">
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Quick actions</h3>
+            <div style={{ marginTop: '.75rem', display: 'grid', gap: '.625rem', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+              {[
+                { Icon: IconBookOpen,  t: 'Take a mock test',      to: '/mock-tests' },
+                { Icon: IconBriefcase, t: 'Articleship vacancies', to: '/job-vacancies?type=articleship' },
+                { Icon: IconUsers,     t: 'Book a mentor (soon)',  to: '/career-counselling' },
+                { Icon: IconBookOpen,  t: 'Study material',        to: '/resources' },
+              ].map((a) => (
+                <a key={a.t} href={'#' + a.to} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
+                  <a.Icon size="sm" /> {a.t}
+                  <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
+                </a>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'settings' && (
+        <div role="tabpanel" className="sd-tab-body-grid">
+          <div className="card">
+            <div className="row gap-3">
+              <span className="avatar-circle" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
+                {user.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+              </span>
+              <div>
+                <div style={{ fontWeight: 600 }}>{user.name}</div>
+                <div className="muted-text" style={{ fontSize: '.8125rem' }}>{user.email}</div>
+                <span className="badge badge-secondary" style={{ marginTop: '.375rem' }}>{user.role}</span>
+              </div>
+            </div>
+            <div className="col gap-2" style={{ marginTop: '1rem' }}>
+              <button onClick={logout} className="btn btn-outline" style={{ justifyContent: 'flex-start', color: 'var(--destructive)', borderColor: 'oklch(0.577 0.245 27.325 / 0.3)' }}>
+                <IconLogOut size="sm" /> Sign out
+              </button>
+            </div>
+          </div>
+          <NotificationSettingsCard />
+        </div>
+      )}
+    </>
   );
 }
 

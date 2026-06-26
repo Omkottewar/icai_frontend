@@ -5,6 +5,8 @@ import {
   IconDownload, IconCheckCircle, IconFileText, IconTrash,
   IconUsers, IconShield,
 } from '../../icons';
+import { toast } from '../../lib/notify';
+import { dialog } from '../../lib/dialog';
 
 // Discord-style event chat. Channels in a left rail, message canvas in the
 // middle, composer at the bottom. Built around the useEventChat hook which
@@ -227,7 +229,7 @@ export default function EventChat({ event, onClose }) {
     event: meta, me, channels, activeChannelId, setChannel,
     messages, pinned, hasMore, typingUserIds, onlineCount,
     status, error,
-    send, retrySend, deleteMessage, toggleReaction, togglePin,
+    send, retrySend, deleteMessage, toggleReaction, togglePin, toggleAnswered,
     loadOlder, loadPinned, searchInActive, searchParticipants, uploadAttachment, emitTyping,
     loadRoster, reportMessage,
   } = chat;
@@ -236,6 +238,12 @@ export default function EventChat({ event, onClose }) {
     () => channels.find((c) => c.id === activeChannelId),
     [channels, activeChannelId],
   );
+
+  // Q&A channels render with a distinct composer prompt and surface an
+  // "answered" affordance on top-level questions. The kind comes from the
+  // channel row (server-trusted); the frontend never assumes Q&A based on
+  // channel name alone.
+  const isQA = activeChannel?.kind === 'qa';
 
   // Layout state
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -667,18 +675,34 @@ export default function EventChat({ event, onClose }) {
                     showAuthor={showAuthor}
                     meId={me?.id}
                     onDelete={async () => {
-                      if (!confirm('Delete this message?')) return;
+                      const ok = await dialog.confirm({
+                        title: 'Delete message?',
+                        message: 'Delete this message?',
+                        confirmText: 'Delete',
+                        danger: true,
+                      });
+                      if (!ok) return;
                       await deleteMessage(item.id);
                     }}
                     onReport={async () => {
-                      const reason = prompt('Why are you reporting this message?');
-                      if (!reason || !reason.trim()) return;
+                      const reason = await dialog.prompt({
+                        title: 'Report message',
+                        message: 'Why are you reporting this message?',
+                        placeholder: 'Briefly describe the issue',
+                        multiline: true,
+                        required: true,
+                        confirmText: 'Submit report',
+                      });
+                      if (reason === null || !reason.trim()) return;
                       const ok = await reportMessage(item.id, reason.trim());
-                      if (ok) alert('Thanks — a moderator will review this.');
+                      if (ok) toast.success('Thanks — a moderator will review this.');
                     }}
                     onReply={() => setReplyTo({ id: item.id, body: item.body, author_name: item.author_name })}
                     onReact={(emoji) => toggleReaction(item.id, emoji)}
                     onPin={() => togglePin(item.id, !!item.pinned_at)}
+                    onAnswered={isQA && !item.parent_post_id
+                      ? () => toggleAnswered(item.id, !!item.answered_at)
+                      : null}
                     onRetry={() => item.client_id && retrySend(item.client_id)}
                   />
                 </Fragment>
@@ -698,6 +722,8 @@ export default function EventChat({ event, onClose }) {
         <Composer
           eventId={eventId}
           channelId={activeChannelId}
+          channelKind={activeChannel?.kind}
+          channelName={activeChannel?.name}
           replyTo={replyTo}
           onClearReply={() => setReplyTo(null)}
           send={send}
@@ -800,7 +826,7 @@ function ChannelSidebar({ channels, activeId, onPick, eventTitle, onlineCount, r
 // ─── One message in the stream ──────────────────────────────────────────
 function MessageItem({
   message, parent, mine, showAuthor, meId,
-  onDelete, onReply, onReact, onPin, onReport, onRetry,
+  onDelete, onReply, onReact, onPin, onAnswered, onReport, onRetry,
 }) {
   const tint = authorTint(message.created_by);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -883,6 +909,11 @@ function MessageItem({
               {!!message.pinned_at && (
                 <div className="ec-pinned-flag">📌 Pinned</div>
               )}
+              {!!message.answered_at && (
+                <div className="ec-answered-flag" title="A moderator has marked this question answered">
+                  ✓ Answered
+                </div>
+              )}
               {message.reply_count > 0 && (
                 <button type="button" className="ec-reply-count" onClick={onReply}>
                   ↪ {message.reply_count} {message.reply_count === 1 ? 'reply' : 'replies'}
@@ -907,6 +938,16 @@ function MessageItem({
             <button type="button" className="ec-msg-action" onClick={onReply} title="Reply">↪</button>
             {!!message.pinned_at && <button type="button" className="ec-msg-action" onClick={onPin} title="Unpin">📌</button>}
             {!message.pinned_at && <button type="button" className="ec-msg-action" onClick={onPin} title="Pin">📌</button>}
+            {onAnswered && (
+              <button
+                type="button"
+                className={'ec-msg-action' + (message.answered_at ? ' is-answered-action' : '')}
+                onClick={onAnswered}
+                title={message.answered_at ? 'Reopen this question' : 'Mark this question answered'}
+              >
+                ✓
+              </button>
+            )}
             {mine && <button type="button" className="ec-msg-action ec-msg-action-danger" onClick={onDelete} title="Delete"><IconTrash size="sm" /></button>}
             {!mine && onReport && (
               <button type="button" className="ec-msg-action" onClick={onReport} title="Report message">⚑</button>
@@ -946,7 +987,7 @@ function AttachmentTile({ attachment }) {
 }
 
 // ─── Composer (textarea + attachments + mention autocomplete) ───────────
-function Composer({ channelId, replyTo, onClearReply, send, uploadAttachment, emitTyping, searchParticipants, disabled }) {
+function Composer({ channelId, channelKind, channelName, replyTo, onClearReply, send, uploadAttachment, emitTyping, searchParticipants, disabled }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [attachments, setAttachments] = useState([]); // [{ id, name, mime_type, url, size_bytes }]
@@ -1184,7 +1225,13 @@ function Composer({ channelId, replyTo, onClearReply, send, uploadAttachment, em
         <textarea
           ref={inputRef}
           className="ec-composer-input"
-          placeholder={disabled ? 'Chat unavailable…' : 'Message #channel  · @ to mention · paste images'}
+          placeholder={
+            disabled
+              ? 'Chat unavailable…'
+              : channelKind === 'qa'
+                ? 'Ask the speaker a question · members ask, organisers reply'
+                : `Message #${channelName || 'channel'}  · @ to mention · paste images`
+          }
           value={draft}
           onChange={onDraftChange}
           onKeyDown={onKey}
@@ -1628,6 +1675,17 @@ function ChatStyles() {
       .ec-retry-btn:hover { background: var(--destructive); color: white; }
       .ec-bubble-body { white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; }
       .ec-pinned-flag { font-size: .65rem; color: #92400e; font-weight: 700; margin-top: .25rem; }
+      .ec-answered-flag {
+        display: inline-block;
+        font-size: .65rem; font-weight: 700; margin-top: .35rem;
+        padding: .1rem .45rem; border-radius: 999px;
+        background: oklch(0.92 0.13 145); color: oklch(0.38 0.16 145);
+        border: 1px solid oklch(0.85 0.12 145);
+      }
+      .ec-msg-action.is-answered-action {
+        color: oklch(0.42 0.18 145);
+        background: oklch(0.96 0.07 145);
+      }
 
       /* Markdown inside chat bodies */
       .cm-link { color: var(--primary); text-decoration: underline; }

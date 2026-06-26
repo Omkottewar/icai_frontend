@@ -8,6 +8,7 @@ import { invalidate, apiWrite } from '../../lib/apiCache';
 import { SITE_SLOTS, SLOT_SLUGS } from '../../lib/siteContentSlots';
 import { SITE_CONTENT_DEFAULTS } from '../../hooks/useSiteContent';
 import { renderMarkdown } from '../../lib/markdown.jsx';
+import Button from '../../components/ui/Button';
 
 function formatWhen(ts) {
   if (!ts) return '—';
@@ -225,9 +226,9 @@ function SlotDrawer({ slug, initial, onClose, onSaved, showToast }) {
       footer={
         <>
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving} style={{ padding: '.5rem 1rem' }}>
+          <Button className="btn btn-primary" onClick={save} loading={saving} style={{ padding: '.5rem 1rem' }}>
             {saving ? 'Saving…' : 'Save changes'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -473,9 +474,9 @@ function CommitteeMembersDrawer({ initial, onClose, onSaved, showToast }) {
       footer={
         <>
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving} style={{ padding: '.5rem 1rem' }}>
+          <Button className="btn btn-primary" onClick={save} loading={saving} style={{ padding: '.5rem 1rem' }}>
             {saving ? 'Saving…' : 'Save changes'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -867,9 +868,9 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
       footer={
         <>
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving} style={{ padding: '.5rem 1rem' }}>
+          <Button className="btn btn-primary" onClick={save} loading={saving} style={{ padding: '.5rem 1rem' }}>
             {saving ? 'Saving…' : 'Save changes'}
-          </button>
+          </Button>
         </>
       }
     >

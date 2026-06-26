@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { IconCheckCircle, IconArrowRight } from '../icons';
 import { ShimmerPageBody } from '../components/ui/Shimmer';
+import { toast } from '../lib/notify';
+import Button from '../components/ui/Button';
 
 // CPE quiz taker. State machine:
 //   loading → ready → submitting → result (passed | failed)
@@ -51,7 +53,7 @@ export default function ResourceQuizPage() {
     // Ensure every question has an answer.
     const missing = data.questions.filter((q) => !answers[q.id]);
     if (missing.length > 0) {
-      alert(`Please answer all ${data.questions.length} questions before submitting.`);
+      toast.warning(`Please answer all ${data.questions.length} questions before submitting.`);
       return;
     }
     setSubmitting(true);
@@ -137,9 +139,9 @@ export default function ResourceQuizPage() {
             </div>
           ))}
 
-          <button type="submit" className="btn btn-primary quiz-submit" disabled={submitting}>
+          <Button type="submit" className="btn btn-primary quiz-submit" loading={submitting}>
             {submitting ? 'Grading…' : 'Submit quiz'}
-          </button>
+          </Button>
         </form>
 
         <style>{QUIZ_STYLES}</style>

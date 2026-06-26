@@ -10,6 +10,7 @@ import { IconArrowRight } from '../icons';
 
 import InsightsStyles from '../components/dashboard/insights/insightsStyles';
 import { ShimmerPageBody, Shimmer } from '../components/ui/Shimmer';
+import { dialog } from '../lib/dialog';
 import { useUrlState } from '../components/dashboard/insights/useUrlState';
 import { mergeWithMock, MOCK_KPIS, MOCK_EVENTS_PER_MONTH, MOCK_REGS_PER_MONTH, MOCK_BY_COMMITTEE, MOCK_RECENT_EVENTS, MOCK_PENDING_APPROVALS } from '../components/dashboard/insights/branchMetricsMock';
 import {
@@ -201,7 +202,13 @@ export default function BranchMetricsPage() {
     try { await save(); } catch { /* error already surfaced via hook */ }
   }
   async function handleReset() {
-    if (!window.confirm('Restore the default layout? Your customisations will be lost.')) return;
+    const ok = await dialog.confirm({
+      title: 'Restore default layout?',
+      message: 'Restore the default layout? Your customisations will be lost.',
+      confirmText: 'Restore',
+      danger: true,
+    });
+    if (!ok) return;
     try { await reset(); } catch { /* error already surfaced via hook */ }
   }
 

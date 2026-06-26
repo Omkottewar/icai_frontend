@@ -3,6 +3,8 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX, IconFileText } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 function GalleryRowShimmer({ count = 5 }) {
   return (
@@ -140,7 +142,13 @@ export default function GalleryAlbumsAdminPage() {
   };
 
   const del = async (row) => {
-    if (!confirm(`Delete album "${row.title}"? All photos in it will also be deleted.`)) return;
+    const ok = await dialog.confirm({
+      title: 'Delete album?',
+      message: `Delete album "${row.title}"? All photos in it will also be deleted.`,
+      confirmText: 'Delete album',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`/api/admin/gallery-albums/${row.id}`, { method: 'DELETE' });
       showToast?.('Deleted', 'success');
@@ -273,9 +281,9 @@ export default function GalleryAlbumsAdminPage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', marginTop: '1.25rem' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={save} disabled={busy}>
+              <Button className="btn btn-primary" onClick={save} loading={busy}>
                 {busy ? 'Saving…' : 'Save'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -381,7 +389,13 @@ function PhotosPanel({ album, onClose, onChange }) {
   };
 
   const del = async (p) => {
-    if (!confirm('Delete this photo?')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete photo?',
+      message: 'Delete this photo?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`/api/admin/gallery-albums/${album.id}/photos/${p.id}`, { method: 'DELETE' });
       showToast?.('Photo deleted', 'success');

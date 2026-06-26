@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useEventRegistration } from '../../hooks/useEventRegistration';
 import { navigate } from '../../hooks/useRoute';
 import { IconX, IconCheckCircle, IconLock, IconCalendar, IconMapPin } from '../../icons';
+import Button from '../ui/Button';
 
 function rupees(paise) {
   return `₹${(Number(paise) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -177,16 +178,16 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
                 </div>
               )}
 
-              <button
+              <Button
                 type="submit"
                 className="btn btn-primary"
-                disabled={loading}
+                loading={loading}
                 style={{ width: '100%', padding: '.7rem 1rem', fontWeight: 600 }}
               >
                 {loading
                   ? (isPaid ? 'Opening payment…' : 'Registering…')
                   : (isPaid ? `Pay ${rupees(event.fee_paise)} & Register` : 'Confirm Registration')}
-              </button>
+              </Button>
 
               {isPaid && (
                 <div className="muted-text" style={{ fontSize: '.7125rem', marginTop: '.6rem', textAlign: 'center' }}>

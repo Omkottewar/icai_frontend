@@ -5,6 +5,7 @@ import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import PasswordField from '../../components/auth/PasswordField';
 import SocialButtons from '../../components/auth/SocialButtons';
 import { IconArrowRight, IconShield, IconX, IconMail } from '../../icons';
+import Button from '../../components/ui/Button';
 
 export default function LoginPage() {
   const { login, socialLogin } = useAuth();
@@ -94,14 +95,14 @@ export default function LoginPage() {
               />
             </div>
 
-            <button
+            <Button
               type="submit"
               className="btn btn-primary"
-              disabled={submitting}
+              loading={submitting}
               style={{ width: '100%', justifyContent: 'center', padding: '.875rem' }}
             >
               {submitting ? 'Signing in…' : <>Sign in <IconArrowRight size="sm" /></>}
-            </button>
+            </Button>
           </form>
 
           <SocialButtons mode="login" onPick={(provider) => socialLogin(provider)} />

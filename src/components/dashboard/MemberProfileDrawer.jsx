@@ -3,6 +3,7 @@ import Drawer from '../admin/Drawer';
 import { useAuth } from '../../context/AuthContext';
 import { apiWrite, invalidate } from '../../lib/apiCache';
 import { IconX, IconCheck, IconPlus, IconShield } from '../../icons';
+import Button from '../ui/Button';
 
 // Profile editor for the current Member. Reads its initial state from the
 // dashboard payload (passed in as `profile`) and PATCHes
@@ -128,9 +129,9 @@ export default function MemberProfileDrawer({ open, onClose, profile, userPhone,
             <span style={{ color: 'var(--destructive)', marginRight: 'auto', fontSize: '.85rem' }}>{error}</span>
           )}
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={onSave} disabled={saving}>
+          <Button className="btn btn-primary" onClick={onSave} loading={saving}>
             {saving ? 'Saving…' : 'Save changes'}
-          </button>
+          </Button>
         </>
       }
     >

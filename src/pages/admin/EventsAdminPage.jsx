@@ -9,9 +9,13 @@ import { useRoleFlags } from '../../hooks/useRoleFlags';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { Shimmer, ShimmerFormField, ShimmerLines } from '../../components/ui/Shimmer';
 import { eventLabel, EVENT_STATUS, toneStyle } from '../../lib/eventStatus';
+import { MCM_ROLE_CODES, ROLE_CODE_LABEL } from '../../lib/checklistQuestions';
 import EventTimeline from '../../components/admin/EventTimeline';
 import ComparableEventsPanel from '../../components/admin/ComparableEventsPanel';
 import EventQuickActions from '../../components/admin/EventQuickActions';
+import { dialog } from '../../lib/dialog';
+import { publishEventWithOverride } from '../../lib/eventPublish';
+import Button from '../../components/ui/Button';
 import DateTimePicker from '../../components/admin/DateTimePicker';
 import { IconPlus, IconCheckCircle } from '../../icons';
 
@@ -41,12 +45,22 @@ const EMPTY_FORM = {
   ends_at: '',
   cpe_hours: '0',
   fee_rupees: '0',
+  gst_applicable: false,
+  gst_percent: '18',
   capacity: '',
   program_type: '',
   highlights: '',
   recurrence_rrule: '',
   banner_id: '',
   banner_url: '',
+  // Recurrence (used on CREATE only — series expansion runs server-side
+  // after the seed event is created via /repeat). Editing an existing
+  // series happens through the dedicated "Series" view, not this form.
+  recurring_enabled: false,
+  recurring_freq: 'WEEKLY',
+  recurring_interval: 1,
+  recurring_count: 4,
+  recurring_until: '',
 };
 
 // Banner uploads can be image OR video. The file endpoint stores the
@@ -277,6 +291,8 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
           ends_at: toLocalInput(row.ends_at),
           cpe_hours: String(row.cpe_hours ?? '0'),
           fee_rupees: String((row.fee_paise ?? 0) / 100),
+          gst_applicable: Boolean(row.gst_applicable),
+          gst_percent: String(row.gst_percent ?? '18'),
           capacity: row.capacity == null ? '' : String(row.capacity),
           program_type: row.program_type || '',
           highlights: Array.isArray(row.highlights) ? row.highlights.join('\n') : '',
@@ -344,6 +360,8 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
         ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
         cpe_hours: form.cpe_hours,
         fee_paise: Math.round(Number(form.fee_rupees || 0) * 100),
+        gst_applicable: Boolean(form.gst_applicable),
+        gst_percent: form.gst_applicable ? Number(form.gst_percent || 18) : 0,
         capacity: form.capacity === '' ? null : Number(form.capacity),
         program_type: form.program_type || null,
         highlights: form.highlights ? form.highlights.split('\n').map((s) => s.trim()).filter(Boolean) : null,
@@ -352,7 +370,30 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
       };
       if (isNew) {
         const row = await adminFetch('/api/admin/events', { method: 'POST', body: payload });
-        showToast?.('Event created', 'success');
+        // Expand the recurrence after the seed is created. We fire this
+        // separately (vs cramming it into POST) so admins can see exactly
+        // which event was the seed and how many children got built.
+        if (form.recurring_enabled && row?.id) {
+          try {
+            const result = await adminFetch(`/api/admin/events/${row.id}/repeat`, {
+              method: 'POST',
+              body: {
+                freq: form.recurring_freq,
+                interval: Number(form.recurring_interval) || 1,
+                count: form.recurring_count ? Number(form.recurring_count) : undefined,
+                until: form.recurring_until ? new Date(form.recurring_until).toISOString() : undefined,
+              },
+            });
+            showToast?.(`Event series created — ${result.created + 1} occurrences total`, 'success');
+          } catch (e3) {
+            // Seed succeeded; only the expansion failed. Surface the error
+            // but keep the seed event so the admin can retry from the
+            // (now-existing) event's Series view.
+            showToast?.(`Seed event created but recurrence expansion failed: ${e3.message}`, 'error');
+          }
+        } else {
+          showToast?.('Event created', 'success');
+        }
         onSaved?.();
         onClose?.();
         return row;
@@ -369,43 +410,26 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
   };
 
   const onPublish = async () => {
-    // Two-step flow: first try without override. If the backend rejects
-    // with "checklist not approved", offer the override path with a strong
-    // confirm + reason capture (recorded in event_override_log).
-    try {
-      await adminFetch(`/api/admin/events/${id}/publish`, { method: 'POST' });
-      showToast?.('Event published — visible on the public site', 'success');
+    const result = await publishEventWithOverride(id, {
+      onSuccess: (m) => showToast?.(m, 'success'),
+      onError:   (m) => showToast?.(m, 'error'),
+      successMessage: 'Event published — visible on the public site',
+    });
+    if (result.ok) {
       onSaved?.();
       onClose?.();
-    } catch (e) {
-      const msg = e?.message || '';
-      if (msg.includes('not fully approved') || msg.includes('override')) {
-        const okay = confirm(
-          "This event's checklist isn't fully approved.\n\n" +
-          'Publishing now will be logged as a chairman override and shown in ' +
-          'the audit trail. Continue?',
-        );
-        if (!okay) return;
-        const reason = prompt('Reason for override? (recorded in the audit log)') || '';
-        try {
-          await adminFetch(
-            `/api/admin/events/${id}/publish?override=true`,
-            { method: 'POST', body: { reason: reason.trim() || null } },
-          );
-          showToast?.('Published with override — recorded in audit log', 'success');
-          onSaved?.();
-          onClose?.();
-        } catch (e2) {
-          showToast?.(e2.message || 'Override publish failed', 'error');
-        }
-        return;
-      }
-      showToast?.(msg, 'error');
     }
   };
 
   const onCancel = async () => {
-    if (!confirm('Cancel this event? Registered attendees will no longer see it.')) return;
+    const ok = await dialog.confirm({
+      title: 'Cancel event?',
+      message: 'Cancel this event? Registered attendees will no longer see it.',
+      confirmText: 'Cancel event',
+      cancelText: 'Back',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminFetch(`/api/admin/events/${id}/cancel`, { method: 'POST' });
       showToast?.('Event cancelled', 'success');
@@ -415,7 +439,13 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
   };
 
   const onDelete = async () => {
-    if (!confirm('Delete this event permanently from the admin view? (Soft delete — data is kept.)')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete event?',
+      message: 'Delete this event permanently from the admin view? (Soft delete — data is kept.)',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminFetch(`/api/admin/events/${id}`, { method: 'DELETE' });
       showToast?.('Event deleted', 'success');
@@ -475,9 +505,9 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
             </button>
           )}
           {canManage && isLast && (
-            <button type="submit" form="event-form" disabled={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
+            <Button type="submit" form="event-form" loading={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
               {saving ? 'Saving…' : (isNew ? 'Create event' : 'Save changes')}
-            </button>
+            </Button>
           )}
           {readOnly && (
             <button type="button" className="btn btn-outline" onClick={onClose} style={{ padding: '.5rem 1rem' }}>Close</button>
@@ -489,7 +519,19 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
         <DrawerFormSkeleton />
       ) : (
         <fieldset id="event-form-fieldset" disabled={readOnly} style={{ border: 0, padding: 0, margin: 0, minInlineSize: 'auto' }}>
-        <form id="event-form" onSubmit={onSubmit}>
+        <form
+          id="event-form"
+          onSubmit={onSubmit}
+          // Stop Enter inside a numeric input (CPE hours, fee, capacity, …)
+          // from submitting the half-filled form. The user gets a failed
+          // validation error and assumes the input rejected their keypress.
+          // Submission still works via the explicit footer buttons.
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'submit') {
+              e.preventDefault();
+            }
+          }}
+        >
           {readOnly && (
             <div style={{ background: '#eff6ff', color: '#1e3a8a', padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', marginBottom: '1rem', border: '1px solid #bfdbfe' }}>
               Read-only view. Only the branch chairman or admin can change event details.
@@ -501,7 +543,12 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
             </div>
           )}
 
-          <WizardStepper steps={WIZARD_STEPS} activeIdx={stepIdx} onJump={isNew ? null : setStepIdx} />
+          {/* Tab navigation is clickable in BOTH new and edit modes — the
+              earlier `isNew ? null : setStepIdx` guard made the tabs inert
+              while creating a new event, which made the wizard feel
+              broken when the user wanted to jump between steps to fill
+              fields out of order. */}
+          <WizardStepper steps={WIZARD_STEPS} activeIdx={stepIdx} onJump={setStepIdx} />
 
           {stepIdx === 0 && (<>
           <Section title="Basics">
@@ -577,11 +624,91 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
               <FormField label="Registration fee (₹)">
                 <input type="number" step="1" min="0" className="input-base" value={form.fee_rupees} onChange={(e) => set('fee_rupees', e.target.value)} />
               </FormField>
+              <FormField label="GST applicable?" hint="Adds tax to the displayed fee and invoice (H.20)">
+                <label className="row gap-2" style={{ alignItems: 'center', marginTop: '.35rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.gst_applicable)}
+                    onChange={(e) => set('gst_applicable', e.target.checked)}
+                  />
+                  <span style={{ fontSize: '.875rem' }}>Apply GST on this event's fee</span>
+                </label>
+              </FormField>
+              {form.gst_applicable && (
+                <FormField label="GST %" hint="Default 18% — change only if a different slab applies">
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="28"
+                    className="input-base"
+                    value={form.gst_percent}
+                    onChange={(e) => set('gst_percent', e.target.value)}
+                  />
+                </FormField>
+              )}
               <FormField label="Capacity" hint="Leave blank for unlimited" span={2}>
                 <input type="number" step="1" min="0" className="input-base" value={form.capacity} onChange={(e) => set('capacity', e.target.value)} />
               </FormField>
             </Grid>
           </Section>
+
+          {/* Recurrence — only visible while creating a new event. Editing
+              an existing series is done through the per-event Series view
+              (PATCH /admin/events/:id/series), not this form. */}
+          {isNew && (
+            <Section title="Recurrence">
+              <label style={{ display: 'flex', gap: '.5rem', alignItems: 'center', fontSize: '.9rem', cursor: 'pointer', marginBottom: form.recurring_enabled ? '.75rem' : 0 }}>
+                <input
+                  type="checkbox"
+                  checked={form.recurring_enabled}
+                  onChange={(e) => set('recurring_enabled', e.target.checked)}
+                />
+                <span>This is a recurring event <span className="muted-text">(creates child events automatically)</span></span>
+              </label>
+              {form.recurring_enabled && (
+                <>
+                  <Grid>
+                    <FormField label="Frequency">
+                      <select className="input-base" value={form.recurring_freq} onChange={(e) => set('recurring_freq', e.target.value)}>
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="MONTHLY">Monthly</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Repeat every" hint={`${form.recurring_freq === 'DAILY' ? 'days' : form.recurring_freq === 'WEEKLY' ? 'weeks' : 'months'}`}>
+                      <input
+                        type="number" min="1" max="12" step="1"
+                        className="input-base"
+                        value={form.recurring_interval}
+                        onChange={(e) => set('recurring_interval', e.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Number of occurrences" hint="Including this seed event (max 52)" span={1}>
+                      <input
+                        type="number" min="2" max="52" step="1"
+                        className="input-base"
+                        value={form.recurring_count}
+                        onChange={(e) => set('recurring_count', e.target.value)}
+                        placeholder="e.g. 8"
+                      />
+                    </FormField>
+                    <FormField label="Or repeat until" hint="Optional end date" span={1}>
+                      <input
+                        type="date"
+                        className="input-base"
+                        value={form.recurring_until}
+                        onChange={(e) => set('recurring_until', e.target.value)}
+                      />
+                    </FormField>
+                  </Grid>
+                  <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
+                    Provide either "Number of occurrences" or "Repeat until". Each child event inherits this event's metadata (committee, audience, mode, fee, capacity, banner) and can be edited individually later.
+                  </p>
+                </>
+              )}
+            </Section>
+          )}
 
           </>)}
 
@@ -906,10 +1033,6 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   const [templateDetail, setTemplateDetail] = useState(null); // { questions, ... }
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userSearch, setUserSearch] = useState('');
-  // assignments: { [section_question_id]: user_id|null }
-  const [assignments, setAssignments] = useState({});
   const [primaryFiller, setPrimaryFiller] = useState(''); // user_id
   const [primaryReviewer, setPrimaryReviewer] = useState(''); // user_id
   const [err, setErr] = useState('');
@@ -924,23 +1047,19 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
     return () => { cancelled = true; };
   }, []);
 
-  // Pre-fetch the user directory in the background — same call we'll use
-  // for the per-section picker. Throttled by 250ms debounce on search.
+  // Fetch the MCM-eligible user directory once on mount. Each picker has
+  // its own client-side search box so we don't need a debounced server
+  // round-trip per keystroke. role_codes filter scopes the dropdown to
+  // MCM users only — a checklist for an event is filled / reviewed by a
+  // member of the managing committee, never a student or generic member.
   useEffect(() => {
     let cancelled = false;
-    setUsersLoading(true);
-    const q = userSearch.trim();
-    const url = q
-      ? `/api/admin/users?q=${encodeURIComponent(q)}&status=active&pageSize=25`
-      : '/api/admin/users?status=active&pageSize=50';
-    const t = setTimeout(() => {
-      adminFetch(url)
-        .then((j) => { if (!cancelled) setUsers(j.rows || []); })
-        .catch(() => {})
-        .finally(() => { if (!cancelled) setUsersLoading(false); });
-    }, q ? 250 : 0);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [userSearch]);
+    const url = `/api/admin/users?status=active&pageSize=100&role_codes=${MCM_ROLE_CODES.join(',')}`;
+    adminFetch(url)
+      .then((j) => { if (!cancelled) setUsers(j.rows || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -989,18 +1108,13 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
     setCreating(true);
     setErr('');
     try {
-      // Convert the assignments map into the array shape the API expects.
-      // Drop null/empty values — those mean "no override, let primary filler
-      // cover this section".
-      const section_assignments = Object.entries(assignments)
-        .filter(([_, uid]) => !!uid)
-        .map(([section_question_id, assignee_id]) => ({ section_question_id, assignee_id }));
-
+      // Per F20: filler selection is now a single primary-filler choice (no
+      // per-section assignment). The backend still accepts a section_assignments
+      // array for backward compat with existing scripts; we just don't send it.
       const body = {
         template_id: pickedTemplate.id,
         event_id: eventId,
         title: `${pickedTemplate.name} — ${eventTitle}`,
-        section_assignments,
       };
       if (primaryFiller)   body.assigned_fill_user_id   = primaryFiller;
       if (primaryReviewer) body.assigned_review_user_id = primaryReviewer;
@@ -1021,8 +1135,10 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   const sections = (templateDetail?.questions || [])
     .filter((q) => q.type === 'section_heading');
 
-  // Total of currently-assigned sections (used for the assign button copy).
-  const assignedCount = Object.values(assignments).filter(Boolean).length;
+  // Per F20: per-section assignment was removed. Keep the variable as a
+  // constant 0 so the create-button copy still compiles; the conditional
+  // suffix never renders.
+  const assignedCount = 0;
 
   return (
     <div className="tp-root" onClick={onClose}>
@@ -1110,84 +1226,60 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
                   <div className="tp-banner">
                     <strong>{pickedTemplate.name}</strong>
                     <p>
-                      Pick a person for each section, or leave it blank. Anyone you skip will be filled by the
-                      <strong> primary filler</strong> below (auto-set to the committee chairman by default).
+                      Pick who will <strong>fill</strong> this checklist and who will <strong>review</strong> it. The
+                      committee chairman fills the entire checklist; the branch chairman approves it. You only need to
+                      change these if you want a specific person other than the current chair to act this time.
                     </p>
                   </div>
 
-                  <div className="tp-search">
-                    <input
-                      type="search"
-                      placeholder="Search users by name or email…"
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                      className="tp-input"
-                    />
-                    {usersLoading && <span className="muted-text" style={{ fontSize: '.7rem' }}>Loading…</span>}
-                  </div>
+                  {/* Per-section USER pickers were previously rendered here. They
+                      were removed in F20 — per the catalogue and the actual data
+                      model (see ChecklistInstancesPage:175), the committee
+                      chairman fills the ENTIRE checklist regardless of which
+                      sections exist. The section_owner_role set on each section
+                      heading inside the template editor drives REVIEW-stage
+                      routing only (treasurer reviews finance sections, VC
+                      reviews speakers/agenda, etc.) — it is not a filler gate.
+                      Removing the per-section USER pickers eliminates the
+                      duplication the user flagged: one place to pick a filler
+                      (right below) and one place to define per-section
+                      reviewers (the template editor). */}
 
-                  {sections.length === 0 && (
-                    <p className="muted-text" style={{ fontSize: '.85rem' }}>
-                      This template has no sections — the primary filler handles everything.
-                    </p>
-                  )}
-
-                  {sections.map((s) => {
-                    const value = assignments[s.id] || '';
-                    const hint = roleLabel(s.section_owner_role);
-                    return (
-                      <div key={s.id} className="tp-section-row">
-                        <div className="tp-section-info">
-                          <strong>{s.label || '(unnamed section)'}</strong>
-                          {hint && (
-                            <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                              Reviewed by {hint}
-                            </span>
-                          )}
-                        </div>
-                        <UserPicker
-                          users={users}
-                          value={value}
-                          placeholder="— Primary filler —"
-                          onChange={(uid) => setAssignments((m) => ({ ...m, [s.id]: uid }))}
-                        />
-                      </div>
-                    );
-                  })}
-
-                  <details className="tp-advanced">
-                    <summary>Advanced: override primary filler / reviewer</summary>
-                    <div className="tp-advanced-body">
-                      <div className="tp-section-row">
-                        <div className="tp-section-info">
-                          <strong>Primary filler</strong>
-                          <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                            Default: current Committee Chairman
-                          </span>
-                        </div>
-                        <UserPicker
-                          users={users}
-                          value={primaryFiller}
-                          placeholder="— Auto (Committee Chairman) —"
-                          onChange={setPrimaryFiller}
-                        />
-                      </div>
-                      <div className="tp-section-row">
-                        <div className="tp-section-info">
-                          <strong>Reviewer</strong>
-                          <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                            Default: current Branch Chairman
-                          </span>
-                        </div>
-                        <UserPicker
-                          users={users}
-                          value={primaryReviewer}
-                          placeholder="— Auto (Branch Chairman) —"
-                          onChange={setPrimaryReviewer}
-                        />
-                      </div>
+                  <div className="tp-section-row">
+                    <div className="tp-section-info">
+                      <strong>Primary filler</strong>
+                      <span className="muted-text" style={{ fontSize: '.7rem' }}>
+                        Fills every section. Default: current Committee Chairman.
+                      </span>
                     </div>
-                  </details>
+                    <UserPicker
+                      users={users}
+                      value={primaryFiller}
+                      placeholder="— Auto (Committee Chairman) —"
+                      onChange={setPrimaryFiller}
+                    />
+                  </div>
+                  <div className="tp-section-row">
+                    <div className="tp-section-info">
+                      <strong>Reviewer</strong>
+                      <span className="muted-text" style={{ fontSize: '.7rem' }}>
+                        Approves once filled. Default: current Branch Chairman.
+                      </span>
+                    </div>
+                    <UserPicker
+                      users={users}
+                      value={primaryReviewer}
+                      placeholder="— Auto (Branch Chairman) —"
+                      onChange={setPrimaryReviewer}
+                    />
+                  </div>
+
+                  {sections.length > 0 && (
+                    <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem', padding: '.5rem .65rem', background: 'var(--muted, #f8fafc)', border: '1px dashed var(--border)', borderRadius: '.4rem' }}>
+                      This template has {sections.length} section{sections.length === 1 ? '' : 's'}. The filler above
+                      handles every section; the reviewer above approves the whole checklist when it's submitted.
+                    </div>
+                  )}
                 </>
               )}
             </>
@@ -1196,7 +1288,7 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
 
         <footer className="tp-foot">
           {step === 'assign' && (
-            <button type="button" className="tp-back" onClick={() => { setStep('pick'); setPickedTemplate(null); setAssignments({}); }}>
+            <button type="button" className="tp-back" onClick={() => { setStep('pick'); setPickedTemplate(null); setPrimaryFiller(''); setPrimaryReviewer(''); }}>
               ← Back
             </button>
           )}
@@ -1369,9 +1461,28 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
 // debounced its server-side ?q= search — but does show "no users found"
 // when empty so the admin understands what's going on. The empty value
 // `''` is treated as "no override" and renders the placeholder text.
+// Picks the best human-readable role label from a user's `active_roles`
+// array (returned by /api/admin/users). Prefers the MCM-eligible codes
+// in the order they appear in MCM_ROLE_CODES so "Branch Chairman" beats
+// "MCM" when a user holds both.
+function pickRoleBadge(activeRoles) {
+  if (!Array.isArray(activeRoles) || activeRoles.length === 0) return null;
+  const codes = activeRoles.map((r) => r.role_code);
+  for (const c of MCM_ROLE_CODES) {
+    if (codes.includes(c)) return ROLE_CODE_LABEL[c] || c;
+  }
+  // No MCM-role match → fall back to whatever role they do have.
+  return activeRoles[0]?.role_name || ROLE_CODE_LABEL[activeRoles[0]?.role_code] || null;
+}
+
 function UserPicker({ users, value, placeholder, onChange }) {
   const [open, setOpen] = useState(false);
+  // Per-dropdown search box so the admin doesn't have to scroll through
+  // dozens of names. Filters client-side over the `users` prop, which is
+  // already scoped to MCM-eligible users by the parent.
+  const [search, setSearch] = useState('');
   const wrapRef = useRef(null);
+  const searchRef = useRef(null);
   useEffect(() => {
     if (!open) return;
     const close = (e) => {
@@ -1380,9 +1491,30 @@ function UserPicker({ users, value, placeholder, onChange }) {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+  // Auto-focus the search input when the menu opens; clear when it closes.
+  useEffect(() => {
+    if (open) {
+      setSearch('');
+      // Defer to give the input a chance to mount.
+      setTimeout(() => searchRef.current?.focus(), 0);
+    }
+  }, [open]);
 
   const picked = value ? users.find((u) => u.id === value) : null;
   const label = picked ? `${picked.name}` : placeholder;
+
+  const filtered = (() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) =>
+      (u.name || '').toLowerCase().includes(q)
+      || (u.email || '').toLowerCase().includes(q)
+      || (Array.isArray(u.active_roles) && u.active_roles.some((r) =>
+        (r.role_name || '').toLowerCase().includes(q)
+        || (ROLE_CODE_LABEL[r.role_code] || '').toLowerCase().includes(q)
+      )),
+    );
+  })();
 
   return (
     <div ref={wrapRef} className="up-wrap">
@@ -1399,11 +1531,35 @@ function UserPicker({ users, value, placeholder, onChange }) {
       </button>
       {open && (
         <div className="up-menu" role="menu">
-          {users.length === 0 ? (
-            <div className="up-item-empty">No users in that search</div>
+          <div style={{
+            position: 'sticky', top: 0, background: 'var(--card)',
+            padding: '.4rem .5rem', borderBottom: '1px solid var(--border)',
+            zIndex: 1,
+          }}>
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, email or role…"
+              style={{
+                width: '100%', padding: '.35rem .55rem',
+                border: '1px solid var(--border)', borderRadius: '.3rem',
+                fontSize: '.8rem', boxSizing: 'border-box',
+              }}
+              // Don't close the dropdown on click; stopping propagation
+              // keeps the outside-click handler from firing.
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          {filtered.length === 0 ? (
+            <div className="up-item-empty">
+              {search ? 'No matches' : 'No MCM users available'}
+            </div>
           ) : (
-            users.map((u) => {
+            filtered.map((u) => {
               const active = u.id === value;
+              const roleBadge = pickRoleBadge(u.active_roles);
               return (
                 <button
                   key={u.id}
@@ -1413,7 +1569,16 @@ function UserPicker({ users, value, placeholder, onChange }) {
                 >
                   <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     <strong style={{ fontWeight: 600 }}>{u.name}</strong>
-                    <span style={{ marginLeft: '.4rem', color: 'var(--muted-foreground)', fontSize: '.75rem' }}>
+                    {roleBadge && (
+                      <span style={{
+                        marginLeft: '.4rem', fontSize: '.65rem', fontWeight: 600,
+                        padding: '.05rem .35rem', borderRadius: 999,
+                        background: 'rgba(30,58,138,.08)', color: 'var(--primary, #1e40af)',
+                      }}>
+                        {roleBadge}
+                      </span>
+                    )}
+                    <span style={{ marginLeft: '.4rem', color: 'var(--muted-foreground)', fontSize: '.7rem' }}>
                       {u.email}
                     </span>
                   </span>

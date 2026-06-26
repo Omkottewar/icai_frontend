@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/layout/PageHeader';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import { IconCheckCircle, IconArrowLeft, IconArrowRight } from '../icons';
+import { toast } from '../lib/notify';
+import { dialog } from '../lib/dialog';
+import Button from '../components/ui/Button';
 
 // Mock-test online attempt surface.
 //
@@ -69,7 +72,7 @@ export default function MockTestAttemptPage() {
     let cancelled = false;
     api(`/api/mock-tests/${mockTestId}/attempt`, { method: 'POST' })
       .then((r) => { if (!cancelled && r?.attempt?.id) navigate(`/attempts/${r.attempt.id}`); })
-      .catch((e) => { if (!cancelled) alert(e.message); });
+      .catch((e) => { if (!cancelled) toast.error(e.message); });
     return () => { cancelled = true; };
   }, [startMode, mockTestId, user, route.path]);
 
@@ -203,7 +206,13 @@ function AttemptLive({ attemptId }) {
       const msg = unanswered > 0
         ? `You have ${unanswered} unanswered question${unanswered === 1 ? '' : 's'}. Submit anyway?`
         : 'Submit your attempt? You won\'t be able to change answers after this.';
-      if (!window.confirm(msg)) return;
+      const ok = await dialog.confirm({
+        title: 'Submit attempt?',
+        message: msg,
+        confirmText: 'Submit',
+        danger: unanswered > 0,
+      });
+      if (!ok) return;
     }
     // Flush any pending saves before submit.
     for (const t of Object.values(saveTimers.current)) clearTimeout(t);
@@ -226,12 +235,20 @@ function AttemptLive({ attemptId }) {
         }).catch(() => {}),
       ));
       const r = await api(`/api/attempts/${attemptId}/submit`, { method: 'POST' });
-      navigate('/mock-tests');
-      // Tiny delay then reload so the page state resets cleanly.
-      setTimeout(() => window.location.reload(), 50);
+      // Don't navigate away — flip the local attempt state to the
+      // 'submitted' branch so the existing success view (✓ Attempt
+      // submitted) renders in-place. Previous behaviour was to
+      // immediately navigate to /mock-tests + reload, which (a) gave
+      // the student no completion confirmation and (b) meant the
+      // /mock-tests card could still show "Take test online" until the
+      // page rehydrated. Bug compounded with the missing
+      // registration → 'attended' transition on the backend.
+      if (r?.attempt) {
+        setData((prev) => prev ? { ...prev, attempt: r.attempt } : prev);
+      }
       return r;
     } catch (e) {
-      alert(`Submit failed — ${e.message}. Please try again.`);
+      toast.error(`Submit failed — ${e.message}. Please try again.`);
     } finally {
       setSubmitting(false);
     }
@@ -284,13 +301,53 @@ function AttemptLive({ attemptId }) {
 
   const submitted = data.attempt.status !== 'in_progress';
   if (submitted) {
+    // The auto-grade only covers MCQ + numerical. If the test has any
+    // short / long answers, the final score is still pending WICASA
+    // review. We show the auto score immediately if it's available, but
+    // tag it as "auto" so the student knows manual marks may be added.
+    const hasSubjective = (data.questions || []).some((q) => q.question_type === 'short' || q.question_type === 'long');
+    const autoScore = data.attempt.score_auto != null ? Number(data.attempt.score_auto) : null;
+    const maxScore = data.test?.max_score != null ? Number(data.test.max_score) : null;
+    const wasAutoSubmitted = data.attempt.status === 'auto_submitted';
     return (
-      <section className="container" style={{ padding: '4rem 1rem', textAlign: 'center' }}>
-        <IconCheckCircle size="lg" />
-        <h2 style={{ marginTop: '1rem' }}>Attempt submitted</h2>
-        <p className="muted-text">
-          Results will appear in your <a href="#/mock-tests">My Mock Tests</a> page once the branch publishes them.
+      <section className="container" style={{ padding: '4rem 1rem', maxWidth: '36rem', margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ color: '#16a34a', display: 'inline-flex' }}><IconCheckCircle size="lg" /></div>
+        <h2 style={{ marginTop: '1rem', fontSize: '1.25rem' }}>
+          {wasAutoSubmitted ? 'Time up — attempt auto-submitted' : 'Attempt submitted'}
+        </h2>
+        <p className="muted-text" style={{ marginTop: '.5rem', fontSize: '.875rem' }}>
+          Submitted on {new Date(data.attempt.submitted_at ?? Date.now()).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
         </p>
+
+        {autoScore != null && (
+          <div style={{
+            marginTop: '1.5rem', padding: '1rem 1.25rem',
+            background: 'oklch(0.95 0.08 145)', color: '#065f46',
+            border: '1px solid oklch(0.85 0.12 145)',
+            borderRadius: '.5rem', display: 'inline-block', minWidth: '14rem',
+          }}>
+            <div style={{ fontSize: '.7rem', fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>
+              {hasSubjective ? 'Auto-graded so far' : 'Your score'}
+            </div>
+            <div style={{ fontSize: '1.75rem', fontWeight: 700, marginTop: '.25rem' }}>
+              {autoScore}{maxScore != null && <span style={{ fontSize: '1rem', fontWeight: 400, color: 'var(--muted-foreground)' }}> / {maxScore}</span>}
+            </div>
+            {hasSubjective && (
+              <div style={{ fontSize: '.7rem', marginTop: '.4rem' }}>
+                Short / long answers will be marked by WICASA. Final score may change.
+              </div>
+            )}
+          </div>
+        )}
+
+        <p className="muted-text" style={{ marginTop: '1.5rem', fontSize: '.85rem' }}>
+          Your final result will appear on the <a href="#/mock-tests">My Mock Tests</a> page once the branch publishes it.
+        </p>
+        <div style={{ marginTop: '1.5rem' }}>
+          <a href="#/mock-tests" className="btn btn-primary" style={{ padding: '.5rem 1.1rem' }}>
+            Back to Mock Tests
+          </a>
+        </div>
       </section>
     );
   }
@@ -303,14 +360,13 @@ function AttemptLive({ attemptId }) {
         <div className={'mta-timer' + (msLeft != null && msLeft < 60_000 ? ' is-urgent' : '')}>
           {msLeft == null ? '—' : fmtTimeLeft(msLeft)}
         </div>
-        <button
-          type="button"
+        <Button
           className="btn btn-primary mta-submit"
           onClick={() => submit({})}
-          disabled={submitting}
+          loading={submitting}
         >
           {submitting ? 'Submitting…' : 'Submit'}
-        </button>
+        </Button>
       </header>
 
       <div className="mta-body">

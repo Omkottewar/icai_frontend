@@ -5,6 +5,7 @@ import caIndiaLogo from '../assets/CA India Logo.png';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
 import PushPermissionBanner from '../components/PushPermissionBanner';
+import CookieConsentBanner from '../components/CookieConsentBanner';
 import { ShimmerFullPageSplash, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 
 // Inner Suspense fallback used for the admin content region only — the
@@ -57,6 +58,7 @@ const ChecklistInstancesPage = lazy(() => import('../pages/ChecklistInstancesPag
 const BranchMetricsPage      = lazy(() => import('../pages/BranchMetricsPage'));
 
 const OnboardingPage     = lazy(() => import('../pages/auth/OnboardingPage'));
+const AnnouncementsPage  = lazy(() => import('../pages/AnnouncementsPage'));
 const PhotoGalleryPage   = lazy(() => import('../pages/PhotoGalleryPage'));
 const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
 const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'));
@@ -79,6 +81,12 @@ const JobPostingsAdminPage       = lazy(() => import('../pages/admin/JobPostings
 const ChecklistTemplatesAdminPage = lazy(() => import('../pages/admin/ChecklistTemplatesAdminPage'));
 const NotificationsLogAdminPage  = lazy(() => import('../pages/admin/NotificationsLogAdminPage'));
 const ApprovalsAdminPage         = lazy(() => import('../pages/admin/ApprovalsAdminPage'));
+const PragyaanAdminPage          = lazy(() => import('../pages/admin/PragyaanAdminPage'));
+const CpeAdminPage               = lazy(() => import('../pages/admin/CpeAdminPage'));
+const RoomsAdminPage             = lazy(() => import('../pages/admin/RoomsAdminPage'));
+const BookingsAdminPage          = lazy(() => import('../pages/admin/BookingsAdminPage'));
+const CabfAdminPage              = lazy(() => import('../pages/admin/CabfAdminPage'));
+const PaymentsAdminPage          = lazy(() => import('../pages/admin/PaymentsAdminPage'));
 const PaperPresentationsAdminPage = lazy(() => import('../pages/admin/PaperPresentationsAdminPage'));
 const NewslettersAdminPage       = lazy(() => import('../pages/admin/NewslettersAdminPage'));
 const GalleryAlbumsAdminPage     = lazy(() => import('../pages/admin/GalleryAlbumsAdminPage'));
@@ -89,6 +97,7 @@ const GrievanceRoutesAdminPage   = lazy(() => import('../pages/admin/GrievanceRo
 const ResourcesAdminPage         = lazy(() => import('../pages/admin/ResourcesAdminPage'));
 const QuizEditorPage             = lazy(() => import('../pages/admin/QuizEditorPage'));
 const MockTestsAdminPage         = lazy(() => import('../pages/admin/MockTestsAdminPage'));
+const IcaiDirectoryAdminPage     = lazy(() => import('../pages/admin/IcaiDirectoryAdminPage'));
 
 // Section L (Resources) — public-facing pages with slug-based detail routes.
 const ResourcePaperPage   = lazy(() => import('../pages/ResourcePaperPage'));
@@ -129,6 +138,7 @@ const ROUTES = {
   '/signup': SignupPage,
   '/forgot': ForgotPage,
   '/onboarding': OnboardingPage,
+  '/announcements': AnnouncementsPage,
   '/gallery': PhotoGalleryPage,
   '/job-vacancies': JobVacanciesPage,
   '/members-directory': MembersDirectoryPage,
@@ -159,19 +169,18 @@ const ADMIN_ROUTES = {
   '/admin/events': EventsAdminPage,
   '/admin/registrations': EventRegistrationsAdminPage,
   '/admin/users': UsersAdminPage,
-  '/admin/cpe': () => <ComingSoonPage title="CPE credits" description="Issue structured/unstructured CPE credits, bulk-issue from event attendees, audit member compliance." />,
+  '/admin/cpe': CpeAdminPage,
   '/admin/approvals': ApprovalsAdminPage,
-  '/admin/rooms': () => <ComingSoonPage title="Rooms" description="Manage seminar halls, reading room, library — capacity and hourly fees." />,
-  '/admin/bookings': () => <ComingSoonPage title="Room bookings" description="Approve or reject incoming room booking requests; resolve slot conflicts." />,
+  '/admin/rooms': RoomsAdminPage,
+  '/admin/bookings': BookingsAdminPage,
   '/admin/committees': CommitteesAdminPage,
   '/admin/site-content': SiteContentAdminPage,
   '/admin/site-settings': SiteSettingsAdminPage,
   '/admin/announcements': AnnouncementsAdminPage,
   '/admin/checklist-templates': ChecklistTemplatesAdminPage,
   '/admin/jobs': JobPostingsAdminPage,
-  '/admin/cabf': () => <ComingSoonPage title="CABF requests" description="Review CA Benevolent Fund assistance requests, approve disbursements, track audit trail." />,
-  '/admin/payments': () => <ComingSoonPage title="Payments" description="Read-only view of payments with refunds, disputes, and invoices." />,
-  '/admin/files': () => <ComingSoonPage title="Files" description="Browse uploaded banners, certificates, and other assets." />,
+  '/admin/cabf': CabfAdminPage,
+  '/admin/payments': PaymentsAdminPage,
   '/admin/notifications-log': NotificationsLogAdminPage,
   // ─── Branch content (Resources page, Gallery, About page) ───
   '/admin/paper-presentations': PaperPresentationsAdminPage,
@@ -183,9 +192,26 @@ const ADMIN_ROUTES = {
   '/admin/grievance-routes':    GrievanceRoutesAdminPage,
   '/admin/resources':           ResourcesAdminPage,
   '/admin/mock-tests':          MockTestsAdminPage,
+  '/admin/pragyaan':            PragyaanAdminPage,
+  '/admin/icai-directory':      IcaiDirectoryAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);
+
+// Prefix-matched full-bleed routes — used for the mock-test attempt
+// surface, which is an exam-mode "kiosk" that owns the entire viewport
+// (timer + question palette + submit button) and must NOT be visually
+// overlapped by the global Header. Previously the attempt page rendered
+// underneath the site header, which covered its topbar (so the Submit
+// button was unreachable) and cropped the top of every question.
+function isFullBleedPath(path) {
+  if (FULL_BLEED_ROUTES.has(path)) return true;
+  // Live attempt UI: /attempts/<uuid>
+  if (path.startsWith('/attempts/')) return true;
+  // Attempt bootstrap: /mock-tests/<uuid>/attempt
+  if (path.startsWith('/mock-tests/') && path.endsWith('/attempt')) return true;
+  return false;
+}
 
 function isAdminPath(path) {
   return path === '/admin' || path.startsWith('/admin/');
@@ -332,7 +358,7 @@ export default function AppShell() {
     }
   }
   Page = Page ?? NotFound;
-  const fullBleed = FULL_BLEED_ROUTES.has(route.path);
+  const fullBleed = isFullBleedPath(route.path);
 
   if (fullBleed) {
     return (
@@ -341,16 +367,19 @@ export default function AppShell() {
         <Suspense fallback={<ShimmerFullPageSplash />}>
           <Page />
         </Suspense>
+        <CookieConsentBanner />
       </>
     );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      {/* WCAG 2.4.1 Bypass Blocks — visually hidden until focused. */}
+      <a href="#main-content" className="skip-link">Skip to main content</a>
       <ScrollToTop />
       <Header />
       <PushPermissionBanner />
-      <main style={{ flex: 1 }}>
+      <main id="main-content" style={{ flex: 1 }} tabIndex={-1}>
         <Suspense fallback={<ShimmerFullPageSplash />}>
           <Page />
         </Suspense>
@@ -359,6 +388,7 @@ export default function AppShell() {
       <Suspense fallback={null}>
         <PrayGyaanWidget />
       </Suspense>
+      <CookieConsentBanner />
     </div>
   );
 }

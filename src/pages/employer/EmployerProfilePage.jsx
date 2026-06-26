@@ -3,6 +3,7 @@ import EmployerLayout from '../../components/employer/EmployerLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
 import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
+import Button from '../../components/ui/Button';
 
 export default function EmployerProfilePage() {
   const { showToast } = useAuth();
@@ -111,9 +112,9 @@ export default function EmployerProfilePage() {
 
           {!readOnly && (
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
+              <Button type="submit" className="btn btn-primary" loading={saving}>
                 {saving ? 'Saving…' : 'Save changes'}
-              </button>
+              </Button>
             </div>
           )}
         </form>

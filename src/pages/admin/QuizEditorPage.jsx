@@ -4,6 +4,8 @@ import { adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
 import { IconPlus, IconTrash, IconCheck } from '../../icons';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 // Quiz authoring page. Bulk-replace semantics — admin edits everything in
 // one form and clicks Save to replace the whole quiz. Server validates
@@ -65,7 +67,12 @@ export default function QuizEditorPage() {
   };
 
   const publish = async () => {
-    if (!confirm('Publish this quiz? Members will be able to take it for CPE credit.')) return;
+    const ok = await dialog.confirm({
+      title: 'Publish quiz?',
+      message: 'Publish this quiz? Members will be able to take it for CPE credit.',
+      confirmText: 'Publish',
+    });
+    if (!ok) return;
     try {
       await adminFetch(`/api/admin/resources/papers/${paperId}/quiz/publish`, { method: 'POST' });
       showToast('Quiz is now live', 'success');
@@ -74,7 +81,13 @@ export default function QuizEditorPage() {
   };
 
   const unpublish = async () => {
-    if (!confirm('Unpublish this quiz? Members won\'t be able to take it.')) return;
+    const ok = await dialog.confirm({
+      title: 'Unpublish quiz?',
+      message: "Unpublish this quiz? Members won't be able to take it.",
+      confirmText: 'Unpublish',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminFetch(`/api/admin/resources/papers/${paperId}/quiz/unpublish`, { method: 'POST' });
       showToast('Quiz unpublished', 'success');
@@ -92,9 +105,9 @@ export default function QuizEditorPage() {
             ? <button className="btn btn-outline" onClick={unpublish}>Unpublish</button>
             : <button className="btn btn-outline" onClick={publish} disabled={!quiz}>Publish</button>
           }
-          <button className="btn btn-primary" onClick={save} disabled={busy || questions.length < 3}>
+          <Button className="btn btn-primary" onClick={save} disabled={questions.length < 3} loading={busy}>
             {busy ? 'Saving…' : 'Save quiz'}
-          </button>
+          </Button>
         </div>
       }
     >

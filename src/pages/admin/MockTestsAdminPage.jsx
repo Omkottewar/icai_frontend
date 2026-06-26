@@ -7,6 +7,8 @@ import { useAdminList, adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { IconArrowRight, IconCheckCircle, IconAward, IconFileText, IconX } from '../../icons';
 import { Shimmer, ShimmerFormField } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 // WICASA-side mock-test admin. Lists scheduled / open / completed tests,
 // lets WICASA create new ones, edit metadata, attach a practice paper +
@@ -209,7 +211,13 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
   }
 
   async function softDelete() {
-    if (!confirm('Delete this mock test? Registrations will be retained for audit.')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete mock test?',
+      message: 'Delete this mock test? Registrations will be retained for audit.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     setDeleting(true); setError('');
     try {
       await adminFetch(`/api/admin/mock-tests/${form.id}`, { method: 'DELETE' });
@@ -249,7 +257,12 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
 
   async function publishResults() {
     if (!form.id) return;
-    if (!confirm('Publish results? Students will be able to see their scores immediately.')) return;
+    const ok = await dialog.confirm({
+      title: 'Publish results?',
+      message: 'Publish results? Students will be able to see their scores immediately.',
+      confirmText: 'Publish',
+    });
+    if (!ok) return;
     try {
       const r = await adminFetch(`/api/admin/mock-tests/${form.id}/publish-results`, { method: 'POST' });
       set('result_published_at', r.item.result_published_at);
@@ -263,7 +276,13 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
 
   async function unpublishResults() {
     if (!form.id) return;
-    if (!confirm('Unpublish results? Students will no longer see their scores.')) return;
+    const ok = await dialog.confirm({
+      title: 'Unpublish results?',
+      message: 'Unpublish results? Students will no longer see their scores.',
+      confirmText: 'Unpublish',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminFetch(`/api/admin/mock-tests/${form.id}/unpublish-results`, { method: 'POST' });
       set('result_published_at', null);
@@ -289,9 +308,9 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
             </button>
           )}
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+          <Button className="btn btn-primary" onClick={save} loading={saving}>
             {saving ? 'Saving…' : (isNew ? 'Create' : 'Save changes')}
-          </button>
+          </Button>
         </>
       }
     >
@@ -543,9 +562,9 @@ function RegistrationsSection({ mockTestId, maxScore }) {
             {rows == null ? 'Loading…' : `${rows.length} registration${rows.length === 1 ? '' : 's'}`} · max score {maxScore}
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={saveMarks} disabled={saving || dirtyCount === 0} style={{ padding: '.4rem .8rem', fontSize: '.8rem' }}>
+        <Button className="btn btn-primary" onClick={saveMarks} disabled={dirtyCount === 0} loading={saving} style={{ padding: '.4rem .8rem', fontSize: '.8rem' }}>
           {saving ? 'Saving…' : `Save marks${dirtyCount > 0 ? ` (${dirtyCount})` : ''}`}
-        </button>
+        </Button>
       </div>
       {err && <p style={{ color: 'var(--destructive)', fontSize: '.78rem' }}>{err}</p>}
       {rows == null ? (

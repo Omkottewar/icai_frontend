@@ -6,6 +6,7 @@ import PasswordField from '../../components/auth/PasswordField';
 import RolePicker from '../../components/auth/RolePicker';
 import SocialButtons from '../../components/auth/SocialButtons';
 import { IconArrowRight, IconShield, IconX, IconMail, IconUser } from '../../icons';
+import Button from '../../components/ui/Button';
 
 export default function SignupPage() {
   const { signup, socialLogin } = useAuth();
@@ -17,6 +18,29 @@ export default function SignupPage() {
   const [showPw, setShowPw] = useState(false);
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // MRN gate (Open Question #3) — backend tells us whether gating is
+  // enabled; when it is, signup is rejected unless the MRN exists in the
+  // imported ICAI directory. We pre-check on blur so the user gets
+  // immediate feedback instead of waiting for submit.
+  const [mrn, setMrn] = useState('');
+  const [mrnState, setMrnState] = useState({ checked: false, exists: false, gating: false, profile: null });
+
+  async function checkMrn(value) {
+    const m = value.trim();
+    if (!m) { setMrnState({ checked: false, exists: false, gating: false, profile: null }); return; }
+    try {
+      const r = await fetch(`/api/auth/check-mrn?mrn=${encodeURIComponent(m)}`);
+      const j = await r.json();
+      setMrnState({
+        checked: true,
+        exists: Boolean(j.exists),
+        gating: Boolean(j.gating_enabled),
+        profile: j.profile ?? null,
+      });
+    } catch {
+      setMrnState({ checked: false, exists: false, gating: false, profile: null });
+    }
+  }
 
   useEffect(() => {
     if (route.query?.error) setErr(decodeURIComponent(route.query.error));
@@ -34,9 +58,14 @@ export default function SignupPage() {
       setErr('Password must include at least one letter and one number.');
       return;
     }
+    // Pre-empt the server gate when we already know the MRN is missing.
+    if (role === 'Member' && mrnState.gating && (!mrn.trim() || !mrnState.exists)) {
+      setErr('Please enter a valid Membership Number (MRN) registered with the Nagpur branch.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await signup({ email: email.trim(), password, name: name.trim(), role });
+      await signup({ email: email.trim(), password, name: name.trim(), role, mrn: mrn.trim() || undefined });
     } catch (e) {
       setErr(e.message || 'Could not create account');
     } finally {
@@ -90,6 +119,38 @@ export default function SignupPage() {
               </div>
             </div>
 
+            {role === 'Member' && (
+              <div>
+                <label className="field-label">Membership Number (MRN)</label>
+                <input
+                  className="input-base"
+                  type="text"
+                  value={mrn}
+                  onChange={(e) => setMrn(e.target.value.toUpperCase())}
+                  onBlur={(e) => checkMrn(e.target.value)}
+                  placeholder="e.g. 123456"
+                  autoComplete="off"
+                />
+                {mrnState.checked && mrnState.exists && mrnState.profile && (
+                  <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.375rem', color: 'var(--success, #047857)' }}>
+                    ✓ Verified — {mrnState.profile.name}
+                    {mrnState.profile.city ? ` · ${mrnState.profile.city}` : ''}
+                  </p>
+                )}
+                {mrnState.checked && !mrnState.exists && mrnState.gating && (
+                  <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.375rem', color: 'var(--danger, #b91c1c)' }}>
+                    This MRN is not in the Nagpur branch directory. Email{' '}
+                    <a href="mailto:nagpur@icai.org">nagpur@icai.org</a> if you believe this is a mistake.
+                  </p>
+                )}
+                {mrnState.checked && !mrnState.gating && (
+                  <p className="muted-text" style={{ fontSize: '.7rem', marginTop: '.375rem' }}>
+                    Directory check is in soft-launch mode. You can sign up either way.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="field-label">Email</label>
               <div style={{ position: 'relative' }}>
@@ -129,14 +190,14 @@ export default function SignupPage() {
               </div>
             )}
 
-            <button
+            <Button
               type="submit"
               className="btn btn-primary"
-              disabled={submitting}
+              loading={submitting}
               style={{ width: '100%', justifyContent: 'center', padding: '.875rem' }}
             >
               {submitting ? 'Creating account…' : <>Create {role} account <IconArrowRight size="sm" /></>}
-            </button>
+            </Button>
 
             <div className="alert alert-info">
               <IconShield size="sm" />

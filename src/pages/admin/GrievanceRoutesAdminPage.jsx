@@ -3,6 +3,8 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 const EMPTY = { subject: '', label: '', route_email: '', active: true };
 
@@ -60,7 +62,13 @@ export default function GrievanceRoutesAdminPage() {
       showToast?.('The "other" fallback route cannot be deleted', 'error');
       return;
     }
-    if (!confirm(`Delete the "${row.label}" route?`)) return;
+    const ok = await dialog.confirm({
+      title: 'Delete route?',
+      message: `Delete the "${row.label}" route?`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const r = await fetch(`/api/admin/grievance-routes/${row.subject}`, { method: 'DELETE', credentials: 'include' });
     if (r.ok) { showToast?.('Deleted', 'success'); load(); }
     else      { showToast?.('Could not delete', 'error'); }
@@ -162,9 +170,9 @@ export default function GrievanceRoutesAdminPage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', marginTop: '1.25rem' }}>
               <button type="button" className="btn btn-ghost" onClick={() => setEditing(null)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+              <Button className="btn btn-primary" onClick={save} loading={saving}>
                 {saving ? 'Saving…' : 'Save'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

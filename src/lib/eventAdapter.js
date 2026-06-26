@@ -25,5 +25,8 @@ export function apiEventToCardEvent(row) {
     capacity: row.capacity,
     registered_count: Number(row.registered_count || 0),
     starts_at: row.starts_at,
+    ends_at: row.ends_at,
+    description: row.description || '',
+    online_url: row.online_url || '',
   };
 }

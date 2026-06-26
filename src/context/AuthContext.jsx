@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { IconCheckCircle, IconX, IconBell } from '../icons';
+import { toast as notify } from '../lib/notify';
 
 const AuthContext = createContext(null);
 
@@ -49,7 +49,14 @@ function toUiUser(apiUser) {
     name:     apiUser.name,
     email:    apiUser.email,
     phone:    apiUser.phone ?? '',
+    // Capitalised label used by legacy display code ("Welcome, Student").
     role:     roleMap[apiUser.primary_role] ?? 'Member',
+    // Raw lowercase enum value ("student" / "member" / "employer" / "admin" / …).
+    // Required by role gates that mirror the backend's `primary_role` checks
+    // (e.g. the mock-tests Register button gate). Before this field existed,
+    // every such gate evaluated `undefined === 'student'` → false, which silently
+    // hid the action from the very users it was supposed to allow.
+    primary_role: apiUser.primary_role,
     // Active role assignments (the real source of truth — see schema).
     // Each entry: { code, name, scope_committee_id, effective_from, effective_to }
     roles:    Array.isArray(apiUser.roles) ? apiUser.roles : [],
@@ -88,7 +95,6 @@ export function AuthProvider({ children }) {
   // background, but we can render the UI immediately — `loading` is false
   // in that case because the UI is renderable with full confidence.
   const [loading, setLoading] = useState(!initialCachedUser);
-  const [toast, setToast] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -161,9 +167,10 @@ export function AuthProvider({ children }) {
     };
   }, [refresh]);
 
+  // Bridge the legacy `showToast(text, kind)` API to the new top-right stack
+  // (lib/notify.js). Callers across the app still use this signature.
   const showToast = (text, kind = 'success') => {
-    setToast({ text, kind });
-    setTimeout(() => setToast(null), 2800);
+    notify.show(text, kind);
   };
 
   // Embedded sign-in: post credentials to our server, which calls Auth0's
@@ -179,8 +186,8 @@ export function AuthProvider({ children }) {
   // user, auto-logs them in, and sets the session cookie. If the Auth0
   // tenant requires email verification first, we get { requiresLogin: true }
   // and bounce the user to /login with a friendly message.
-  const signup = async ({ email, password, name, role = 'Member' }) => {
-    const body = await postJson('/api/auth/signup', { email, password, name, role });
+  const signup = async ({ email, password, name, role = 'Member', mrn }) => {
+    const body = await postJson('/api/auth/signup', { email, password, name, role, mrn });
     // Account created but the user has to verify their email first (or the
     // tenant blocks first-login auto-auth). Send them to /login with a hint.
     if (body.requiresVerification || body.requiresLogin) {
@@ -233,14 +240,6 @@ export function AuthProvider({ children }) {
       refresh,
     }}>
       {children}
-      {toast && (
-        <div className="toast" role="status">
-          {toast.kind === 'success' ? <IconCheckCircle /> :
-           toast.kind === 'error'   ? <IconX /> :
-                                      <IconBell />}
-          <span>{toast.text}</span>
-        </div>
-      )}
     </AuthContext.Provider>
   );
 }

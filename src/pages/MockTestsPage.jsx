@@ -5,8 +5,11 @@ import { navigate, useRoute } from '../hooks/useRoute';
 import {
   IconCalendar, IconClock, IconMapPin, IconAward, IconArrowRight,
   IconCheckCircle, IconDownload, IconGraduationCap, IconBookOpen, IconX,
+  IconMessageSquare, IconTrash,
 } from '../icons';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
+import { dialog } from '../lib/dialog';
+import Button from '../components/ui/Button';
 
 // Public, student-facing mock-tests page.
 //   /mock-tests              — list of upcoming + recently-completed tests
@@ -52,6 +55,12 @@ export default function MockTestsPage() {
   const [my, setMy]       = useState([]);
   const [err, setErr]     = useState('');
 
+  // Mock tests are a CA-student feature (catalogue §1.3). Anyone can browse
+  // the upcoming-tests list (the page is public) but only signed-in students
+  // can register or take an attempt. Admin is included so WICASA staff can
+  // dry-run a test before publishing it.
+  const canTakeMockTest = user?.primary_role === 'student' || user?.primary_role === 'admin';
+
   async function load() {
     setErr('');
     try {
@@ -87,7 +96,14 @@ export default function MockTestsPage() {
     }
   }
   async function onCancel(id) {
-    if (!confirm('Cancel your registration for this mock test?')) return;
+    const ok = await dialog.confirm({
+      title: 'Cancel registration?',
+      message: 'Cancel your registration for this mock test?',
+      confirmText: 'Cancel registration',
+      cancelText: 'Keep it',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`/api/mock-tests/${id}/register`, { method: 'DELETE' });
       showToast?.('Registration cancelled', 'info');
@@ -162,6 +178,7 @@ export default function MockTestsPage() {
                 test={t}
                 openExpanded={openId === t.id}
                 myReg={myByTest.get(t.id)}
+                canTake={canTakeMockTest}
                 onRegister={() => onRegister(t.id)}
                 onCancel={() => onCancel(t.id)}
               />
@@ -180,6 +197,7 @@ export default function MockTestsPage() {
                   test={t}
                   openExpanded={openId === t.id}
                   myReg={myByTest.get(t.id)}
+                  canTake={canTakeMockTest}
                   onRegister={() => onRegister(t.id)}
                   onCancel={() => onCancel(t.id)}
                 />
@@ -214,8 +232,10 @@ export default function MockTestsPage() {
 }
 
 // ─── Card for one mock test ─────────────────────────────────────────────
-function MockTestCard({ test, myReg, openExpanded, onRegister, onCancel }) {
+function MockTestCard({ test, myReg, openExpanded, canTake, onRegister, onCancel }) {
   const [open, setOpen] = useState(!!openExpanded);
+  const [discussOpen, setDiscussOpen] = useState(false);
+  const [discussCount, setDiscussCount] = useState(test.comment_count || 0);
   const now = Date.now();
   const closesAt = test.registration_close_at || test.scheduled_at;
   const closed = closesAt && new Date(closesAt).getTime() <= now;
@@ -279,7 +299,16 @@ function MockTestCard({ test, myReg, openExpanded, onRegister, onCancel }) {
 
       {/* CTA row */}
       <div className="mt-card-cta">
-        {myStatus === 'registered' && !completed && (
+        {/* For non-students we still show the test details but hide every
+            action — there's no Register, no Take test online, no Cancel.
+            Catalogue §1.3 scopes mock tests to CA students; members /
+            employers / visitors see the listing as informational only. */}
+        {!canTake && !myStatus && (
+          <span className="mt-pill mt-pill-muted" title="Mock tests are a CA-student feature">
+            For CA students
+          </span>
+        )}
+        {canTake && myStatus === 'registered' && !completed && (
           <>
             <span className="mt-pill mt-pill-success"><IconCheckCircle size="sm" /> Registered</span>
             {test.supports_online && (
@@ -291,9 +320,9 @@ function MockTestCard({ test, myReg, openExpanded, onRegister, onCancel }) {
                 Take test online <IconArrowRight size="sm" />
               </a>
             )}
-            <button type="button" className="btn btn-ghost" onClick={onCancel} style={{ padding: '.3rem .55rem', fontSize: '.76rem', color: 'var(--destructive)' }}>
+            <Button className="btn btn-ghost" onClick={onCancel} style={{ padding: '.3rem .55rem', fontSize: '.76rem', color: 'var(--destructive)' }}>
               <IconX size="sm" /> Cancel
-            </button>
+            </Button>
           </>
         )}
         {myStatus === 'attended' && (
@@ -302,21 +331,41 @@ function MockTestCard({ test, myReg, openExpanded, onRegister, onCancel }) {
         {myStatus === 'absent' && (
           <span className="mt-pill mt-pill-warn">Marked absent</span>
         )}
-        {!myStatus && isOpen && !capacityFull && (
-          <button type="button" className="btn btn-primary" onClick={onRegister} style={{ padding: '.35rem .8rem', fontSize: '.82rem' }}>
+        {canTake && !myStatus && isOpen && !capacityFull && (
+          <Button className="btn btn-primary" onClick={onRegister} style={{ padding: '.35rem .8rem', fontSize: '.82rem' }}>
             Register <IconArrowRight size="sm" />
-          </button>
+          </Button>
         )}
-        {!myStatus && capacityFull && (
+        {canTake && !myStatus && capacityFull && (
           <span className="mt-pill mt-pill-warn">Full</span>
         )}
-        {!myStatus && !isOpen && !completed && (
+        {canTake && !myStatus && !isOpen && !completed && (
           <span className="mt-pill mt-pill-muted">Registration {closed ? 'closed' : 'not yet open'}</span>
         )}
-        <button type="button" className="btn btn-ghost" onClick={() => setOpen((o) => !o)} style={{ padding: '.3rem .55rem', fontSize: '.76rem', marginLeft: 'auto' }}>
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={() => setDiscussOpen((o) => !o)}
+          style={{ padding: '.3rem .55rem', fontSize: '.76rem', marginLeft: 'auto' }}
+          aria-expanded={discussOpen}
+        >
+          <IconMessageSquare size="sm" /> Discuss
+          {discussCount > 0 && (
+            <span style={{
+              marginLeft: '.3rem', fontSize: '.7rem', fontWeight: 700,
+              background: 'var(--primary)', color: 'white',
+              padding: '.05rem .35rem', borderRadius: 999,
+            }}>{discussCount}</span>
+          )}
+        </button>
+        <button type="button" className="btn btn-ghost" onClick={() => setOpen((o) => !o)} style={{ padding: '.3rem .55rem', fontSize: '.76rem' }}>
           {open ? 'Hide details' : 'Details'}
         </button>
       </div>
+
+      {discussOpen && (
+        <MockTestDiscussion testId={test.id} onCountChange={setDiscussCount} />
+      )}
 
       <style>{`
         .mt-card { display: flex; flex-direction: column; gap: .55rem; }
@@ -362,6 +411,190 @@ function MockTestCard({ test, myReg, openExpanded, onRegister, onCancel }) {
         .mt-pill-muted   { background: var(--muted, #f1f5f9); color: var(--muted-foreground); }
       `}</style>
     </article>
+  );
+}
+
+// ─── Per-mock-test discussion thread ────────────────────────────────────
+// Lazy-mounts when the user expands "Discuss" on a card. Anyone can read;
+// logged-in users can post (composer hidden for visitors with a sign-in
+// prompt). Lives inline in the same card so peers can scroll between
+// tests without losing context.
+function MockTestDiscussion({ testId, onCountChange }) {
+  const { user } = useAuth();
+  const [posts, setPosts] = useState(null);  // null = loading, [] = empty
+  const [busy, setBusy] = useState(false);
+  const [body, setBody] = useState('');
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPosts(null); setError(null);
+    api(`/api/mock-tests/${testId}/thread`)
+      .then((d) => {
+        if (cancelled) return;
+        setPosts(d.posts || []);
+        if (typeof onCountChange === 'function') onCountChange((d.posts || []).length);
+      })
+      .catch((e) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
+  }, [testId]);
+
+  async function submit(e) {
+    e.preventDefault();
+    const text = body.trim();
+    if (!text || busy) return;
+    setBusy(true); setError(null);
+    try {
+      const d = await api(`/api/mock-tests/${testId}/thread/posts`, {
+        method: 'POST',
+        body: { body: text },
+      });
+      setPosts((prev) => {
+        const next = [...(prev || []), d.post];
+        if (typeof onCountChange === 'function') onCountChange(next.length);
+        return next;
+      });
+      setBody('');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(postId) {
+    const ok = await dialog.confirm({
+      title: 'Delete comment?',
+      message: 'Delete this comment?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await api(`/api/mock-tests/thread/posts/${postId}`, { method: 'DELETE' });
+      setPosts((prev) => {
+        const next = (prev || []).filter((p) => p.id !== postId);
+        if (typeof onCountChange === 'function') onCountChange(next.length);
+        return next;
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div className="mt-disc">
+      <div className="mt-disc-head">
+        <IconMessageSquare size="sm" /> <strong>Discussion</strong>
+        <span className="muted-text" style={{ fontSize: '.72rem' }}>
+          · Be respectful and helpful — moderators may remove off-topic or abusive comments.
+        </span>
+      </div>
+
+      {posts === null && <ShimmerLines count={2} lastWidth="60%" />}
+
+      {posts && posts.length === 0 && (
+        <p className="muted-text" style={{ fontSize: '.78rem', margin: '.5rem 0' }}>
+          No comments yet. {user ? 'Start the discussion below.' : 'Sign in to post the first comment.'}
+        </p>
+      )}
+
+      {posts && posts.length > 0 && (
+        <ul className="mt-disc-list">
+          {posts.map((p) => {
+            const mine = user && user.id === p.created_by;
+            return (
+              <li key={p.id} className="mt-disc-row">
+                <div className="mt-disc-meta">
+                  <strong className="mt-disc-author">{p.author_name || 'Member'}</strong>
+                  <span className="muted-text">{fmtDt(p.created_at)}</span>
+                  {mine && (
+                    <button
+                      type="button"
+                      className="mt-disc-del"
+                      onClick={() => remove(p.id)}
+                      title="Delete this comment"
+                      aria-label="Delete comment"
+                    >
+                      <IconTrash size="sm" />
+                    </button>
+                  )}
+                </div>
+                <div className="mt-disc-body">{p.body}</div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {user ? (
+        <form className="mt-disc-form" onSubmit={submit}>
+          <textarea
+            className="input-base"
+            placeholder="Share a tip, ask a question, or compare your solution…"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={2000}
+            rows={2}
+            style={{ width: '100%', fontSize: '.82rem', resize: 'vertical' }}
+            disabled={busy}
+          />
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: '.4rem', gap: '.5rem' }}>
+            <span className="muted-text" style={{ fontSize: '.7rem' }}>{body.length}/2000</span>
+            <Button
+              type="submit"
+              className="btn btn-primary"
+              style={{ padding: '.3rem .8rem', fontSize: '.78rem' }}
+              disabled={!body.trim()}
+              loading={busy}
+            >
+              {busy ? 'Posting…' : 'Post comment'}
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <p className="muted-text" style={{ fontSize: '.78rem', marginTop: '.5rem' }}>
+          <a href="#/login">Sign in</a> to join the discussion.
+        </p>
+      )}
+
+      {error && (
+        <p style={{ color: 'var(--destructive)', fontSize: '.75rem', marginTop: '.4rem' }}>{error}</p>
+      )}
+
+      <style>{`
+        .mt-disc {
+          margin-top: .65rem; padding-top: .65rem;
+          border-top: 1px dashed var(--border);
+          display: flex; flex-direction: column; gap: .4rem;
+        }
+        .mt-disc-head {
+          display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
+          font-size: .78rem;
+        }
+        .mt-disc-list {
+          list-style: none; padding: 0; margin: 0;
+          display: flex; flex-direction: column; gap: .55rem;
+        }
+        .mt-disc-row {
+          padding: .5rem .65rem;
+          background: var(--muted, #f8fafc);
+          border-radius: .4rem;
+        }
+        .mt-disc-meta {
+          display: flex; align-items: center; gap: .5rem;
+          font-size: .72rem; margin-bottom: .25rem;
+        }
+        .mt-disc-author { color: var(--primary); }
+        .mt-disc-body { font-size: .82rem; line-height: 1.4; white-space: pre-wrap; }
+        .mt-disc-del {
+          margin-left: auto; background: none; border: 0; cursor: pointer;
+          color: var(--muted-foreground); padding: 0;
+        }
+        .mt-disc-del:hover { color: var(--destructive); }
+        .mt-disc-form { margin-top: .25rem; }
+      `}</style>
+    </div>
   );
 }
 

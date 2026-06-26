@@ -4,6 +4,8 @@ import { navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
 import { IconBriefcase, IconX } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 const STATUS_BADGE = {
   draft:           { bg: '#f1f5f9', fg: '#475569', label: 'Draft'   },
@@ -37,14 +39,25 @@ export default function EmployerPostingsPage() {
   useEffect(() => { load(); }, []);
 
   const close = async (id) => {
-    if (!confirm('Close this posting? It will be hidden from job seekers.')) return;
+    const ok = await dialog.confirm({
+      title: 'Close posting?',
+      message: 'Close this posting? It will be hidden from job seekers.',
+      confirmText: 'Close',
+    });
+    if (!ok) return;
     const r = await fetch(`/api/employer/postings/${id}/close`, { method: 'POST', credentials: 'include' });
     if (r.ok) { showToast?.('Posting closed', 'success'); load(); }
     else      { showToast?.('Could not close posting', 'error'); }
   };
 
   const del = async (id) => {
-    if (!confirm('Delete this posting permanently?')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete posting?',
+      message: 'Delete this posting permanently?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     const r = await fetch(`/api/employer/postings/${id}`, { method: 'DELETE', credentials: 'include' });
     if (r.ok) { showToast?.('Deleted', 'success'); load(); }
     else      { showToast?.('Could not delete', 'error'); }
@@ -124,9 +137,9 @@ export default function EmployerPostingsPage() {
                     <td style={{ padding: '.75rem', textAlign: 'right' }}>
                       <button className="btn btn-ghost" onClick={() => navigate(`/employer/postings/${p.id}/edit`)}>Edit</button>
                       {p.status === 'active' && (
-                        <button className="btn btn-ghost" onClick={() => close(p.id)}>Close</button>
+                        <Button className="btn btn-ghost" onClick={() => close(p.id)}>Close</Button>
                       )}
-                      <button className="btn btn-ghost" style={{ color: '#b91c1c' }} onClick={() => del(p.id)}>Delete</button>
+                      <Button className="btn btn-ghost" style={{ color: '#b91c1c' }} onClick={() => del(p.id)}>Delete</Button>
                     </td>
                   </tr>
                 );

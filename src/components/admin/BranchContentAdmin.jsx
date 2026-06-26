@@ -3,6 +3,8 @@ import AdminLayout from './AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { IconX } from '../../icons';
 import { Shimmer } from '../ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../ui/Button';
 
 // Generic admin CRUD page used by the 5 branch-content entities
 // (paper-presentations, gallery-albums, newsletters, office-bearers,
@@ -138,7 +140,13 @@ export default function BranchContentAdmin({
 
   const del = async (row) => {
     const label = row.title || row.person_name || row.fy_label || 'this item';
-    if (!confirm(`Delete "${label}"?`)) return;
+    const ok = await dialog.confirm({
+      title: 'Delete item?',
+      message: `Delete "${label}"?`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`${endpoint}/${row[rowKey]}`, { method: 'DELETE' });
       showToast?.('Deleted', 'success');
@@ -237,9 +245,9 @@ function Drawer({ title, fields, form, set, err, saving, onClose, onSave }) {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', marginTop: '1.25rem' }}>
           <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={onSave} disabled={saving}>
+          <Button className="btn btn-primary" onClick={onSave} loading={saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

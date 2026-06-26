@@ -60,7 +60,7 @@ export async function adminFetch(endpoint, opts = {}) {
   // Derive an invalidation prefix from the endpoint:
   //   /api/admin/users/<id>/roles → /api/admin/users
   //   /api/admin/events/<id>/publish → /api/admin/events (+ checklist-instances)
-  const match = endpoint.match(/^(\/api\/admin\/[a-z_]+)/);
+  const match = endpoint.match(/^(\/api\/admin\/[a-z0-9_-]+)/);
   const prefix = match ? match[1] : '/api';
   const extra = [];
   if (endpoint.includes('/publish') || endpoint.includes('/cancel')) {

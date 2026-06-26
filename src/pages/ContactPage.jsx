@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { IconMapPin, IconMail, IconPhone, IconClock, IconCheckCircle, IconX } from '../icons';
 import { useSiteSettings } from '../hooks/useSiteSettings';
+import { useRecaptcha } from '../hooks/useRecaptcha';
+import Button from '../components/ui/Button';
 
 const AGAINST_TYPES = [
   { value: 'branch', label: 'The branch / office' },
@@ -23,6 +25,7 @@ const EMPTY = {
 
 export default function ContactPage() {
   const { settings } = useSiteSettings();
+  const { execute: executeRecaptcha, enabled: captchaEnabled } = useRecaptcha();
   const [form, setForm] = useState(EMPTY);
   const [subjects, setSubjects] = useState(FALLBACK_SUBJECTS);
   const [ticketNo, setTicketNo] = useState('');
@@ -50,11 +53,12 @@ export default function ContactPage() {
     e.preventDefault();
     setBusy(true); setErr('');
     try {
+      const recaptcha_token = await executeRecaptcha('grievance_submit');
       const r = await fetch('/api/grievances', {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, recaptcha_token }),
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? 'Could not submit. Please try again.');
@@ -164,10 +168,18 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              <button className="btn btn-primary" type="submit" disabled={busy}
+              <Button className="btn btn-primary" type="submit" loading={busy}
                 style={{ justifyContent: 'center' }}>
                 {busy ? 'Sending…' : 'Send message'}
-              </button>
+              </Button>
+
+              {captchaEnabled && (
+                <p className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
+                  Protected by reCAPTCHA. Google{' '}
+                  <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">Privacy</a> &{' '}
+                  <a href="https://policies.google.com/terms" target="_blank" rel="noopener noreferrer">Terms</a> apply.
+                </p>
+              )}
             </form>
           )}
         </div>

@@ -7,12 +7,46 @@ import {
 } from '../icons';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 
+// Renders a cover image with a graceful gradient fallback when the URL is
+// missing OR when the image fails to load (404, mock data, etc.). The
+// fallback uses the same look as the "no cover" placeholder so cards stay
+// visually consistent across the grid. Pre-fix the listings showed broken
+// alt-text where mock cover_file_id rows pointed to files that didn't
+// actually exist on disk — that's what made the page look unfinished.
+function CoverImage({ src, alt, label }) {
+  const [failed, setFailed] = useState(!src);
+
+  const fallback = (
+    <div style={{
+      width: '100%', aspectRatio: '4/3',
+      background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+      color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: '1rem', fontWeight: 700, textAlign: 'center', padding: '1rem',
+      letterSpacing: '.02em',
+    }}>
+      {label}
+    </div>
+  );
+
+  if (failed || !src) return fallback;
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block', background: '#f1f5f9' }}
+    />
+  );
+}
+
 function NewsletterShimmerGrid({ count = 6 }) {
   return (
     <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }} aria-hidden="true">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          <Shimmer width="100%" height="0" style={{ aspectRatio: '3/4', display: 'block', borderRadius: 0 }} />
+          <Shimmer width="100%" height="0" style={{ aspectRatio: '4/3', display: 'block', borderRadius: 0 }} />
           <div style={{ padding: '.875rem 1rem 1rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
             <Shimmer height=".6rem" width="40%" />
             <Shimmer height=".95rem" width="80%" />
@@ -178,26 +212,18 @@ export default function ResourcesPage() {
                 className="card hover-lift"
                 style={{ display: 'flex', flexDirection: 'column', padding: '0', overflow: 'hidden', textDecoration: 'none', color: 'inherit' }}
               >
-                {n.cover_url ? (
-                  <img src={n.cover_url} alt={n.title} loading="lazy"
-                       style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{
-                    width: '100%', aspectRatio: '3/4',
-                    background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '.85rem', fontWeight: 700, textAlign: 'center', padding: '1rem',
-                  }}>
-                    {MONTH_NAMES[n.issue_month - 1]} {n.issue_year}
-                  </div>
-                )}
-                <div style={{ padding: '.875rem 1rem 1rem' }}>
+                <CoverImage
+                  src={n.cover_url}
+                  alt={n.title}
+                  label={`${MONTH_NAMES[n.issue_month - 1]} ${n.issue_year}`}
+                />
+                <div style={{ padding: '.75rem .9rem .9rem' }}>
                   <div style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
                     {MONTH_NAMES[n.issue_month - 1]} {n.issue_year}
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginTop: '.15rem' }}>{n.title}</div>
+                  <div style={{ fontWeight: 600, fontSize: '.9rem', marginTop: '.15rem', lineHeight: 1.3 }}>{n.title}</div>
                   {n.pdf_url && (
-                    <div className="row gap-1" style={{ marginTop: '.5rem', color: 'var(--primary)', fontSize: '.8rem', fontWeight: 600 }}>
+                    <div className="row gap-1" style={{ marginTop: '.45rem', color: 'var(--primary)', fontSize: '.78rem', fontWeight: 600 }}>
                       <IconDownload size="sm" /> Download PDF
                     </div>
                   )}
@@ -227,25 +253,17 @@ export default function ResourcesPage() {
                 className="card hover-lift"
                 style={{ display: 'flex', flexDirection: 'column', padding: '0', overflow: 'hidden', textDecoration: 'none', color: 'inherit' }}
               >
-                {j.cover_url ? (
-                  <img src={j.cover_url} alt={j.title} loading="lazy"
-                       style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{
-                    width: '100%', aspectRatio: '3/4',
-                    background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
-                    color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '.85rem', fontWeight: 700, textAlign: 'center', padding: '1rem',
-                  }}>
-                    {j.issue_label}
-                  </div>
-                )}
-                <div style={{ padding: '.875rem 1rem 1rem' }}>
+                <CoverImage
+                  src={j.cover_url}
+                  alt={j.title}
+                  label={j.issue_label}
+                />
+                <div style={{ padding: '.75rem .9rem .9rem' }}>
                   <div style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', textTransform: 'uppercase', letterSpacing: '.04em' }}>
                     {j.issue_label}
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: '.95rem', marginTop: '.15rem' }}>{j.title}</div>
-                  <div className="row gap-1" style={{ marginTop: '.5rem', color: 'var(--primary)', fontSize: '.8rem', fontWeight: 600 }}>
+                  <div style={{ fontWeight: 600, fontSize: '.9rem', marginTop: '.15rem', lineHeight: 1.3 }}>{j.title}</div>
+                  <div className="row gap-1" style={{ marginTop: '.45rem', color: 'var(--primary)', fontSize: '.78rem', fontWeight: 600 }}>
                     Read issue <IconArrowRight size="sm" />
                   </div>
                 </div>

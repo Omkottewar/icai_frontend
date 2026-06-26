@@ -1,69 +1,224 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
-import { useRoute } from '../hooks/useRoute';
+import { useAuth } from '../context/AuthContext';
+import { useRoute, navigate } from '../hooks/useRoute';
+import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import {
-  IconUsers, IconCheck, IconCheckCircle, IconClock, IconArrowRight,
+  IconUsers, IconCheck, IconCheckCircle, IconClock, IconArrowRight, IconMapPin,
 } from '../icons';
+import Button from '../components/ui/Button';
 
-const ROOMS = [
-  { id: 'reading-room', name: 'Reading Room', capacity: 80, blurb: 'Quiet study space with individual desks, Wi-Fi and reference material.', amenities: ['Wi-Fi', 'Air-conditioned', 'Power sockets', 'Reference desk'] },
-  { id: 'seminar-hall', name: 'Seminar Hall', capacity: 40, blurb: 'Flexible room for workshops, study circles and committee meetings.', amenities: ['Projector', 'Whiteboard', 'Wi-Fi', 'Air-conditioned'] },
-  { id: 'discussion-pod', name: 'Discussion Pod', capacity: 8, blurb: 'Compact room for small-group articleship discussions and interviews.', amenities: ['Wi-Fi', 'Whiteboard', 'Air-conditioned'] },
+// Fixed 2-hour slots — keeps the booking surface predictable. The backend
+// stores explicit start/end timestamps so we can switch to an admin-defined
+// slot table later without breaking historical bookings.
+const SLOTS = [
+  { label: '10:00 – 12:00', startH: 10, endH: 12 },
+  { label: '12:00 – 14:00', startH: 12, endH: 14 },
+  { label: '14:00 – 16:00', startH: 14, endH: 16 },
+  { label: '16:00 – 18:00', startH: 16, endH: 18 },
 ];
 
-const SLOTS = ['10:00 – 12:00', '12:00 – 14:00', '14:00 – 16:00', '16:00 – 18:00'];
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const DATES = Array.from({ length: 6 }, (_, i) => {
+// Date strip — today + next 6 days. Booking can happen up to a week out.
+const DATES = Array.from({ length: 7 }, (_, i) => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() + i);
   return d;
 });
 
-// Deterministic mock availability — reads as "live" but is static.
-function slotStatus(roomId, dateIdx, slotIdx) {
-  const seed = [...roomId].reduce((a, c) => a + c.charCodeAt(0), 0);
-  return (seed + dateIdx * 5 + slotIdx * 3) % 4 === 0 ? 'booked' : 'available';
+// YYYY-MM-DD in the local zone (the API normalises to UTC; we don't want
+// timezone drift on the picker).
+function ymd(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+// Build a full ISO timestamp from a date + hour-of-day. Treated as the
+// user's local zone — the backend stores UTC, ranges still match.
+function isoAt(date, hour) {
+  const d = new Date(date);
+  d.setHours(hour, 0, 0, 0);
+  return d.toISOString();
+}
+
+// Two intervals [aStart,aEnd) and [bStart,bEnd) overlap iff
+// aStart < bEnd AND bStart < aEnd. The backend's EXCLUDE constraint enforces
+// this server-side; we also check client-side so we can disable booked slots
+// in the UI before the user clicks.
+function overlaps(aStart, aEnd, bStart, bEnd) {
+  return aStart < bEnd && bStart < aEnd;
 }
 
 export default function RoomBookingPage() {
   const route = useRoute();
-  const initialRoom = ROOMS.find((r) => r.id === route.query.room)?.id || 'reading-room';
+  const { user } = useAuth();
 
-  const [roomId, setRoomId] = useState(initialRoom);
+  const [rooms, setRooms] = useState(null);
+  const [roomId, setRoomId] = useState(null);
   const [dateIdx, setDateIdx] = useState(0);
   const [slotIdx, setSlotIdx] = useState(null);
-  const [form, setForm] = useState({ name: '', email: '', purpose: '' });
-  const [confirmed, setConfirmed] = useState(null);
+  const [purpose, setPurpose] = useState('');
+  const [availability, setAvailability] = useState([]);   // bookings on the selected day
+  const [loadingAvail, setLoadingAvail] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmed, setConfirmed] = useState(null);       // booking row after success
+  const [error, setError] = useState('');
 
-  const room = ROOMS.find((r) => r.id === roomId);
+  // Load the room list once on mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/rooms', { credentials: 'include' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed to load rooms');
+        setRooms(j.rows);
+        // Seed roomId from ?room= query param if it matches an available room,
+        // otherwise the first room in the list.
+        const preferred = j.rows.find((r2) => r2.id === route.query?.room || r2.name === route.query?.room);
+        setRoomId(preferred?.id ?? j.rows[0]?.id ?? null);
+      } catch (e) {
+        setError(e.message);
+        setRooms([]);
+      }
+    })();
+  }, []); // eslint-disable-line
+
+  // Whenever room or date changes, refetch availability for that day.
+  useEffect(() => {
+    if (!roomId) { setAvailability([]); return; }
+    setLoadingAvail(true);
+    setSlotIdx(null);
+    (async () => {
+      try {
+        const date = ymd(DATES[dateIdx]);
+        const r = await fetch(`/api/rooms/${roomId}/availability?date=${date}`, { credentials: 'include' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.error || 'Failed to load availability');
+        setAvailability(j.bookings ?? []);
+      } catch (e) {
+        setError(e.message);
+        setAvailability([]);
+      } finally {
+        setLoadingAvail(false);
+      }
+    })();
+  }, [roomId, dateIdx]);
+
+  const room = useMemo(() => rooms?.find((r) => r.id === roomId) ?? null, [rooms, roomId]);
   const date = DATES[dateIdx];
   const dateLabel = `${WEEKDAYS[date.getDay()]}, ${date.getDate()} ${MONTHS[date.getMonth()]}`;
-  const availableCount = SLOTS.filter((_, i) => slotStatus(roomId, dateIdx, i) === 'available').length;
-  const canConfirm = slotIdx !== null && form.name.trim() && form.email.trim();
 
-  const onSelectRoom = (id) => { setRoomId(id); setSlotIdx(null); };
-  const onSelectDate = (i) => { setDateIdx(i); setSlotIdx(null); };
-
-  const onConfirm = (e) => {
-    e.preventDefault();
-    if (!canConfirm) return;
-    setConfirmed({
-      room: room.name,
-      date: dateLabel,
-      slot: SLOTS[slotIdx],
-      name: form.name,
-      ref: 'NB-' + Math.random().toString(36).slice(2, 7).toUpperCase(),
-    });
+  // Compute per-slot status from the bookings we got back.
+  const slotIsBooked = (slot) => {
+    const start = new Date(isoAt(date, slot.startH));
+    const end   = new Date(isoAt(date, slot.endH));
+    return availability.some((b) => overlaps(start, end, new Date(b.slot_start), new Date(b.slot_end)));
   };
 
-  const reset = () => {
+  // Also disable slots that have already started today (no past bookings).
+  const slotIsPast = (slot) => {
+    if (dateIdx > 0) return false;
+    return new Date().getHours() >= slot.endH;
+  };
+
+  const freeCount = SLOTS.filter((s) => !slotIsBooked(s) && !slotIsPast(s)).length;
+  const canConfirm = !!user && slotIdx !== null && !!room && !submitting;
+
+  async function submit(e) {
+    e?.preventDefault?.();
+    if (!canConfirm) return;
+    setError('');
+    setSubmitting(true);
+    try {
+      const slot = SLOTS[slotIdx];
+      const r = await fetch(`/api/rooms/${roomId}/book`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          slot_start: isoAt(date, slot.startH),
+          slot_end:   isoAt(date, slot.endH),
+          purpose: purpose || null,
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Booking failed');
+      setConfirmed({
+        room: j.room.name,
+        date: dateLabel,
+        slot: slot.label,
+        status: j.booking.status,
+        id: j.booking.id,
+      });
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function reset() {
     setConfirmed(null);
     setSlotIdx(null);
-    setForm({ name: '', email: '', purpose: '' });
-  };
+    setPurpose('');
+    setError('');
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+
+  // Logged-out users hit a clear CTA instead of a non-functional form.
+  if (!user) {
+    return (
+      <>
+        <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+        <section className="container" style={{ padding: '2.5rem 1rem' }}>
+          <div className="card" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Please sign in to book a room</h2>
+            <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.5rem' }}>
+              Bookings are confirmed against your branch profile so we can contact you
+              and apply the right fee category (member / student).
+            </p>
+            <button className="btn btn-primary" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login?next=/room-booking')}>
+              Sign in to continue
+            </button>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  if (rooms === null) {
+    return (
+      <>
+        <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+        <section className="container" style={{ padding: '2.5rem 1rem' }}>
+          <ShimmerLines count={8} />
+        </section>
+      </>
+    );
+  }
+
+  if (rooms.length === 0) {
+    return (
+      <>
+        <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+        <section className="container" style={{ padding: '2.5rem 1rem' }}>
+          <div className="card" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
+            <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>No rooms available yet</h2>
+            <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.5rem' }}>
+              The branch hasn't published any bookable rooms. Check back soon or contact the office.
+            </p>
+            <a href="#/contact" className="btn btn-outline" style={{ marginTop: '1.25rem' }}>Open the contact form</a>
+          </div>
+        </section>
+      </>
+    );
+  }
 
   return (
     <>
@@ -76,26 +231,28 @@ export default function RoomBookingPage() {
             {/* Step 1 — room */}
             <div className="tiny-eyebrow">Step 1 · Choose a room</div>
             <div className="room-grid" style={{ marginTop: '.75rem', marginBottom: '2rem' }}>
-              {ROOMS.map((r) => {
+              {rooms.map((r) => {
                 const active = r.id === roomId;
                 return (
                   <button
                     key={r.id}
                     type="button"
-                    onClick={() => onSelectRoom(r.id)}
+                    onClick={() => { setRoomId(r.id); setSlotIdx(null); }}
                     className={'room-card' + (active ? ' is-active' : '')}
                   >
                     <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: '.5rem' }}>
                       <div style={{ fontWeight: 700 }}>{r.name}</div>
                       {active && <span className="room-card-check"><IconCheck size="sm" /></span>}
                     </div>
-                    <div className="row gap-1 muted-text" style={{ fontSize: '.8125rem', marginTop: '.3rem' }}>
-                      <IconUsers size="sm" /> {r.capacity} seats
+                    <div className="row gap-3 muted-text" style={{ fontSize: '.8125rem', marginTop: '.3rem', flexWrap: 'wrap' }}>
+                      {r.capacity != null && <span className="row gap-1"><IconUsers size="sm" /> {r.capacity} seats</span>}
+                      {r.location && <span className="row gap-1"><IconMapPin size="sm" /> {r.location}</span>}
                     </div>
-                    <p className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.5rem', lineHeight: 1.5 }}>{r.blurb}</p>
-                    <div className="room-amenities">
-                      {r.amenities.map((a) => <span key={a} className="room-amenity">{a}</span>)}
-                    </div>
+                    {r.fee_paise_per_hour > 0 && (
+                      <p className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.5rem' }}>
+                        ₹{(r.fee_paise_per_hour / 100).toLocaleString('en-IN')} / hour
+                      </p>
+                    )}
                   </button>
                 );
               })}
@@ -110,7 +267,7 @@ export default function RoomBookingPage() {
                   <button
                     key={i}
                     type="button"
-                    onClick={() => onSelectDate(i)}
+                    onClick={() => { setDateIdx(i); setSlotIdx(null); }}
                     className={'date-chip' + (active ? ' is-active' : '')}
                   >
                     <span style={{ fontSize: '.6875rem', fontWeight: 700, opacity: .8 }}>
@@ -123,33 +280,40 @@ export default function RoomBookingPage() {
               })}
             </div>
 
-            {/* Step 3 — live availability */}
+            {/* Step 3 — slots */}
             <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: '.5rem' }}>
-              <div className="tiny-eyebrow">Step 3 · Available time slots</div>
+              <div className="tiny-eyebrow">Step 3 · Pick a time slot</div>
               <div className="row gap-3" style={{ fontSize: '.75rem', color: 'var(--muted-foreground)' }}>
                 <span className="row gap-1"><span className="avail-dot avail-free" /> Available</span>
                 <span className="row gap-1"><span className="avail-dot avail-booked" /> Booked</span>
               </div>
             </div>
             <div className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.4rem' }}>
-              {room.name} · {dateLabel} ·{' '}
-              <strong style={{ color: 'var(--secondary)' }}>{availableCount} of {SLOTS.length} slots free</strong>
+              {room?.name} · {dateLabel} ·{' '}
+              {loadingAvail
+                ? <Shimmer width="6rem" height=".85rem" />
+                : <strong style={{ color: 'var(--secondary)' }}>{freeCount} of {SLOTS.length} slots free</strong>}
             </div>
             <div className="slot-grid" style={{ marginTop: '.85rem' }}>
               {SLOTS.map((s, i) => {
-                const booked = slotStatus(roomId, dateIdx, i) === 'booked';
+                const booked = slotIsBooked(s);
+                const past   = slotIsPast(s);
+                const disabled = booked || past;
                 const active = i === slotIdx;
                 return (
                   <button
-                    key={s}
+                    key={s.label}
                     type="button"
-                    disabled={booked}
+                    disabled={disabled}
                     onClick={() => setSlotIdx(i)}
-                    className={'slot-chip' + (booked ? ' is-booked' : '') + (active ? ' is-active' : '')}
+                    className={'slot-chip' + (disabled ? ' is-booked' : '') + (active ? ' is-active' : '')}
+                    title={past ? 'This slot is in the past' : (booked ? 'Already booked' : undefined)}
                   >
                     <IconClock size="sm" />
-                    <span style={{ fontWeight: 700 }}>{s}</span>
-                    <span style={{ fontSize: '.6875rem' }}>{booked ? 'Booked' : 'Available'}</span>
+                    <span style={{ fontWeight: 700 }}>{s.label}</span>
+                    <span style={{ fontSize: '.6875rem' }}>
+                      {past ? 'Past' : booked ? 'Booked' : 'Available'}
+                    </span>
                   </button>
                 );
               })}
@@ -162,50 +326,63 @@ export default function RoomBookingPage() {
               {confirmed ? (
                 <div style={{ textAlign: 'center' }}>
                   <div className="booking-success-icon"><IconCheckCircle size="lg" /></div>
-                  <h3 style={{ marginTop: '.75rem', fontSize: '1.125rem', fontWeight: 700 }}>Booking confirmed</h3>
+                  <h3 style={{ marginTop: '.75rem', fontSize: '1.125rem', fontWeight: 700 }}>Request submitted</h3>
                   <p className="muted-text" style={{ fontSize: '.8125rem', marginTop: '.35rem' }}>
-                    A confirmation has been sent to {confirmed.name}.
+                    The branch will review and confirm your booking shortly. You can track its status from your dashboard.
                   </p>
                   <div style={{ marginTop: '1rem', textAlign: 'left', fontSize: '.875rem', display: 'flex', flexDirection: 'column', gap: '.45rem' }}>
                     <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Room</span><strong>{confirmed.room}</strong></div>
                     <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Date</span><strong>{confirmed.date}</strong></div>
                     <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Time</span><strong>{confirmed.slot}</strong></div>
-                    <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Reference</span><strong>{confirmed.ref}</strong></div>
+                    <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Status</span><strong style={{ textTransform: 'capitalize' }}>{confirmed.status}</strong></div>
                   </div>
-                  <button className="btn btn-outline" style={{ marginTop: '1.25rem', width: '100%', justifyContent: 'center' }} onClick={reset}>
-                    Book another room
-                  </button>
+                  <div style={{ display: 'flex', gap: '.5rem', marginTop: '1.25rem' }}>
+                    <button className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={reset}>
+                      Book another
+                    </button>
+                    <a href="#/dashboard" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                      Open dashboard
+                    </a>
+                  </div>
                 </div>
               ) : (
-                <form onSubmit={onConfirm}>
+                <form onSubmit={submit}>
                   <h3 style={{ fontSize: '1.125rem', fontWeight: 700 }}>Booking summary</h3>
                   <div style={{ marginTop: '.75rem', display: 'flex', flexDirection: 'column', gap: '.45rem', fontSize: '.875rem' }}>
-                    <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Room</span><strong>{room.name}</strong></div>
+                    <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Room</span><strong>{room?.name || '—'}</strong></div>
                     <div className="row" style={{ justifyContent: 'space-between' }}><span className="muted-text">Date</span><strong>{dateLabel}</strong></div>
                     <div className="row" style={{ justifyContent: 'space-between' }}>
                       <span className="muted-text">Time</span>
                       <strong style={{ color: slotIdx === null ? 'var(--muted-foreground)' : 'inherit' }}>
-                        {slotIdx === null ? 'Select a slot' : SLOTS[slotIdx]}
+                        {slotIdx === null ? 'Select a slot' : SLOTS[slotIdx].label}
                       </strong>
                     </div>
                   </div>
                   <div style={{ borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
-                  <label className="field-label">Full name</label>
-                  <input className="input-base" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Your name" />
-                  <label className="field-label" style={{ marginTop: '.75rem' }}>Email</label>
-                  <input className="input-base" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="you@example.com" />
-                  <label className="field-label" style={{ marginTop: '.75rem' }}>Purpose (optional)</label>
-                  <input className="input-base" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} placeholder="e.g. Study circle meeting" />
-                  <button
+                  <label className="field-label" htmlFor="rb-purpose">Purpose (optional)</label>
+                  <input
+                    id="rb-purpose"
+                    className="input-base"
+                    value={purpose}
+                    onChange={(e) => setPurpose(e.target.value)}
+                    placeholder="e.g. Study circle meeting"
+                    maxLength={200}
+                  />
+                  {error && (
+                    <p style={{ color: 'var(--destructive)', fontSize: '.8125rem', marginTop: '.5rem' }}>{error}</p>
+                  )}
+                  <Button
                     type="submit"
                     className="btn btn-primary"
                     disabled={!canConfirm}
+                    loading={submitting}
                     style={{ marginTop: '1.25rem', width: '100%', justifyContent: 'center', opacity: canConfirm ? 1 : .55 }}
                   >
-                    Confirm Booking <IconArrowRight size="sm" />
-                  </button>
-                  <p className="muted-text" style={{ fontSize: '.6875rem', marginTop: '.6rem', textAlign: 'center' }}>
-                    Demo booking — no real reservation is made.
+                    {submitting ? 'Submitting…' : 'Request Booking'} {!submitting && <IconArrowRight size="sm" />}
+                  </Button>
+                  <p className="muted-text" style={{ fontSize: '.6875rem', marginTop: '.6rem', textAlign: 'center', lineHeight: 1.45 }}>
+                    A ₹500 refundable deposit is collected after the branch confirms your booking.
+                    Bookings auto-cancel if absent for more than 7 days.
                   </p>
                 </form>
               )}

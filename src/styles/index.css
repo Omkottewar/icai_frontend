@@ -102,6 +102,81 @@ input, select, textarea { font-family: inherit; }
 .btn-ghost-light { background: rgba(255,255,255,.1); color: white; border-color: rgba(255,255,255,.3); backdrop-filter: blur(8px); }
 .btn-ghost-light:hover { background: rgba(255,255,255,.2); }
 
+/* ── Loading state for any .btn ─────────────────────────────────────────
+   Two activation paths:
+     1. The <Button> component sets data-loading + .btn-loading
+     2. Any caller can opt in via data-loading="true" on a native <button>
+   The button is fully blocked from interaction while loading; pointer
+   becomes "wait" so users see something is in flight.                  */
+.btn[disabled],
+.btn[data-loading="true"] {
+  cursor: not-allowed;
+  opacity: .85;
+}
+.btn[data-loading="true"] {
+  cursor: wait;
+  pointer-events: none;
+}
+.btn-loading .btn-label { opacity: .8; }
+.btn-loading-overlay .btn-label { visibility: hidden; }
+.btn-spinner-overlay {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-loading-overlay { position: relative; }
+.btn-spinner {
+  display: inline-block;
+  width: .85em;
+  height: .85em;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: btn-spin .65s linear infinite;
+}
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner { animation: btn-spin 1.6s linear infinite; }
+}
+
+/* WCAG 2.4.7 Focus Visible — keyboard focus must be perceivable. Mouse
+   clicks suppress the ring via :focus-visible (browser-managed). */
+.btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: .25rem;
+}
+
+/* WCAG 2.4.1 Skip Link — first focusable element. Visually hidden until
+   it receives keyboard focus, at which point it animates into view above
+   all content. Pairs with id="main-content" on the page main element. */
+.skip-link {
+  position: fixed;
+  top: -3rem;
+  left: 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: .5rem 1rem;
+  border-radius: .25rem;
+  font-weight: 600;
+  z-index: 9999;
+  transition: top .15s ease;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 1rem;
+  outline: 2px solid white;
+  outline-offset: 2px;
+}
+
 .input-base {
   width: 100%;
   padding: .625rem .75rem;
@@ -907,13 +982,140 @@ input, select, textarea { font-family: inherit; }
 
 .divider-top { border-top: 1px solid var(--border); }
 
-@keyframes scroll {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+/* ── Announcement ticker ────────────────────────────────────────────────
+   Industry-standard marquee. Slow, continuous; pauses on hover, focus,
+   or when the user tabs into one of the items so a click is achievable;
+   honours prefers-reduced-motion by stopping motion entirely.
+
+   The track contains the announcement list duplicated twice. The animation
+   translates by -50% (one full copy of the list), then the keyframe loops
+   so the second copy slides in to replace the first — seamless from the
+   user's POV. */
+.ticker-bar {
+  border-top: 1px solid oklch(0.78 0.13 90 / 0.6);
+  border-bottom: 1px solid oklch(0.78 0.13 90 / 0.6);
+  background: oklch(0.92 0.09 90 / 0.55);
+}
+.ticker-row {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .375rem 1rem;
+  font-size: .875rem;
+}
+.ticker-label {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: .15rem .55rem;
+  border-radius: .375rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ticker-label:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.ticker-viewport {
+  flex: 1 1 auto;
+  overflow: hidden;
+  min-width: 0;
+  /* Soft fade on both edges so items appear to come in / out instead of
+     pop at the container boundary. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+          mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
 }
 .ticker-track {
-  display: inline-flex; gap: 3rem; white-space: nowrap;
-  animation: scroll 35s linear infinite;
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5rem;
+  white-space: nowrap;
+  /* 90s is the industry-standard sweet spot for branch news tickers —
+     readable, not boring. (The legacy 35s was too aggressive.) */
+  animation: ticker-scroll 90s linear infinite;
+  /* Hint to the browser this is a long-running transform animation so
+     it's hardware-accelerated. */
+  will-change: transform;
+}
+/* Pause animation when the user hovers the bar, focuses any item with
+   the keyboard, or hovers the View-all link. */
+.ticker-bar:hover .ticker-track,
+.ticker-bar:focus-within .ticker-track {
+  animation-play-state: paused;
+}
+.ticker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: rgba(0, 0, 0, .78);
+  text-decoration: none;
+  font-weight: 500;
+  padding: .15rem .25rem;
+  border-radius: .25rem;
+  transition: color .15s ease, background .15s ease;
+}
+.ticker-item:hover,
+.ticker-item:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  outline: none;
+}
+.ticker-item:focus-visible {
+  /* Subtle focus ring for keyboard users only — no background fill. */
+  box-shadow: 0 0 0 2px oklch(0.36 0.13 255 / 0.35);
+  border-radius: .25rem;
+}
+.ticker-dot {
+  color: var(--primary);
+  font-weight: 700;
+}
+.ticker-title { white-space: nowrap; }
+.ticker-pdf {
+  font-size: .625rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: .05rem .3rem;
+  border-radius: .2rem;
+  background: oklch(0.95 0.04 25);
+  color: oklch(0.45 0.18 25);
+  margin-left: .15rem;
+}
+.ticker-viewall {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-weight: 600;
+  font-size: .8125rem;
+  color: var(--primary);
+  text-decoration: none;
+  padding: .15rem .35rem;
+  border-radius: .25rem;
+  white-space: nowrap;
+}
+.ticker-viewall:hover,
+.ticker-viewall:focus-visible {
+  text-decoration: underline;
+  outline: none;
+}
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+/* Accessibility: stop the marquee entirely for users who've asked for
+   reduced motion. The list is still navigable via Tab. */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; }
+}
+@media (max-width: 640px) {
+  .ticker-viewall { display: none; }
+  .ticker-row { gap: .5rem; padding: .375rem .75rem; }
 }
 
 /* Icons */
@@ -1031,6 +1233,7 @@ input, select, textarea { font-family: inherit; }
 .alert-error { background: oklch(0.577 0.245 27.325 / 0.08); color: var(--destructive); border: 1px solid oklch(0.577 0.245 27.325 / 0.2); }
 .alert-success { background: oklch(0.55 0.14 155 / 0.08); color: var(--secondary); border: 1px solid oklch(0.55 0.14 155 / 0.2); }
 
+/* Legacy single-toast (still used by AuthContext until migration is complete) */
 .toast {
   position: fixed; bottom: 1.5rem; right: 1.5rem;
   background: var(--card); border: 1px solid var(--border);
@@ -1044,6 +1247,190 @@ input, select, textarea { font-family: inherit; }
 @keyframes slideIn {
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
+}
+
+/* ── Top-right toast stack ─────────────────────────────────────────────
+   Anchored to the top-right of the viewport. Stacks vertically with a
+   small gap and slides in from the right; tapped/swiped or auto-dismissed
+   after the configured duration. */
+.toast-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .625rem;
+  z-index: 1000;
+  pointer-events: none;
+  max-width: min(26rem, calc(100vw - 2rem));
+}
+.toast-item {
+  pointer-events: auto;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted-foreground);
+  border-radius: .5rem;
+  padding: .75rem .875rem;
+  display: flex;
+  align-items: flex-start;
+  gap: .625rem;
+  box-shadow: 0 12px 28px -10px oklch(0.18 0.05 250 / 0.28), 0 2px 4px -2px oklch(0.18 0.05 250 / 0.08);
+  font-size: .875rem;
+  animation: toastIn .22s cubic-bezier(.2,.7,.2,1);
+  min-width: 16rem;
+}
+.toast-item.toast-leaving { animation: toastOut .2s ease forwards; }
+.toast-success { border-left-color: var(--secondary); }
+.toast-error   { border-left-color: var(--destructive); }
+.toast-warning { border-left-color: oklch(0.78 0.16 75); }
+.toast-info    { border-left-color: var(--primary); }
+.toast-icon {
+  flex: 0 0 auto;
+  width: 1.125rem;
+  height: 1.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.toast-success .toast-icon { color: var(--secondary); }
+.toast-error   .toast-icon { color: var(--destructive); }
+.toast-warning .toast-icon { color: oklch(0.62 0.16 75); }
+.toast-info    .toast-icon { color: var(--primary); }
+.toast-body { flex: 1 1 auto; min-width: 0; }
+.toast-title {
+  font-weight: 600;
+  font-size: .8125rem;
+  margin-bottom: .125rem;
+  color: var(--foreground);
+}
+.toast-text {
+  color: var(--foreground);
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+.toast-close {
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: .25rem;
+  color: var(--muted-foreground);
+  transition: background .15s, color .15s;
+}
+.toast-close:hover { background: var(--muted); color: var(--foreground); }
+.toast-close:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+@keyframes toastIn {
+  from { transform: translateX(110%); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+@keyframes toastOut {
+  from { transform: translateX(0); opacity: 1; }
+  to   { transform: translateX(110%); opacity: 0; }
+}
+@media (max-width: 640px) {
+  .toast-stack { top: .75rem; right: .75rem; left: .75rem; max-width: none; }
+  .toast-item { min-width: 0; }
+}
+
+/* ── Modal alert / confirm / prompt ───────────────────────────────────
+   Replaces native window.alert / .confirm / .prompt. Centred backdrop with
+   a card-style shell that matches the rest of the app. */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.18 0.05 250 / 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: dialogFadeIn .15s ease;
+}
+.dialog-shell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  box-shadow: 0 25px 50px -12px oklch(0.18 0.05 250 / 0.35);
+  width: min(28rem, 100%);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  animation: dialogPopIn .2s cubic-bezier(.2,.7,.2,1);
+}
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: 1.125rem 1.25rem .25rem;
+}
+.dialog-title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.dialog-close {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: .25rem;
+  color: var(--muted-foreground);
+  transition: background .15s, color .15s;
+}
+.dialog-close:hover { background: var(--muted); color: var(--foreground); }
+.dialog-close:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.dialog-body {
+  padding: .25rem 1.25rem 1rem;
+  overflow-y: auto;
+  font-size: .9375rem;
+  color: var(--foreground);
+  line-height: 1.5;
+}
+.dialog-text {
+  margin: .5rem 0;
+  white-space: pre-line;
+}
+.dialog-text:first-child { margin-top: 0; }
+.dialog-text:last-child { margin-bottom: 0; }
+.dialog-input { margin-top: .75rem; }
+.dialog-error {
+  margin-top: .5rem;
+  color: var(--destructive);
+  font-size: .8125rem;
+}
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: .5rem;
+  padding: .875rem 1.25rem 1.125rem;
+  border-top: 1px solid var(--border);
+  background: oklch(0.985 0.005 240);
+  border-bottom-left-radius: .75rem;
+  border-bottom-right-radius: .75rem;
+}
+.btn-danger {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+.btn-danger:hover { filter: brightness(0.92); }
+@keyframes dialogFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes dialogPopIn {
+  from { transform: translateY(8px) scale(.97); opacity: 0; }
+  to   { transform: translateY(0) scale(1); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dialog-overlay, .dialog-shell,
+  .toast-item, .toast-item.toast-leaving { animation: none; }
 }
 
 /* Modal */

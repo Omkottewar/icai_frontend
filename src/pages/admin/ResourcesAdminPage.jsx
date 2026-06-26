@@ -4,6 +4,8 @@ import { adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { IconPlus, IconCheck, IconX, IconEdit, IconTrash, IconArrowRight } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 function ResourceListShimmer({ count = 5 }) {
   return (
@@ -106,7 +108,15 @@ function ModerationQueue() {
   };
 
   const reject = async (item) => {
-    const note = prompt(`Tell ${item.submitted_by_name || 'the submitter'} what needs to change:`);
+    const note = await dialog.prompt({
+      title: 'Reject paper',
+      message: `Tell ${item.submitted_by_name || 'the submitter'} what needs to change:`,
+      placeholder: 'Specific feedback for the submitter',
+      multiline: true,
+      required: true,
+      confirmText: 'Reject',
+      danger: true,
+    });
     if (!note?.trim()) return;
     act(item.id, 'reject', note.trim());
   };
@@ -163,7 +173,13 @@ function PapersTab() {
   useEffect(load, [status]);
 
   const remove = async (id) => {
-    if (!confirm('Delete this paper? This cannot be undone.')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete paper?',
+      message: 'Delete this paper? This cannot be undone.',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try { await adminFetch(`/api/admin/resources/papers/${id}`, { method: 'DELETE' }); showToast('Deleted', 'success'); load(); }
     catch (e) { showToast(e.message, 'error'); }
   };
@@ -228,7 +244,13 @@ function EjournalTab() {
   }, []);
 
   const remove = async (id) => {
-    if (!confirm('Delete this issue?')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete issue?',
+      message: 'Delete this issue?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try { await adminFetch(`/api/admin/resources/ejournal-issues/${id}`, { method: 'DELETE' }); showToast('Deleted', 'success'); load(); }
     catch (e) { showToast(e.message, 'error'); }
   };
@@ -311,7 +333,7 @@ function EjournalEditor({ row, topics, onClose }) {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', marginTop: '.5rem' }}>
           <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+          <Button type="submit" className="btn btn-primary" loading={busy}>{busy ? 'Saving…' : 'Save'}</Button>
         </div>
       </form>
       <style>{MODAL_STYLES}</style>
@@ -333,9 +355,22 @@ function TopicsTab() {
   };
 
   const addTopic = async () => {
-    const name = prompt('Topic name (e.g. "Crypto Tax"):');
+    const name = await dialog.prompt({
+      title: 'New topic',
+      message: 'Topic name (e.g. "Crypto Tax"):',
+      placeholder: 'Topic name',
+      required: true,
+      confirmText: 'Next',
+    });
     if (!name?.trim()) return;
-    const code = prompt('Short code (lowercase, no spaces — e.g. "crypto"):', name.toLowerCase().replace(/[^a-z0-9]+/g, '_'));
+    const code = await dialog.prompt({
+      title: 'Topic code',
+      message: 'Short code (lowercase, no spaces — e.g. "crypto"):',
+      defaultValue: name.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
+      placeholder: 'lowercase code',
+      required: true,
+      confirmText: 'Create',
+    });
     if (!code?.trim()) return;
     try { await adminFetch('/api/admin/resources/topics', { method: 'POST', body: { name: name.trim(), code: code.trim() } }); load(); }
     catch (e) { showToast(e.message, 'error'); }
@@ -378,7 +413,13 @@ function LinkCardsTab() {
   useEffect(load, []);
 
   const remove = async (id) => {
-    if (!confirm('Delete this link card?')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete link card?',
+      message: 'Delete this link card?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try { await adminFetch(`/api/admin/resources/link-cards/${id}`, { method: 'DELETE' }); load(); }
     catch (e) { showToast(e.message, 'error'); }
   };
@@ -459,7 +500,7 @@ function LinkCardEditor({ row, onClose }) {
         </label>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '.5rem', marginTop: '.5rem' }}>
           <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button>
+          <Button type="submit" className="btn btn-primary" loading={busy}>{busy ? 'Saving…' : 'Save'}</Button>
         </div>
       </form>
       <style>{MODAL_STYLES}</style>

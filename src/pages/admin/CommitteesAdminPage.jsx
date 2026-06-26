@@ -6,6 +6,8 @@ import FormField from '../../components/admin/FormField';
 import { useAdminList, adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { ShimmerFormField } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 const EMPTY_FORM = { code: '', name: '', description: '', active: true };
 
@@ -159,7 +161,13 @@ function CommitteeDrawer({ committeeId, onClose, onSaved, showToast }) {
   }
 
   async function hardDelete() {
-    if (!confirm(`Permanently delete "${detail?.name}"? This cannot be undone.`)) return;
+    const ok = await dialog.confirm({
+      title: 'Permanently delete?',
+      message: `Permanently delete "${detail?.name}"? This cannot be undone.`,
+      confirmText: 'Delete forever',
+      danger: true,
+    });
+    if (!ok) return;
     setSaving(true);
     try {
       await adminFetch(`/api/admin/committees/${committeeId}`, { method: 'DELETE' });
@@ -192,9 +200,9 @@ function CommitteeDrawer({ committeeId, onClose, onSaved, showToast }) {
             </button>
           )}
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving || loading} style={{ padding: '.5rem 1rem' }}>
+          <Button className="btn btn-primary" onClick={save} disabled={loading} loading={saving} style={{ padding: '.5rem 1rem' }}>
             {saving ? 'Saving…' : (isNew ? 'Create committee' : 'Save changes')}
-          </button>
+          </Button>
         </>
       }
     >

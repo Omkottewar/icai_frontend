@@ -3,6 +3,9 @@ import { useRoute, navigate } from '../../hooks/useRoute';
 import PageHeader from '../../components/layout/PageHeader';
 import { Shimmer } from '../../components/ui/Shimmer';
 import { IconPlus, IconTrash, IconCheck } from '../../icons';
+import { toast } from '../../lib/notify';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 // Admin question builder for a single mock test.
 //
@@ -55,11 +58,17 @@ export default function MockTestQuestionsAdminPage() {
   useEffect(() => { load(); }, [load]);
 
   const remove = async (qid) => {
-    if (!window.confirm('Delete this question?')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete question?',
+      message: 'Delete this question?',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api(`/api/admin/mock-tests/${testId}/questions/${qid}`, { method: 'DELETE' });
       load();
-    } catch (e) { alert(e.message); }
+    } catch (e) { toast.error(e.message); }
   };
 
   // ── Word import ───────────────────────────────────────────────────
@@ -71,11 +80,11 @@ export default function MockTestQuestionsAdminPage() {
     e.target.value = ''; // allow re-picking the same file later
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.docx')) {
-      alert('Please pick a .docx file (Word). Save older .doc files as .docx first.');
+      toast.error('Please pick a .docx file (Word). Save older .doc files as .docx first.');
       return;
     }
     if (file.size > 4 * 1024 * 1024) {
-      alert('File is larger than 4 MB. Trim the document and try again.');
+      toast.error('File is larger than 4 MB. Trim the document and try again.');
       return;
     }
     setImporting(true);
@@ -95,7 +104,7 @@ export default function MockTestQuestionsAdminPage() {
       });
       setImportPreview(r);
     } catch (ex) {
-      alert(`Import failed: ${ex.message}`);
+      toast.error(`Import failed: ${ex.message}`);
     } finally {
       setImporting(false);
     }
@@ -110,9 +119,9 @@ export default function MockTestQuestionsAdminPage() {
       });
       setImportPreview(null);
       load();
-      alert(`Imported ${r.inserted} question${r.inserted === 1 ? '' : 's'}.`);
+      toast.success(`Imported ${r.inserted} question${r.inserted === 1 ? '' : 's'}.`);
     } catch (e) {
-      alert(`Import failed: ${e.message}`);
+      toast.error(`Import failed: ${e.message}`);
     } finally {
       setImporting(false);
     }
@@ -287,7 +296,7 @@ function QuestionEditor({ testId, initial, onClose, onSaved }) {
       }
       onSaved?.();
     } catch (e) {
-      alert(e.message);
+      toast.error(e.message);
     } finally {
       setSaving(false);
     }
@@ -385,9 +394,9 @@ function QuestionEditor({ testId, initial, onClose, onSaved }) {
 
         <div className="row gap-2" style={{ justifyContent: 'flex-end', marginTop: '1.5rem' }}>
           <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving || !body.trim()}>
+          <Button className="btn btn-primary" onClick={save} disabled={!body.trim()} loading={saving}>
             {saving ? 'Saving…' : 'Save question'}
-          </button>
+          </Button>
         </div>
 
         <style>{`

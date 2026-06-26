@@ -3,10 +3,12 @@ import PageHeader from '../components/layout/PageHeader';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { useAuth } from '../context/AuthContext';
 import QuestionRenderer from '../components/checklists/QuestionRenderer';
-import { hasAnswer, ROLE_OPTIONS } from '../lib/checklistQuestions';
-import { IconX } from '../icons';
+import QuestionEditor from '../components/checklists/QuestionEditor';
+import { hasAnswer, ROLE_OPTIONS, QUESTION_TYPES, newQuestion, MCM_ROLE_CODES, ROLE_CODE_LABEL } from '../lib/checklistQuestions';
+import { IconX, IconPlus } from '../icons';
 import { CHECKLIST_STATUS, toneStyle } from '../lib/eventStatus';
 import { useRoleFlags } from '../hooks/useRoleFlags';
+import { dialog } from '../lib/dialog';
 import { Shimmer, ShimmerLines, ShimmerDrawerBody } from '../components/ui/Shimmer';
 
 // Friendly label for an internal role code. Falls back to a prettified
@@ -142,6 +144,10 @@ function InstanceDrawer({ id, onClose }) {
   // Admin-only "Manage assignments" dialog state. Opens via the Manage
   // button next to the assignee summary.
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  // Admin-only "Manage questions" drawer state. Opens via the button next
+  // to the title; lets the admin add / edit / remove / re-order questions
+  // on THIS instance only (does not touch the parent template).
+  const [questionsDialogOpen, setQuestionsDialogOpen] = useState(false);
 
   const load = async () => {
     try {
@@ -171,6 +177,10 @@ function InstanceDrawer({ id, onClose }) {
   // Admin sees the "Manage assignments" affordance. canManage is set true
   // only for admins on the instance, so checking it is enough.
   const canManageAssignments = !!perms.canManage;
+  // Same gate, but additionally restricted to editable statuses — once
+  // submitted or approved, the question list is locked.
+  const canManageQuestions = !!perms.canManage
+    && ['awaiting_fill', 'rejected', 'draft'].includes(instance.status);
 
   // The `section_owner_role` on a section_heading now denotes who REVIEWS
   // the section after submission — it drives the multi-stage approval
@@ -308,7 +318,12 @@ function InstanceDrawer({ id, onClose }) {
   };
 
   const approve = async () => {
-    if (!confirm('Approve this checklist?')) return;
+    const ok = await dialog.confirm({
+      title: 'Approve checklist?',
+      message: 'Approve this checklist?',
+      confirmText: 'Approve',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api(`/api/checklist-instances/${id}/approve`, { method: 'POST' });
@@ -319,7 +334,15 @@ function InstanceDrawer({ id, onClose }) {
   };
 
   const reject = async () => {
-    const note = prompt('Reason for rejection?');
+    const note = await dialog.prompt({
+      title: 'Reject checklist',
+      message: 'Reason for rejection?',
+      placeholder: 'Tell the submitter what needs to change',
+      multiline: true,
+      required: true,
+      confirmText: 'Reject',
+      danger: true,
+    });
     if (!note?.trim()) return;
     setBusy(true);
     try {
@@ -335,7 +358,12 @@ function InstanceDrawer({ id, onClose }) {
   // treasurer, VC). The backend trigger cascades the instance status when
   // all stages are decided.
   const approveStage = async (stageCode) => {
-    if (!confirm(`Approve "${stageCode.replace(/_/g, ' ')}" stage?`)) return;
+    const ok = await dialog.confirm({
+      title: 'Approve stage?',
+      message: `Approve "${stageCode.replace(/_/g, ' ')}" stage?`,
+      confirmText: 'Approve',
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api(`/api/checklist-instances/${id}/approve-stage`, {
@@ -348,7 +376,14 @@ function InstanceDrawer({ id, onClose }) {
     finally { setBusy(false); }
   };
   const rejectStage = async (stageCode) => {
-    const note = prompt('Reason for sending this back?');
+    const note = await dialog.prompt({
+      title: 'Send back?',
+      message: 'Reason for sending this back?',
+      placeholder: 'Tell the committee what to revise',
+      multiline: true,
+      required: true,
+      confirmText: 'Send back',
+    });
     if (!note?.trim()) return;
     setBusy(true);
     try {
@@ -365,13 +400,22 @@ function InstanceDrawer({ id, onClose }) {
   // Terminal reject — closes the event for good. Triggers a stronger
   // confirm than 'send back' because the action cancels the linked event.
   const rejectFinal = async (stageCode) => {
-    const okay = confirm(
-      'Reject completely will CANCEL the linked event and the checklist permanently. ' +
-      'The committee chairman cannot re-fill or re-submit. ' +
-      'Use this only if the event is dead — not for "needs more work" cases. Continue?',
-    );
+    const okay = await dialog.confirm({
+      title: 'Reject completely?',
+      message: 'Reject completely will CANCEL the linked event and the checklist permanently. The committee chairman cannot re-fill or re-submit.\n\nUse this only if the event is dead — not for "needs more work" cases. Continue?',
+      confirmText: 'Reject & cancel event',
+      danger: true,
+    });
     if (!okay) return;
-    const note = prompt('Reason for terminal rejection? (required, will be in the audit log)');
+    const note = await dialog.prompt({
+      title: 'Reason for terminal rejection',
+      message: 'Reason for terminal rejection? (required, will be in the audit log)',
+      placeholder: 'Why is this being terminated?',
+      multiline: true,
+      required: true,
+      confirmText: 'Reject & cancel',
+      danger: true,
+    });
     if (!note?.trim()) return;
     setBusy(true);
     try {
@@ -387,9 +431,19 @@ function InstanceDrawer({ id, onClose }) {
 
   const release = async () => {
     if (!assignees?.filler) {
-      if (!confirm('No filler is assigned yet. Releasing now will rely on role-based fallback. Continue?')) return;
+      const ok = await dialog.confirm({
+        title: 'Release without filler?',
+        message: 'No filler is assigned yet. Releasing now will rely on role-based fallback. Continue?',
+        confirmText: 'Release',
+      });
+      if (!ok) return;
     } else {
-      if (!confirm(`Release this checklist to ${assignees.filler.name}? After release they can fill it.`)) return;
+      const ok = await dialog.confirm({
+        title: 'Release checklist?',
+        message: `Release this checklist to ${assignees.filler.name}? After release they can fill it.`,
+        confirmText: 'Release',
+      });
+      if (!ok) return;
     }
     setBusy(true);
     try {
@@ -412,7 +466,24 @@ function InstanceDrawer({ id, onClose }) {
               {template.name} v{template.version} · Updated {fmt(instance.updated_at)}
             </p>
           </div>
-          <StatusPill status={instance.status} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem' }}>
+            {canManageQuestions && (
+              <button
+                type="button"
+                onClick={() => setQuestionsDialogOpen(true)}
+                style={{
+                  background: 'transparent', border: '1px solid var(--border)',
+                  borderRadius: '.3rem', padding: '.3rem .7rem',
+                  font: 'inherit', fontSize: '.78rem', fontWeight: 600,
+                  cursor: 'pointer', color: 'var(--primary, #1e40af)',
+                }}
+                title="Add, remove, re-order or re-word the questions on THIS instance (does not affect the parent template)"
+              >
+                Manage questions
+              </button>
+            )}
+            <StatusPill status={instance.status} />
+          </div>
         </div>
 
         {/* Assignee summary — surfaced for everyone but most useful to admin
@@ -739,6 +810,19 @@ function InstanceDrawer({ id, onClose }) {
           showToast={showToast}
         />
       )}
+      {questionsDialogOpen && (
+        <InstanceQuestionsDialog
+          instanceId={instance.id}
+          initialQuestions={questions}
+          onClose={() => setQuestionsDialogOpen(false)}
+          onSaved={async () => {
+            setQuestionsDialogOpen(false);
+            await load();
+            showToast?.('Questions updated', 'success');
+          }}
+          showToast={showToast}
+        />
+      )}
     </FullDrawer>
   );
 }
@@ -752,35 +836,27 @@ function SectionAssignmentsDialog({
   instanceId, sections, initialAssignments, initialFiller, initialReviewer,
   onClose, onSaved, showToast,
 }) {
-  // Pre-fill the picker with whatever's already on the instance.
-  const [assignments, setAssignments] = useState(() => {
-    const m = {};
-    for (const a of initialAssignments || []) {
-      if (a.assignee_id) m[a.section_question_id] = a.assignee_id;
-    }
-    return m;
-  });
+  // Per F20: per-section USER assignments were removed. The committee
+  // chairman fills the entire checklist regardless of which sections
+  // exist; the only thing that varies per section is the REVIEWER role,
+  // which is set on the template itself. So this dialog now only
+  // re-assigns the primary filler and primary reviewer.
   const [primaryFiller, setPrimaryFiller] = useState(initialFiller || '');
   const [primaryReviewer, setPrimaryReviewer] = useState(initialReviewer || '');
   const [users, setUsers] = useState([]);
-  const [userSearch, setUserSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
-  // Pre-load users (same debounce pattern as the create modal).
+  // Fetch the MCM-eligible directory once on mount. Each picker has its
+  // own internal search box, so no debounced server-side search needed.
   useEffect(() => {
     let cancelled = false;
-    const q = userSearch.trim();
-    const url = q
-      ? `/api/admin/users?q=${encodeURIComponent(q)}&status=active&pageSize=25`
-      : '/api/admin/users?status=active&pageSize=50';
-    const t = setTimeout(() => {
-      api(url)
-        .then((j) => { if (!cancelled) setUsers(j.rows || []); })
-        .catch(() => {});
-    }, q ? 250 : 0);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [userSearch]);
+    const url = `/api/admin/users?status=active&pageSize=100&role_codes=${MCM_ROLE_CODES.join(',')}`;
+    api(url)
+      .then((j) => { if (!cancelled) setUsers(j.rows || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   // Always close on Escape — matches the rest of the modal UX.
   useEffect(() => {
@@ -793,17 +869,8 @@ function SectionAssignmentsDialog({
     if (saving) return;
     setSaving(true); setErr('');
     try {
-      // 1. Replace-all section assignments.
-      const list = Object.entries(assignments)
-        .filter(([_, uid]) => !!uid)
-        .map(([section_question_id, assignee_id]) => ({ section_question_id, assignee_id }));
-      await api(`/api/checklist-instances/${instanceId}/section-assignments`, {
-        method: 'PUT',
-        body: { assignments: list },
-      });
-
-      // 2. Patch primary filler / reviewer only if they actually changed.
-      //    Sending undefined would no-op; sending an empty string clears.
+      // Patch primary filler / reviewer only if they actually changed.
+      // Sending undefined would no-op; sending an empty string clears.
       const patch = {};
       if (primaryFiller   !== initialFiller)   patch.assigned_fill_user_id   = primaryFiller || null;
       if (primaryReviewer !== initialReviewer) patch.assigned_review_user_id = primaryReviewer || null;
@@ -823,47 +890,17 @@ function SectionAssignmentsDialog({
     <div className="sad-root" onClick={onClose}>
       <div className="sad-card" onClick={(e) => e.stopPropagation()}>
         <header className="sad-head">
-          <h2 style={{ margin: 0, fontSize: '1rem' }}>Manage assignments</h2>
+          <h2 style={{ margin: 0, fontSize: '1rem' }}>Reassign filler / reviewer</h2>
           <button className="sad-x" onClick={onClose} aria-label="Close">×</button>
         </header>
 
         <div className="sad-body">
           {err && <p style={{ color: 'var(--destructive)' }}>{err}</p>}
 
-          <div className="sad-search">
-            <input
-              type="search"
-              placeholder="Search users by name or email…"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              className="sad-input"
-            />
-          </div>
-
-          {sections.length === 0 && (
-            <p className="muted-text" style={{ fontSize: '.85rem' }}>
-              This template has no sections.
-            </p>
-          )}
-
-          {sections.map((s) => {
-            const value = assignments[s.id] || '';
-            return (
-              <div key={s.id} className="sad-row">
-                <div className="sad-row-info">
-                  <strong>{s.label || '(unnamed section)'}</strong>
-                </div>
-                <DialogUserPicker
-                  users={users}
-                  value={value}
-                  placeholder="— Primary filler —"
-                  onChange={(uid) => setAssignments((m) => ({ ...m, [s.id]: uid }))}
-                />
-              </div>
-            );
-          })}
-
-          <div className="sad-divider">Primary filler / reviewer</div>
+          <p className="muted-text" style={{ fontSize: '.8rem', marginBottom: '.75rem' }}>
+            The committee chairman fills the entire checklist; the branch chairman approves it. Change the assignees
+            below only if a different person from the managing committee will handle this event.
+          </p>
 
           <div className="sad-row">
             <div className="sad-row-info"><strong>Primary filler</strong></div>
@@ -883,6 +920,13 @@ function SectionAssignmentsDialog({
               onChange={setPrimaryReviewer}
             />
           </div>
+
+          {sections.length > 0 && (
+            <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.5rem', padding: '.4rem .55rem', background: 'var(--muted, #f8fafc)', border: '1px dashed var(--border)', borderRadius: '.4rem' }}>
+              This checklist has {sections.length} section{sections.length === 1 ? '' : 's'}. The reviewer above
+              approves the whole checklist at once.
+            </div>
+          )}
         </div>
 
         <footer className="sad-foot">
@@ -996,16 +1040,52 @@ function SectionAssignmentsDialog({
 // Lightweight user picker for the reassign dialog. Duplicated (with
 // different class names) so that styling collisions with the create-flow
 // picker don't bleed across.
+// Pick the most relevant role badge to display next to a user's name
+// in the picker. Walks MCM_ROLE_CODES so "Branch Chairman" wins over
+// the generic "MCM" assignment when a person holds both.
+function pickRoleBadge(activeRoles) {
+  if (!Array.isArray(activeRoles) || activeRoles.length === 0) return null;
+  const codes = activeRoles.map((r) => r.role_code);
+  for (const c of MCM_ROLE_CODES) {
+    if (codes.includes(c)) return ROLE_CODE_LABEL[c] || c;
+  }
+  return activeRoles[0]?.role_name || ROLE_CODE_LABEL[activeRoles[0]?.role_code] || null;
+}
+
 function DialogUserPicker({ users, value, placeholder, onChange }) {
   const [open, setOpen] = useState(false);
+  // Internal search box — filters the (already MCM-scoped) users list
+  // client-side so the admin doesn't scroll through dozens of names.
+  const [search, setSearch] = useState('');
   const ref = useRef(null);
+  const searchRef = useRef(null);
   useEffect(() => {
     if (!open) return;
     const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, [open]);
+  useEffect(() => {
+    if (open) {
+      setSearch('');
+      setTimeout(() => searchRef.current?.focus(), 0);
+    }
+  }, [open]);
   const picked = value ? users.find((u) => u.id === value) : null;
+
+  const filtered = (() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) =>
+      (u.name || '').toLowerCase().includes(q)
+      || (u.email || '').toLowerCase().includes(q)
+      || (Array.isArray(u.active_roles) && u.active_roles.some((r) =>
+        (r.role_name || '').toLowerCase().includes(q)
+        || (ROLE_CODE_LABEL[r.role_code] || '').toLowerCase().includes(q)
+      )),
+    );
+  })();
+
   return (
     <div ref={ref} className="dup-wrap">
       <button
@@ -1020,12 +1100,32 @@ function DialogUserPicker({ users, value, placeholder, onChange }) {
       </button>
       {open && (
         <div className="dup-menu">
-          {users.length === 0 ? (
+          <div style={{
+            position: 'sticky', top: 0, background: 'var(--card)',
+            padding: '.4rem .5rem', borderBottom: '1px solid var(--border)',
+            zIndex: 1,
+          }}>
+            <input
+              ref={searchRef}
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, email or role…"
+              style={{
+                width: '100%', padding: '.35rem .55rem',
+                border: '1px solid var(--border)', borderRadius: '.3rem',
+                fontSize: '.8rem', boxSizing: 'border-box',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          {filtered.length === 0 ? (
             <div style={{ color: 'var(--muted-foreground)', padding: '.5rem .55rem', fontSize: '.8rem' }}>
-              No users in that search
+              {search ? 'No matches' : 'No MCM users available'}
             </div>
-          ) : users.map((u) => {
+          ) : filtered.map((u) => {
             const active = u.id === value;
+            const roleBadge = pickRoleBadge(u.active_roles);
             return (
               <button
                 key={u.id}
@@ -1035,7 +1135,16 @@ function DialogUserPicker({ users, value, placeholder, onChange }) {
               >
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   <strong style={{ fontWeight: 600 }}>{u.name}</strong>
-                  <span style={{ marginLeft: '.4rem', color: 'var(--muted-foreground)', fontSize: '.75rem' }}>{u.email}</span>
+                  {roleBadge && (
+                    <span style={{
+                      marginLeft: '.4rem', fontSize: '.65rem', fontWeight: 600,
+                      padding: '.05rem .35rem', borderRadius: 999,
+                      background: 'rgba(30,58,138,.08)', color: 'var(--primary, #1e40af)',
+                    }}>
+                      {roleBadge}
+                    </span>
+                  )}
+                  <span style={{ marginLeft: '.4rem', color: 'var(--muted-foreground)', fontSize: '.7rem' }}>{u.email}</span>
                 </span>
                 {active && <span style={{ color: 'var(--primary, #1e40af)' }}>✓</span>}
               </button>
@@ -1180,6 +1289,235 @@ function ApprovalStagesPanel({ stages, instanceStatus, onApprove, onReject, onRe
         })}
       </ul>
     </section>
+  );
+}
+
+// ─── Manage questions dialog (admin per-instance editor) ────────────────
+// Lets the admin add / re-word / re-order / remove questions on THIS
+// instance only. Template stays untouched. Re-uses the QuestionEditor
+// component the templates page uses, but with a simpler shell — no
+// preset gallery, no metadata fields, just the question list.
+//
+// Behaviour at save time:
+//   • Existing questions keep their id → backend UPDATEs in place →
+//     responses & section_assignments survive untouched.
+//   • Newly added questions have no id → backend INSERTs with a fresh UUID.
+//   • Removed questions disappear from the array → backend DELETEs them
+//     (cascading their orphan responses + section_assignments).
+function InstanceQuestionsDialog({ instanceId, initialQuestions, onClose, onSaved, showToast }) {
+  // Map the loaded instance questions into the draft shape the
+  // QuestionEditor expects (it uses a `_draftId` for stable React keys
+  // across drag/move operations).
+  const seed = (initialQuestions || []).map((q) => ({
+    _draftId: `q_${q.id}`,
+    id: q.id,
+    type: q.type,
+    label: q.label,
+    help_text: q.help_text || '',
+    required: q.required,
+    config: q.config || {},
+    // section_owner_role intentionally not carried over — F21 made
+    // filler / approver an event-creation-time decision; instance
+    // questions no longer track a per-section role.
+  }));
+  const [questions, setQuestions] = useState(seed);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  const setQ = (idx, patch) =>
+    setQuestions((qs) => qs.map((q, i) => i === idx ? { ...q, ...patch } : q));
+  const setCfg = (idx, patch) =>
+    setQuestions((qs) => qs.map((q, i) => i === idx ? { ...q, config: { ...q.config, ...patch } } : q));
+  const move = (idx, dir) => {
+    setQuestions((qs) => {
+      const j = idx + dir;
+      if (j < 0 || j >= qs.length) return qs;
+      const copy = qs.slice();
+      [copy[idx], copy[j]] = [copy[j], copy[idx]];
+      return copy;
+    });
+  };
+  const remove = async (idx) => {
+    const q = questions[idx];
+    const isTemplateSourced = q.id && q.id.length > 0;
+    const message = isTemplateSourced
+      ? 'Remove this question from THIS event? (The template stays untouched.) Any answer already filled in for this question will also be deleted.'
+      : 'Remove this question?';
+    const ok = await dialog.confirm({
+      title: 'Remove question?',
+      message,
+      confirmText: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    setQuestions((qs) => qs.filter((_, i) => i !== idx));
+  };
+  const duplicate = (idx) => setQuestions((qs) => {
+    const src = qs[idx];
+    return [
+      ...qs.slice(0, idx + 1),
+      { ...src, _draftId: `q_${Math.random().toString(36).slice(2, 9)}`, id: undefined, label: src.label + ' (copy)' },
+      ...qs.slice(idx + 1),
+    ];
+  });
+
+  const addItem = (type) => {
+    setQuestions((qs) => [...qs, newQuestion(type)]);
+  };
+
+  const save = async () => {
+    setErr(''); setBusy(true);
+    try {
+      const payload = questions.map((q, i) => ({
+        // Only include id when it came from the server (existing row);
+        // newly-added drafts have undefined id so the backend INSERTs.
+        ...(q.id ? { id: q.id } : {}),
+        type: q.type,
+        label: q.label,
+        help_text: q.help_text || null,
+        required: !!q.required,
+        config: q.config || {},
+        sort_order: i,
+        // Always null per F21 — instance questions no longer carry a
+        // per-section reviewer role; approver is the instance-level
+        // assigned_review_user_id set at event-checklist creation time.
+        section_owner_role: null,
+      }));
+      if (payload.length === 0) throw new Error('Add at least one question');
+      for (const q of payload) {
+        if (!q.label.trim()) throw new Error('Every question needs a label');
+      }
+      await api(`/api/checklist-instances/${instanceId}/questions`, {
+        method: 'PUT',
+        body: { questions: payload },
+      });
+      onSaved?.();
+    } catch (e) {
+      setErr(e.message);
+      showToast?.(e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <FullDrawer onClose={onClose}>
+      <header style={{ borderBottom: '1px solid var(--border)', paddingBottom: '.75rem', marginBottom: '1rem' }}>
+        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Manage questions</h2>
+        <p className="muted-text" style={{ margin: '.25rem 0 0', fontSize: '.8125rem' }}>
+          Add, re-order, re-word or remove items on this event's checklist. Changes stay on this event and do <strong>not</strong> affect the master template or any other event's checklist.
+        </p>
+      </header>
+
+      {questions.length === 0 ? (
+        <p className="muted-text" style={{ padding: '1rem 0' }}>
+          No questions yet. Add one below to get started.
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.6rem' }}>
+          {questions.map((q, idx) => (
+            <div
+              key={q._draftId}
+              style={{
+                border: '1px solid var(--border)',
+                borderRadius: '.4rem',
+                padding: '.5rem .65rem',
+                background: q.type === 'section_heading' ? 'rgba(30,58,138,.04)' : 'var(--card)',
+              }}
+            >
+              <QuestionEditor
+                question={q}
+                index={idx}
+                count={questions.length}
+                onPatch={(p) => setQ(idx, p)}
+                onPatchConfig={(p) => setCfg(idx, p)}
+                onRemove={() => remove(idx)}
+                onMove={(dir) => move(idx, dir)}
+                onDuplicate={() => duplicate(idx)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AddQuestionMenu onAdd={addItem} />
+
+      {err && (
+        <p style={{ color: 'var(--destructive)', marginTop: '.75rem', fontSize: '.85rem' }}>{err}</p>
+      )}
+
+      <footer style={{
+        position: 'sticky', bottom: 0, marginTop: '1rem',
+        padding: '.75rem 0', borderTop: '1px solid var(--border)',
+        background: 'var(--card)',
+        display: 'flex', gap: '.5rem', justifyContent: 'flex-end',
+      }}>
+        <button type="button" onClick={onClose} disabled={busy} style={{ padding: '.4rem .9rem' }}>Cancel</button>
+        <button type="button" onClick={save} disabled={busy} className="btn-primary" style={{ padding: '.4rem .9rem' }}>
+          {busy ? 'Saving…' : 'Save changes'}
+        </button>
+      </footer>
+    </FullDrawer>
+  );
+}
+
+// Small picker that lets the user append a new question of the chosen
+// type. Defaults to "short text" since that's the 80% case; the dropdown
+// exposes every type the template builder supports.
+function AddQuestionMenu({ onAdd }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  return (
+    <div style={{ marginTop: '.75rem', position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setPickerOpen((o) => !o)}
+        style={{
+          background: 'var(--background)',
+          border: '1px dashed var(--border)',
+          borderRadius: '.4rem',
+          padding: '.55rem .85rem',
+          width: '100%',
+          textAlign: 'center',
+          fontSize: '.85rem',
+          fontWeight: 600,
+          color: 'var(--primary, #1e40af)',
+          cursor: 'pointer',
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '.4rem',
+        }}
+      >
+        <IconPlus size="sm" /> Add a question
+      </button>
+      {pickerOpen && (
+        <div style={{
+          position: 'absolute', bottom: 'calc(100% + .25rem)', left: 0, right: 0,
+          background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '.4rem',
+          boxShadow: '0 10px 25px rgba(0,0,0,.12)',
+          padding: '.4rem', display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.25rem',
+          zIndex: 5,
+        }}>
+          {QUESTION_TYPES.map((t) => (
+            <button
+              key={t.type}
+              type="button"
+              onClick={() => { onAdd(t.type); setPickerOpen(false); }}
+              style={{
+                background: 'transparent', border: 0, padding: '.4rem .55rem',
+                textAlign: 'left', fontSize: '.8rem', cursor: 'pointer',
+                borderRadius: '.3rem',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(30,58,138,.06)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {t.label}
+              {t.hint && (
+                <div className="muted-text" style={{ fontSize: '.68rem' }}>{t.hint}</div>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

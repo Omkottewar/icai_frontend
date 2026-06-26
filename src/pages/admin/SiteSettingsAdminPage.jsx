@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { SITE_SETTINGS } from '../../lib/siteContentSlots';
 import { SITE_SETTINGS_DEFAULTS } from '../../hooks/useSiteSettings';
 import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
+import Button from '../../components/ui/Button';
 
 // Group definitions in declaration order so the form is stable as keys are
 // added. SITE_SETTINGS already encodes the group per key.
@@ -59,9 +60,9 @@ export default function SiteSettingsAdminPage() {
       title="Site settings"
       subtitle="Contact details, footer text, and social links shown across the site"
       actions={
-        <button className="btn btn-primary" onClick={save} disabled={saving || loading} style={{ padding: '.5rem 1rem' }}>
+        <Button className="btn btn-primary" onClick={save} disabled={loading} loading={saving} style={{ padding: '.5rem 1rem' }}>
           {saving ? 'Saving…' : 'Save changes'}
-        </button>
+        </Button>
       }
     >
       {loading ? (

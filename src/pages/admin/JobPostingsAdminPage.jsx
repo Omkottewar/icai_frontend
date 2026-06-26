@@ -7,6 +7,8 @@ import { useAdminList, adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { Shimmer, ShimmerFormField } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 const EMPTY_FORM = {
   type: 'job',
@@ -238,7 +240,13 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
   };
 
   const onDelete = async () => {
-    if (!confirm('Delete this posting permanently? (Soft delete — data is kept.)')) return;
+    const ok = await dialog.confirm({
+      title: 'Delete posting?',
+      message: 'Delete this posting permanently? (Soft delete — data is kept.)',
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await adminFetch(`/api/admin/jobs/${id}`, { method: 'DELETE' });
       showToast?.('Posting deleted', 'success');
@@ -261,9 +269,9 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
             </button>
           )}
           <button type="button" className="btn btn-outline" onClick={onClose} style={{ padding: '.5rem 1rem' }}>Close</button>
-          <button type="submit" form="job-form" disabled={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
+          <Button type="submit" form="job-form" loading={saving} className="btn btn-primary" style={{ padding: '.5rem 1rem' }}>
             {saving ? 'Saving…' : (isNew ? 'Create' : 'Save')}
-          </button>
+          </Button>
         </>
       }
     >

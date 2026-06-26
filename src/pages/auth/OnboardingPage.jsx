@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { navigate } from '../../hooks/useRoute';
 import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import { IconArrowRight, IconShield, IconX, IconCheck } from '../../icons';
+import Button from '../../components/ui/Button';
 
 export default function OnboardingPage() {
   const { user, loading } = useAuth();
@@ -211,11 +212,11 @@ export default function OnboardingPage() {
 
             {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
-            <button type="submit" className="btn btn-primary"
+            <Button type="submit" className="btn btn-primary"
               style={{ width: '100%', justifyContent: 'center', padding: '.875rem' }}
-              disabled={submitting}>
+              loading={submitting}>
               {submitting ? 'Saving…' : <>Save and continue <IconArrowRight size="sm" /></>}
-            </button>
+            </Button>
 
             <div className="alert alert-info" style={{ marginTop: '.25rem' }}>
               <IconShield size="sm" />

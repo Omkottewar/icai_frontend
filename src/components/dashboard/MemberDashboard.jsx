@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import NotificationSettingsCard from './NotificationSettingsCard';
 import MemberProfileDrawer from './MemberProfileDrawer';
 import {
@@ -8,6 +8,10 @@ import {
   IconMapPin, IconClock, IconFileText, IconDownload, IconBell,
   IconSparkles, IconEdit,
 } from '../../icons';
+import { googleCalendarEventUrl, googleCalendarSubscribeUrl } from '../../lib/googleCalendar';
+import { toast } from '../../lib/notify';
+import { dialog } from '../../lib/dialog';
+import Button from '../ui/Button';
 
 // Profile-completeness helper. We only consider editable fields here —
 // MRN/FCA/COP are ICAI-sourced and can't be changed in our portal, so
@@ -94,10 +98,11 @@ const ICAI_LINKS = {
   membersPortal:  'https://www.icai.org/members',
 };
 
-export default function MemberDashboard({ user, data, logout, pendingBadge, officeBearerCard }) {
+export default function MemberDashboard({ user, data, logout, onRefresh, pendingBadge, officeBearerCard }) {
   const profile          = data?.profile ?? null;
   const cpe              = data?.cpe ?? null;
   const upcomingEvents   = data?.upcomingEvents ?? [];
+  const recentCertificates = data?.recentCertificates ?? [];
   const suggestedEvents  = data?.suggestedEvents ?? [];
   const recentBookmarks  = data?.recentBookmarks ?? [];
   const announcements    = data?.announcements ?? [];
@@ -112,20 +117,32 @@ export default function MemberDashboard({ user, data, logout, pendingBadge, offi
 
   const { pct: profilePct, missing: profileMissing } = completenessScore(profile);
 
-  // Sections present in the page — drives the jump-pill navigation. We only
-  // surface a chip if the section will actually render (e.g. no Suggested
-  // chip when the user is already registered for everything upcoming).
-  const sections = [
-    cpe                     && { id: 'md-cpe',       label: 'CPE' },
-                               { id: 'md-events',    label: 'Events' },
-    suggestedEvents.length  && { id: 'md-discover',  label: 'Discover' },
-                               { id: 'md-library',   label: 'Library' },
-                               { id: 'md-services',  label: 'Services' },
-    announcements.length    && { id: 'md-updates',   label: 'Updates' },
-  ].filter(Boolean);
+  // Tabbed layout — replaces the long-scroll JumpNav. Each tab groups a
+  // few related cards so the page fits without scrolling on most screens.
+  // Tab state syncs to the URL hash so deep-links + back-button work, and
+  // it survives hot reloads in dev.
+  const TABS = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'events',   label: 'Events' },
+    { id: 'library',  label: 'Library' },
+    { id: 'settings', label: 'Settings' },
+  ];
+  const [tab, setTab] = useState(() => {
+    const h = window.location.hash.replace('#', '');
+    return TABS.some((t) => t.id === h) ? h : 'overview';
+  });
+  useEffect(() => {
+    if (window.location.hash.replace('#', '') !== tab) {
+      window.history.replaceState(null, '', `#${tab}`);
+    }
+  }, [tab]);
 
   return (
     <section className="container md-dash" style={{ padding: '1.5rem 1rem' }}>
+      {/* ── Always-visible header ─────────────────────────────────
+          Identity, urgent CPE alert, office-bearer admin entry, and the
+          stats row stay above the tabs — they're glanceable on every
+          visit regardless of which tab the user lands on. */}
       <MembershipIdentityCard user={user} profile={profile} pendingBadge={pendingBadge} onEdit={openEdit} />
 
       <ProfileCompletenessNudge pct={profilePct} missing={profileMissing} onEdit={openEdit} />
@@ -136,33 +153,54 @@ export default function MemberDashboard({ user, data, logout, pendingBadge, offi
 
       <MemberStatsRow cpe={cpe} profile={profile} eventsAttendedFy={eventsAttendedFy} bookmarksCount={bookmarksCount} />
 
-      <JumpNav sections={sections} />
+      {/* ── Tab strip ────────────────────────────────────────────── */}
+      <div role="tablist" aria-label="Dashboard sections" className="md-tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls={`md-tab-${t.id}`}
+            className={'md-tab' + (tab === t.id ? ' is-active' : '')}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <div className="md-dash-body">
-        {/* ── Main column ─────────────────────────────────────────── */}
-        <div className="md-col">
-          {cpe && <section id="md-cpe" className="md-section"><CPEComplianceCard cpe={cpe} /></section>}
-          <section id="md-events" className="md-section"><UpcomingEventsCard rows={upcomingEvents} /></section>
-          {suggestedEvents.length > 0 && (
-            <section id="md-discover" className="md-section"><SuggestedEventsCard rows={suggestedEvents} /></section>
-          )}
-          <section id="md-library" className="md-section"><SavedLibraryCard items={recentBookmarks} total={bookmarksCount} /></section>
-          <section id="md-services" className="md-section"><MemberServicesGrid /></section>
+      {/* ── Tab panels ───────────────────────────────────────────── */}
+      {tab === 'overview' && (
+        <div id="md-tab-overview" role="tabpanel" className="md-tab-body">
+          {cpe && <CPEComplianceCard cpe={cpe} />}
+          {announcements.length > 0 && <AnnouncementsCard items={announcements} />}
         </div>
+      )}
 
-        {/* ── Side column ─────────────────────────────────────────── *
-            Reordered for "smarter prioritisation": time-sensitive items
-            (announcements) sit above the always-true profile card; rarely-
-            used items (grievance) sit at the bottom. */}
-        <div className="md-col">
-          {announcements.length > 0 && (
-            <section id="md-updates" className="md-section"><AnnouncementsCard items={announcements} /></section>
-          )}
+      {tab === 'events' && (
+        <div id="md-tab-events" role="tabpanel" className="md-tab-body">
+          <UpcomingEventsCard rows={upcomingEvents} onCancelled={() => onRefresh?.()} />
+          <MyRoomBookingsCard />
+          {suggestedEvents.length > 0 && <SuggestedEventsCard rows={suggestedEvents} />}
+          <MyCertificatesCard rows={recentCertificates} />
+        </div>
+      )}
+
+      {tab === 'library' && (
+        <div id="md-tab-library" role="tabpanel" className="md-tab-body">
+          <SavedLibraryCard items={recentBookmarks} total={bookmarksCount} />
+          <MemberServicesGrid />
+        </div>
+      )}
+
+      {tab === 'settings' && (
+        <div id="md-tab-settings" role="tabpanel" className="md-tab-body md-tab-body-grid">
           <ProfileSidecard user={user} profile={profile} logout={logout} onEdit={openEdit} />
+          <CalendarSubscriptionCard />
           <NotificationSettingsCard />
           <GrievanceTile />
         </div>
-      </div>
+      )}
 
       <MemberDashboardStyles />
 
@@ -171,6 +209,7 @@ export default function MemberDashboard({ user, data, logout, pendingBadge, offi
         onClose={closeEdit}
         profile={profile}
         userPhone={profile?.phone ?? ''}
+        onSaved={() => { onRefresh?.(); }}
       />
     </section>
   );
@@ -339,39 +378,64 @@ function CPEDeadlineAlert({ cpe }) {
 }
 
 // ─── Stats row ──────────────────────────────────────────────────────────
+// Compact stats row — we only render tiles that have real data. Tiles
+// with placeholders (dashes, "Profile incomplete") were doing more harm
+// than good on first-impression: they made the page feel broken to
+// non-technical members. The "Years a member" tile is now hidden when
+// member_since is missing; "Saved papers" is hidden until the member
+// has actually saved at least one. The result is a tighter row of
+// genuinely-useful numbers.
 function MemberStatsRow({ cpe, profile, eventsAttendedFy, bookmarksCount }) {
-  const cpePct       = cpe ? Math.min(100, Math.round((cpe.total_hours / cpe.target) * 100)) : 0;
-  const memberYears  = yearsBetween(profile?.member_since);
+  const cpePct      = cpe ? Math.min(100, Math.round((cpe.total_hours / cpe.target) * 100)) : 0;
+  const memberYears = yearsBetween(profile?.member_since);
+
+  const tiles = [];
+  // Always show CPE — it's the most important number on the page.
+  tiles.push({
+    key: 'cpe',
+    Icon: IconAward,
+    label: 'CPE this year',
+    value: cpe ? `${cpe.total_hours}` : '0',
+    sub: cpe ? `of ${cpe.target} hours · ${cpePct}% done` : 'Track CPE here',
+    tone: 'primary',
+  });
+  // Always show events attended — zero is meaningful information.
+  tiles.push({
+    key: 'events',
+    Icon: IconCalendar,
+    label: 'Events attended',
+    value: eventsAttendedFy,
+    sub: eventsAttendedFy === 0 ? 'No events yet this year' : 'This financial year',
+    tone: 'green',
+  });
+  // Only show years-a-member when we have a real number.
+  if (memberYears != null) {
+    tiles.push({
+      key: 'years',
+      Icon: IconUsers,
+      label: 'Years a member',
+      value: memberYears,
+      sub: `Since ${formatDate(profile.member_since)}`,
+      tone: 'indigo',
+    });
+  }
+  // Only show saved-papers when the member has saved at least one.
+  if (bookmarksCount > 0) {
+    tiles.push({
+      key: 'bookmarks',
+      Icon: IconBookOpen,
+      label: 'Saved papers',
+      value: bookmarksCount,
+      sub: 'In your library',
+      tone: 'amber',
+    });
+  }
+
   return (
     <div className="md-stats">
-      <StatTile
-        Icon={IconAward}
-        label="CPE this FY"
-        value={cpe ? `${cpe.total_hours} / ${cpe.target}` : '—'}
-        sub={cpe ? `${cpePct}% complete` : 'No data'}
-        tone="primary"
-      />
-      <StatTile
-        Icon={IconUsers}
-        label="Years a member"
-        value={memberYears != null ? memberYears : '—'}
-        sub={profile?.member_since ? `Since ${formatDate(profile.member_since)}` : 'Profile incomplete'}
-        tone="indigo"
-      />
-      <StatTile
-        Icon={IconCalendar}
-        label="Events attended FY"
-        value={eventsAttendedFy}
-        sub={eventsAttendedFy === 0 ? 'Browse upcoming events' : 'Marked attended'}
-        tone="green"
-      />
-      <StatTile
-        Icon={IconBookOpen}
-        label="Saved papers"
-        value={bookmarksCount}
-        sub={bookmarksCount === 0 ? 'Bookmark from any paper' : 'In your library'}
-        tone="amber"
-      />
+      {tiles.map((t) => (
+        <StatTile key={t.key} Icon={t.Icon} label={t.label} value={t.value} sub={t.sub} tone={t.tone} />
+      ))}
     </div>
   );
 }
@@ -438,7 +502,35 @@ function CpeChip({ label, hours, tone }) {
 }
 
 // ─── My upcoming events ─────────────────────────────────────────────────
-function UpcomingEventsCard({ rows }) {
+function UpcomingEventsCard({ rows, onCancelled }) {
+  const [busy, setBusy] = useState(null); // slug currently being cancelled
+
+  async function cancel(slug, title) {
+    const ok = await dialog.confirm({
+      title: 'Cancel registration?',
+      message: `Cancel your registration for "${title}"?`,
+      confirmText: 'Cancel registration',
+      cancelText: 'Keep it',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(slug);
+    try {
+      const r = await fetch(`/api/events/${slug}/cancel`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed to cancel');
+      onCancelled?.(slug);
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="card md-card">
       <div className="md-card-head">
@@ -455,6 +547,7 @@ function UpcomingEventsCard({ rows }) {
         <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
           {rows.map((e) => {
             const palette = REGISTRATION_STYLES[e.status] ?? REGISTRATION_STYLES.registered;
+            const canCancel = e.status === 'registered' || e.status === 'waitlisted';
             return (
               <li key={e.id} className="md-row">
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -466,14 +559,197 @@ function UpcomingEventsCard({ rows }) {
                     )}
                   </div>
                 </div>
-                <span className="badge" style={{ background: palette.bg, color: palette.fg }}>
-                  {REGISTRATION_LABELS[e.status] ?? e.status}
-                </span>
+                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+                  <span className="badge" style={{ background: palette.bg, color: palette.fg }}>
+                    {REGISTRATION_LABELS[e.status] ?? e.status}
+                  </span>
+                  <a
+                    href={googleCalendarEventUrl({
+                      title: e.title,
+                      starts_at: e.starts_at,
+                      ends_at: e.ends_at,
+                      venue: e.venue,
+                      cpe: Number(e.cpe_hours || 0),
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline"
+                    style={{ padding: '.25rem .5rem', fontSize: '.75rem' }}
+                    aria-label={`Add ${e.title} to my Google Calendar`}
+                  >
+                    <IconCalendar size="sm" /> Calendar
+                  </a>
+                  {canCancel && (
+                    <Button
+                      className="btn btn-ghost"
+                      style={{ padding: '.25rem .5rem', fontSize: '.75rem', color: '#dc2626' }}
+                      loading={busy === e.slug}
+                      onClick={() => cancel(e.slug, e.title)}
+                    >
+                      {busy === e.slug ? 'Cancelling…' : 'Cancel'}
+                    </Button>
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+// ─── My room bookings ───────────────────────────────────────────────────
+// Self-contained card — fetches /api/rooms/my-bookings on mount, lets the
+// member cancel upcoming bookings inline. Hidden entirely when the user
+// has no bookings to avoid a permanent empty state on the dashboard.
+function MyRoomBookingsCard() {
+  const [rows, setRows] = useState(null);
+  const [busy, setBusy] = useState(null);
+
+  async function load() {
+    try {
+      const r = await fetch('/api/rooms/my-bookings', { credentials: 'include' });
+      const j = await r.json();
+      if (r.ok) setRows(j.rows ?? []);
+      else setRows([]);
+    } catch { setRows([]); }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function cancel(id, label) {
+    const ok = await dialog.confirm({
+      title: 'Cancel booking?',
+      message: `Cancel your booking for ${label}?`,
+      confirmText: 'Cancel booking',
+      cancelText: 'Keep it',
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(id);
+    try {
+      const r = await fetch(`/api/rooms/bookings/${id}/cancel`, {
+        method: 'POST', credentials: 'include',
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed to cancel');
+      load();
+    } catch (e) {
+      toast.error(e.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Don't render until we know. Avoids a flash of the "no bookings yet"
+  // state on every page load.
+  if (rows === null || rows.length === 0) return null;
+
+  // Show upcoming (slot_start in the future) at the top; collapse older
+  // history under a divider so the card stays compact.
+  const now = Date.now();
+  const upcoming = rows.filter((b) => new Date(b.slot_start).getTime() >= now && b.status !== 'cancelled');
+  const recent   = rows.filter((b) => !upcoming.includes(b)).slice(0, 3);
+
+  return (
+    <div className="card md-card">
+      <div className="md-card-head">
+        <h2 className="md-card-title">My room bookings</h2>
+        <a href="#/book-room" className="md-card-action">Book a room →</a>
+      </div>
+      <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
+        {upcoming.map((b) => (
+          <li key={b.id} className="md-row">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="md-row-title">{b.room_name || 'Room'}</div>
+              <div className="md-row-meta">
+                <span>{formatDateTime(b.slot_start)} – {formatTimeOnly(b.slot_end)}</span>
+                {b.purpose && <span className="muted-text" style={{ marginLeft: '.5rem' }}>· {b.purpose}</span>}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+              <span className="badge" style={{ background: BOOKING_STATUS_STYLES[b.status]?.bg, color: BOOKING_STATUS_STYLES[b.status]?.fg }}>
+                {b.status}
+              </span>
+              <Button
+                className="btn btn-ghost"
+                style={{ padding: '.25rem .5rem', fontSize: '.75rem', color: '#dc2626' }}
+                loading={busy === b.id}
+                onClick={() => cancel(b.id, `${b.room_name} on ${formatDateTime(b.slot_start)}`)}
+              >
+                {busy === b.id ? 'Cancelling…' : 'Cancel'}
+              </Button>
+            </div>
+          </li>
+        ))}
+        {recent.length > 0 && (
+          <li style={{ padding: '.5rem 0 0', borderTop: upcoming.length ? '1px solid #e5e7eb' : 'none', marginTop: upcoming.length ? '.5rem' : 0 }}>
+            <div className="muted-text" style={{ fontSize: '.7rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Recent</div>
+          </li>
+        )}
+        {recent.map((b) => (
+          <li key={b.id} className="md-row" style={{ opacity: .65 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="md-row-title">{b.room_name || 'Room'}</div>
+              <div className="md-row-meta">{formatDateTime(b.slot_start)}</div>
+            </div>
+            <span className="badge" style={{ background: BOOKING_STATUS_STYLES[b.status]?.bg, color: BOOKING_STATUS_STYLES[b.status]?.fg }}>
+              {b.status}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const BOOKING_STATUS_STYLES = {
+  requested: { bg: '#fef3c7', fg: '#92400e' },
+  confirmed: { bg: '#dcfce7', fg: '#065f46' },
+  completed: { bg: '#f1f5f9', fg: '#334155' },
+  cancelled: { bg: '#fee2e2', fg: '#991b1b' },
+};
+
+function formatTimeOnly(d) {
+  if (!d) return '';
+  try {
+    return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
+// ─── Recent certificates ────────────────────────────────────────────────
+// Past events the user attended that award CPE — one row per event with a
+// "Download certificate" link to the PDF route. Empty state hidden.
+function MyCertificatesCard({ rows }) {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <div className="card md-card">
+      <div className="md-card-head">
+        <h2 className="md-card-title">My certificates</h2>
+        <span className="md-card-action" style={{ color: '#64748b', cursor: 'default' }}>{rows.length} available</span>
+      </div>
+      <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
+        {rows.map((e) => (
+          <li key={e.id} className="md-row">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="md-row-title">{e.title}</div>
+              <div className="md-row-meta">
+                <span className="row gap-1"><IconCalendar size="sm" /> {formatDateTime(e.starts_at)}</span>
+                <span className="row gap-1"><IconAward size="sm" /> {Number(e.cpe_hours)} CPE</span>
+              </div>
+            </div>
+            <a
+              href={`/api/events/${e.slug}/certificate`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-outline"
+              style={{ padding: '.35rem .75rem', fontSize: '.75rem' }}
+            >
+              <IconDownload size="sm" /> Certificate
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -518,6 +794,21 @@ function SuggestedEventsCard({ rows }) {
 }
 
 // ─── Saved Library teaser ───────────────────────────────────────────────
+// Tile cover image with a graceful fallback when src is missing or the
+// image fails to load (which it will for any mock-seeded cover_file_id
+// that points at a non-existent storage path).
+function LibraryCover({ src }) {
+  const [failed, setFailed] = useState(!src);
+  if (failed || !src) {
+    return (
+      <div className="md-library-cover-fallback">
+        <IconFileText size="lg" />
+      </div>
+    );
+  }
+  return <img src={src} alt="" loading="lazy" onError={() => setFailed(true)} />;
+}
+
 function SavedLibraryCard({ items, total }) {
   return (
     <div className="card md-card">
@@ -540,13 +831,7 @@ function SavedLibraryCard({ items, total }) {
         <div className="md-library-grid">
           {items.map((b) => (
             <a key={b.bookmark_id} href={`#/resources/${b.resource_type === 'ejournal' ? 'journal' : 'papers'}/${b.slug}`} className="md-library-tile">
-              {b.cover_url ? (
-                <img src={b.cover_url} alt="" loading="lazy" />
-              ) : (
-                <div className="md-library-cover-fallback">
-                  <IconFileText size="lg" />
-                </div>
-              )}
+              <LibraryCover src={b.cover_url} />
               <div className="md-library-tile-body">
                 <div className="md-library-tile-type">
                   {b.resource_type === 'ejournal' ? 'e-Journal' : 'Paper'}
@@ -564,10 +849,14 @@ function SavedLibraryCard({ items, total }) {
 
 // ─── Member services grid (real URLs) ───────────────────────────────────
 function MemberServicesGrid() {
+  // `external` tiles open the official ICAI portals in a new tab. All three
+  // statutory portals (UDIN, CPE, eServices) require ICAI SSP sign-in, so we
+  // surface that on each tile to avoid surprising first-time users who land
+  // on a login screen and assume our portal is broken.
   const items = [
-    { Icon: IconShield,    title: 'Generate UDIN',          desc: 'Issue UDIN for signed documents on the official portal.', href: ICAI_LINKS.udin, external: true },
-    { Icon: IconAward,     title: 'Track CPE certificates', desc: 'Download structured/unstructured CPE certificates.',     href: ICAI_LINKS.cpePortal, external: true },
-    { Icon: IconBriefcase, title: 'COP services',           desc: 'COP renewal, restoration, surrender, firm registration.', href: ICAI_LINKS.copServices, external: true },
+    { Icon: IconShield,    title: 'Generate UDIN',          desc: 'Issue UDIN for signed documents on the official portal.', href: ICAI_LINKS.udin,        external: true, needsIcaiLogin: true },
+    { Icon: IconAward,     title: 'Track CPE certificates', desc: 'Download structured/unstructured CPE certificates.',     href: ICAI_LINKS.cpePortal,   external: true, needsIcaiLogin: true },
+    { Icon: IconBriefcase, title: 'COP services',           desc: 'COP renewal, restoration, surrender, firm registration.', href: ICAI_LINKS.copServices, external: true, needsIcaiLogin: true },
     { Icon: IconUsers,     title: 'Members directory',      desc: 'Find a Nagpur member by name, MRN or area.',              href: '#/members-directory' },
     { Icon: IconBriefcase, title: 'Job vacancies',          desc: 'Senior positions and openings posted by member firms.',   href: '#/job-vacancies' },
     { Icon: IconHandshake, title: 'Contribute to CABF',     desc: 'Support members and families in distress.',              href: '#/benevolent-fund' },
@@ -593,6 +882,9 @@ function MemberServicesGrid() {
                   {isExternal && <span className="md-service-ext">↗</span>}
                 </span>
                 <span className="md-service-desc">{it.desc}</span>
+                {it.needsIcaiLogin && (
+                  <span className="md-service-hint">ICAI SSP sign-in required</span>
+                )}
               </span>
               <IconArrowRight size="sm" className="md-service-arrow" />
             </a>
@@ -643,6 +935,80 @@ function ProfileSidecard({ user, profile, logout, onEdit }) {
           <IconLogOut size="sm" /> Sign out
         </button>
       </div>
+    </div>
+  );
+}
+
+// ─── Side: calendar subscription ────────────────────────────────────────
+// Surfaces the user's personal calendar feed of registered events. Primary
+// CTA opens Google Calendar in a new tab and adds the feed in-browser — no
+// .ics download, no webcal:// handler prompt. The feed URL is still
+// copyable for users on Apple / Outlook / other clients. Token-based —
+// no DB write, rotates if JWT_SECRET changes.
+function CalendarSubscriptionCard() {
+  const [data, setData] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  async function load() {
+    if (data) return;
+    try {
+      const r = await fetch('/api/events/my-calendar-url', { credentials: 'include' });
+      const j = await r.json();
+      if (r.ok) setData(j);
+    } catch { /* silent */ }
+  }
+
+  async function copy(url) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch { /* silent */ }
+  }
+
+  return (
+    <div className="card md-card">
+      <div className="md-card-head" style={{ cursor: 'pointer' }} onClick={() => { setOpen((o) => !o); load(); }}>
+        <h2 className="md-card-title row gap-2">
+          <IconCalendar size="sm" /> Calendar subscription
+        </h2>
+        <span className="md-card-action" aria-hidden>{open ? '−' : '+'}</span>
+      </div>
+      {open && (
+        <div style={{ paddingTop: '.5rem' }}>
+          <p className="muted-text" style={{ fontSize: '.8125rem', lineHeight: 1.5 }}>
+            Sync every event you've registered for straight into your Google Calendar. New registrations show up automatically — no app install needed.
+          </p>
+          {!data ? (
+            <p className="muted-text">Loading…</p>
+          ) : (
+            <>
+              <a
+                href={googleCalendarSubscribeUrl(data.url || data.webcal)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary"
+                style={{ display: 'flex', width: '100%', padding: '.55rem .75rem', fontSize: '.85rem', justifyContent: 'center', marginTop: '.65rem' }}
+              >
+                <IconCalendar size="sm" /> Open in Google Calendar
+              </a>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ display: 'flex', width: '100%', padding: '.4rem .75rem', fontSize: '.78rem', justifyContent: 'center', marginTop: '.4rem' }}
+                onClick={() => copy(data.url || data.webcal)}
+                aria-label="Copy the raw feed URL for use with Apple Calendar, Outlook desktop, or other apps"
+              >
+                {copied ? '✓ Copied' : 'Copy feed URL (for Apple / Outlook)'}
+              </button>
+              <p className="muted-text" style={{ fontSize: '.7rem', marginTop: '.55rem' }}>
+                Google Calendar opens in a new tab and asks once to add this branch calendar. Other apps: copy the URL above and paste it under "Subscribe to a calendar".
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -708,11 +1074,11 @@ function GrievanceTile() {
 function MemberDashboardStyles() {
   return (
     <style>{`
-      /* Cards are denser here than the default .card to keep the dashboard
-         compact — half the cards are at-a-glance widgets, so less padding
-         puts more content above the fold. */
-      .md-dash .card { padding: .9rem; }
-      .md-dash .md-card { padding: .9rem; }
+      /* Light padding makes the cards feel cramped to non-tech members —
+         restored to the standard .card padding so the dashboard breathes.
+         Density savings are no longer needed now that the page is tabbed. */
+      .md-dash .card { padding: 1.15rem; }
+      .md-dash .md-card { padding: 1.15rem; }
       .md-card-head {
         display: flex; align-items: flex-start; justify-content: space-between;
         gap: .65rem; flex-wrap: wrap;
@@ -729,12 +1095,49 @@ function MemberDashboardStyles() {
         text-transform: uppercase; color: var(--muted-foreground);
       }
 
-      /* ── Section landing offset ─────────────────────────────────── *
-         Each <section.md-section> is a JumpNav target. Setting
-         scroll-margin-top here means a chip click lands the target just
-         below the sticky app header instead of behind it. */
-      .md-section { scroll-margin-top: 96px; }
-      .md-section:not(:last-child) { /* gap handled by .md-col */ }
+      /* ── Tab strip ──────────────────────────────────────────────── *
+         Replaced the JumpNav (anchor pills that scrolled the page) with
+         real tabs that swap visible content. Less scroll, cleaner page,
+         and the URL hash remembers which tab the user last visited. */
+      .md-tabs {
+        display: flex; gap: .25rem; overflow-x: auto;
+        margin-top: 1.1rem; padding-bottom: 0;
+        border-bottom: 1px solid var(--border);
+        scrollbar-width: thin;
+      }
+      .md-tab {
+        appearance: none; background: transparent;
+        border: 0; border-bottom: 2px solid transparent;
+        padding: .65rem 1rem; cursor: pointer;
+        font-size: .85rem; font-weight: 600; color: var(--muted-foreground);
+        white-space: nowrap;
+        transition: color .15s ease, border-color .15s ease;
+        border-radius: 0;
+      }
+      .md-tab:hover { color: var(--foreground); }
+      .md-tab.is-active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+      }
+      .md-tab:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: -2px;
+        border-radius: .25rem;
+      }
+      .md-tab-body {
+        margin-top: 1.25rem;
+        display: flex; flex-direction: column; gap: 1rem;
+      }
+      /* Settings tab uses a 2-col grid on desktop so the four sidecards
+         tile cleanly instead of stacking into a long column. */
+      .md-tab-body-grid {
+        margin-top: 1.25rem;
+        display: grid; gap: 1rem;
+        grid-template-columns: 1fr;
+      }
+      @media (min-width: 720px) {
+        .md-tab-body-grid { grid-template-columns: 1fr 1fr; align-items: start; }
+      }
 
       /* ── Identity header ────────────────────────────────────────── */
       .md-identity {
@@ -842,8 +1245,9 @@ function MemberDashboardStyles() {
 
       /* ── Stat tiles ─────────────────────────────────────────────── */
       .md-stats {
-        display: grid; gap: .55rem;
-        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        display: grid; gap: .75rem;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        margin-top: 1rem;
         margin-bottom: .75rem;
       }
       .md-stat {
@@ -1008,6 +1412,15 @@ function MemberDashboardStyles() {
       .md-service-desc {
         display: block; font-size: .68rem; color: var(--muted-foreground);
         margin-top: .1rem; line-height: 1.3;
+      }
+      .md-service-hint {
+        display: inline-block; margin-top: .35rem;
+        padding: .1rem .4rem;
+        background: oklch(0.95 0.05 90);
+        border: 1px solid oklch(0.85 0.08 90);
+        border-radius: 999px;
+        font-size: .6rem; color: oklch(0.42 0.13 70);
+        font-weight: 600; letter-spacing: .02em;
       }
       .md-service-arrow { color: var(--muted-foreground); flex-shrink: 0; }
 

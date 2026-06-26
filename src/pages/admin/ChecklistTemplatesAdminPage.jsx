@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import {
   QUESTION_TYPES, QUESTION_TYPE_MAP, POPULAR_TYPES,
-  QUESTION_LIBRARY, ROLE_OPTIONS,
+  QUESTION_LIBRARY,
   SECTION_PRESETS,
   newQuestion, defaultConfig,
 } from '../../lib/checklistQuestions';
@@ -13,6 +13,8 @@ import QuestionEditor from '../../components/checklists/QuestionEditor';
 import QuestionRenderer from '../../components/checklists/QuestionRenderer';
 import { IconPlus, IconCopy, IconTrash, IconCheckCircle, IconEdit, IconEye } from '../../icons';
 import { Shimmer, ShimmerLines, ShimmerDrawerBody } from '../../components/ui/Shimmer';
+import { dialog } from '../../lib/dialog';
+import Button from '../../components/ui/Button';
 
 function fmt(d) {
   if (!d) return '—';
@@ -283,7 +285,12 @@ function TemplateList({ onEdit, onPreview, onEmptyStateNew }) {
   }, [route.query.edit, route.query.preview]);
 
   const onPublish = async (row) => {
-    if (!confirm(`Activate "${row.name}"?\n\nOnce active it can be used on events. To change it later, you'll make a new version.`)) return;
+    const ok = await dialog.confirm({
+      title: 'Activate template?',
+      message: `Activate "${row.name}"?\n\nOnce active it can be used on events. To change it later, you'll make a new version.`,
+      confirmText: 'Activate',
+    });
+    if (!ok) return;
     try {
       await api(`/api/checklist-templates/${row.id}/publish`, { method: 'POST' });
       showToast?.('Template is now active', 'success');
@@ -300,7 +307,13 @@ function TemplateList({ onEdit, onPreview, onEmptyStateNew }) {
   };
 
   const onDelete = async (row) => {
-    if (!confirm(`Delete "${row.name}" v${row.version}?`)) return;
+    const okDelete = await dialog.confirm({
+      title: 'Delete template?',
+      message: `Delete "${row.name}" v${row.version}?`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!okDelete) return;
     try {
       await api(`/api/checklist-templates/${row.id}`, { method: 'DELETE' });
       load();
@@ -310,9 +323,12 @@ function TemplateList({ onEdit, onPreview, onEmptyStateNew }) {
       // so the admin doesn't have to hunt down the stray instance manually.
       const msg = e?.message || '';
       if (msg.includes('active instance') || msg.includes('force=1')) {
-        const okay = confirm(
-          `${msg}\n\nDelete the template AND soft-delete those instances?`,
-        );
+        const okay = await dialog.confirm({
+          title: 'Delete with active instances?',
+          message: `${msg}\n\nDelete the template AND soft-delete those instances?`,
+          confirmText: 'Delete all',
+          danger: true,
+        });
         if (!okay) return;
         try {
           await api(`/api/checklist-templates/${row.id}?force=1`, { method: 'DELETE' });
@@ -501,23 +517,26 @@ function BuilderDrawer({ id, onClose }) {
 
   // Append a brand-new section heading at the end. Returns the index of
   // the inserted heading so the caller can scroll/focus it.
-  const appendSection = (title = 'New section', ownerRole = '') => {
+  // Per F21 we no longer carry a section_owner_role on new sections —
+  // approver is decided at event-checklist creation time, not here.
+  const appendSection = (title = 'New section') => {
     setQuestions((qs) => [...qs, newQuestion('section_heading', {
       label: title,
       required: false,
-      section_owner_role: ownerRole || null,
+      section_owner_role: null,
     })]);
   };
 
   // Drop in a whole preset section (heading + N pre-configured questions).
-  // The killer feature for non-tech users.
+  // The killer feature for non-tech users. Preset's `owner_role` is
+  // ignored — sections in templates no longer have a pre-baked role.
   const appendPreset = (preset) => {
     setQuestions((qs) => [
       ...qs,
       newQuestion('section_heading', {
         label: preset.title,
         required: false,
-        section_owner_role: preset.owner_role || null,
+        section_owner_role: null,
       }),
       ...preset.questions.map((q) => newQuestion(q.type, q.overrides ?? {})),
     ]);
@@ -559,7 +578,9 @@ function BuilderDrawer({ id, onClose }) {
   const save = async () => {
     setSaving(true); setErr('');
     try {
-      // Strip client-only keys before sending.
+      // Strip client-only keys before sending. Per F21, section_owner_role
+      // is always sent as null — templates carry only a question list; the
+      // approver is picked at event-checklist creation time.
       const payloadQuestions = questions.map((q, i) => ({
         type: q.type,
         label: q.label,
@@ -567,9 +588,7 @@ function BuilderDrawer({ id, onClose }) {
         required: q.required,
         config: q.config || {},
         sort_order: i,
-        // Only meaningful on section_heading; null elsewhere to keep the
-        // column clean.
-        section_owner_role: q.type === 'section_heading' ? (q.section_owner_role || null) : null,
+        section_owner_role: null,
       }));
       if (!meta.name.trim()) throw new Error('Template name is required');
       if (payloadQuestions.length === 0) throw new Error('Add at least one question');
@@ -596,9 +615,9 @@ function BuilderDrawer({ id, onClose }) {
         <>
           {err && <span style={{ color: 'var(--destructive)', marginRight: 'auto', fontSize: '.875rem' }}>{err}</span>}
           <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={save} disabled={saving}>
+          <Button className="btn btn-primary" onClick={save} loading={saving}>
             {saving ? 'Saving…' : 'Save'}
-          </button>
+          </Button>
         </>
       }
     >
@@ -655,9 +674,15 @@ function BuilderDrawer({ id, onClose }) {
                           appendQuestionToSection(g.headingIdx, type);
                         }
                       }}
-                      onRemoveSection={() => {
+                      onRemoveSection={async () => {
                         if (g.headingIdx == null) return;
-                        if (!confirm('Remove this section AND every question inside it?')) return;
+                        const ok = await dialog.confirm({
+                          title: 'Remove section?',
+                          message: 'Remove this section AND every question inside it?',
+                          confirmText: 'Remove',
+                          danger: true,
+                        });
+                        if (!ok) return;
                         // Remove from heading index through (next-section - 1).
                         setQuestions((qs) => {
                           let end = qs.length;
@@ -1140,34 +1165,21 @@ function SectionCard({
   // The collapse chevron is for managing long templates with 8+ sections.
   // The pre-section group (no heading) is never collapsible.
   const [collapsed, setCollapsed] = useState(false);
-  // Two popovers: the role picker (clickable owner pill) and the ⋯ menu
-  // (now slimmed to just "Remove section" since role moved out).
-  const [rolePickerOpen, setRolePickerOpen] = useState(false);
+  // Settings popover (⋯ menu). Used to live alongside a role picker
+  // ("Who reviews this section?"); per F21 the role picker is gone —
+  // filler + approver are decided exclusively at event-checklist creation.
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const rolePickerRef = useRef(null);
   const settingsRef = useRef(null);
   useEffect(() => {
-    if (!rolePickerOpen && !settingsOpen) return;
+    if (!settingsOpen) return;
     const close = (e) => {
-      if (rolePickerOpen && rolePickerRef.current && !rolePickerRef.current.contains(e.target)) {
-        setRolePickerOpen(false);
-      }
-      if (settingsOpen && settingsRef.current && !settingsRef.current.contains(e.target)) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
         setSettingsOpen(false);
       }
     };
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
-  }, [rolePickerOpen, settingsOpen]);
-
-  // Look up the human label for the current owner so we can show a tiny
-  // hint ("Owner: Treasurer") in the header without forcing the user to
-  // open the popover just to see it.
-  const ownerLabel = (() => {
-    if (!heading?.section_owner_role) return null;
-    const match = ROLE_OPTIONS.find((r) => r.code === heading.section_owner_role);
-    return match?.label ?? null;
-  })();
+  }, [settingsOpen]);
 
   return (
     <div className="sc-card">
@@ -1195,40 +1207,9 @@ function SectionCard({
               placeholder="Section name (e.g. Event basics)"
               onChange={(e) => onPatchQuestion(group.headingIdx, { label: e.target.value })}
             />
-            <div ref={rolePickerRef} className="sc-owner-wrap">
-              <button
-                type="button"
-                className="sc-owner-pill"
-                onClick={() => setRolePickerOpen((o) => !o)}
-                title="Click to choose who reviews this section"
-                aria-expanded={rolePickerOpen}
-              >
-                👤 {ownerLabel || 'Anyone'}
-                <span className="sc-owner-chev">▾</span>
-              </button>
-              {rolePickerOpen && (
-                <div className="sc-role-menu" role="menu">
-                  <div className="sc-settings-label">Who reviews this section?</div>
-                  {ROLE_OPTIONS.map((r) => {
-                    const active = (heading.section_owner_role ?? '') === r.code;
-                    return (
-                      <button
-                        key={r.code || 'any'}
-                        type="button"
-                        className={'sc-role-item' + (active ? ' is-active' : '')}
-                        onClick={() => {
-                          onPatchQuestion(group.headingIdx, { section_owner_role: r.code || null });
-                          setRolePickerOpen(false);
-                        }}
-                      >
-                        {active && <span className="sc-role-check">✓</span>}
-                        <span>{r.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Per-section reviewer role picker was removed in F21 —
+                templates carry only a name + question list. Filler +
+                approver are picked at event-checklist creation time. */}
           </div>
           {collapsed && (
             <span className="sc-count">{items.length} question{items.length === 1 ? '' : 's'}</span>

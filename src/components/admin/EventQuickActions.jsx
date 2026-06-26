@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { adminFetch } from '../../hooks/useAdminList';
 import { useRoleFlags } from '../../hooks/useRoleFlags';
+import { dialog } from '../../lib/dialog';
+import { publishEventWithOverride } from '../../lib/eventPublish';
 
 // Inline approve / publish / cancel buttons that live on each row of the
 // EventsAdminPage table. Saves the chairman from having to open the full
@@ -31,42 +33,24 @@ export default function EventQuickActions({ row, onChanged, showToast }) {
     e.stopPropagation();
     setBusy(true);
     try {
-      // First attempt: no override. Backend returns 400 if the linked
-      // checklist isn't fully approved.
-      await adminFetch(`/api/admin/events/${row.id}/publish`, { method: 'POST' });
-      showToast?.('Published — visible on the public site', 'success');
-      onChanged?.();
-    } catch (err) {
-      const msg = err?.message || '';
-      // Specific error shape from backend means "checklist not approved".
-      // Offer the override path with a strong confirm; otherwise just toast.
-      if (msg.includes('not fully approved') || msg.includes('override')) {
-        const okay = confirm(
-          "This event's checklist isn't fully approved.\n\n" +
-          'Publishing now will be logged as a chairman override and visible ' +
-          'in the audit trail. Continue?',
-        );
-        if (!okay) { setBusy(false); return; }
-        const reason = prompt('Reason for override? (recorded in the audit log)') || '';
-        try {
-          await adminFetch(
-            `/api/admin/events/${row.id}/publish?override=true`,
-            { method: 'POST', body: { reason: reason.trim() || null } },
-          );
-          showToast?.('Published with override — recorded in audit log', 'success');
-          onChanged?.();
-        } catch (err2) {
-          showToast?.(err2.message || 'Override publish failed', 'error');
-        }
-      } else {
-        showToast?.(msg || 'Could not publish', 'error');
-      }
+      const result = await publishEventWithOverride(row.id, {
+        onSuccess: (m) => showToast?.(m, 'success'),
+        onError:   (m) => showToast?.(m, 'error'),
+      });
+      if (result.ok) onChanged?.();
     } finally { setBusy(false); }
   };
 
   const onCancel = async (e) => {
     e.stopPropagation();
-    if (!confirm('Cancel this event? Registered attendees will no longer see it.')) return;
+    const ok = await dialog.confirm({
+      title: 'Cancel event?',
+      message: 'Cancel this event? Registered attendees will no longer see it.',
+      confirmText: 'Cancel event',
+      cancelText: 'Back',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await adminFetch(`/api/admin/events/${row.id}/cancel`, { method: 'POST' });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { usePushSubscription } from '../../hooks/usePushSubscription';
 import { IconBell } from '../../icons';
+import Button from '../ui/Button';
 
 // Notification preferences + diagnostics card for the dashboard.
 //
@@ -135,17 +136,16 @@ export default function NotificationSettingsCard() {
       )}
 
       {supported && !blocked && (
-        <button
-          type="button"
+        <Button
           onClick={onToggle}
-          disabled={loading || busy}
+          loading={loading || busy}
           className={`btn ${subscribed ? 'btn-outline' : 'btn-primary'}`}
           style={{ marginTop: '.75rem', width: '100%', justifyContent: 'center' }}
         >
           {busy ? 'Working…'
             : subscribed ? 'Turn off on this device'
             : 'Enable push notifications'}
-        </button>
+        </Button>
       )}
 
       {/* Test button — only useful once subscribed. Bypasses the full notify()

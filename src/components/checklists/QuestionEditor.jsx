@@ -82,44 +82,9 @@ export default function QuestionEditor({
           onChange={(e) => onPatch({ label: e.target.value })}
         />
 
-        {/* Section ownership: when the question is a section_heading we
-            offer a role picker that scopes the editability of EVERY
-            question below it (until the next section heading). The fill UI
-            uses this to lock sections to the right person. */}
-        {isSection && (
-          <div className="qe-section-owner">
-            <label className="qe-section-owner-label">
-              Who reviews this section?
-              <span style={{ color: 'var(--muted-foreground)', fontWeight: 400, fontSize: '.7rem', marginLeft: '.4rem' }}>
-                — drives the approval routing after submission
-              </span>
-            </label>
-            <select
-              className="qe-input"
-              value={question.section_owner_role ?? ''}
-              onChange={(e) => onPatch({ section_owner_role: e.target.value || null })}
-            >
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r.code || 'any'} value={r.code}>{r.label}</option>
-              ))}
-            </select>
-            <style>{`
-              .qe-section-owner {
-                margin-top: .5rem;
-                padding: .5rem .625rem;
-                background: var(--muted, #f8fafc);
-                border: 1px solid var(--border);
-                border-radius: .375rem;
-              }
-              .qe-section-owner-label {
-                display: block;
-                font-size: .75rem; font-weight: 600;
-                color: var(--muted-foreground);
-                margin-bottom: .25rem;
-              }
-            `}</style>
-          </div>
-        )}
+        {/* Section ownership picker (section_owner_role) was removed —
+            filler + approver are now decided exclusively at event-checklist
+            creation time. Templates carry only a name + question list. */}
 
         {!isSection && (
           <>

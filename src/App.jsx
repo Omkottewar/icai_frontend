@@ -3,6 +3,8 @@ import { AuthProvider } from './context/AuthContext';
 import AppShell from './router/AppShell';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import { ShimmerStyles } from './components/ui/Shimmer';
+import ToastProvider from './components/ui/Toast';
+import ConfirmDialogProvider from './components/ui/ConfirmDialog';
 import { installLinkPrefetchListener } from './lib/routePrefetch';
 
 export default function App() {
@@ -13,10 +15,14 @@ export default function App() {
   useEffect(() => { installLinkPrefetchListener(); }, []);
 
   return (
-    <AuthProvider>
-      <ShimmerStyles />
-      <AppShell />
-      <PWAInstallPrompt />
-    </AuthProvider>
+    <ToastProvider>
+      <ConfirmDialogProvider>
+        <AuthProvider>
+          <ShimmerStyles />
+          <AppShell />
+          <PWAInstallPrompt />
+        </AuthProvider>
+      </ConfirmDialogProvider>
+    </ToastProvider>
   );
 }

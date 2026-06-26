@@ -84,6 +84,31 @@ export const SITE_SLOTS = {
     page:  "About",
     fields: [{ key: "body", label: "Body", kind: "markdown" }],
   },
+  // ── Pragyaan FAQ slots (mirror of backend) ─────────────────────────────────
+  // Free-form Q&A bodies ingested into the Pragyaan KB so the chatbot can
+  // answer the starter chips it suggests. Edit these via the admin Site
+  // Content page; re-run pragyaan:ingest after a change for the bot to pick
+  // them up.
+  faq_branch_services: {
+    label: "Pragyaan FAQ — Branch services (visitor)",
+    page:  "Pragyaan",
+    fields: [{ key: "body", label: "Q&A body", kind: "markdown", hint: "One H3 per question; plain markdown answers below" }],
+  },
+  faq_for_members: {
+    label: "Pragyaan FAQ — For members",
+    page:  "Pragyaan",
+    fields: [{ key: "body", label: "Q&A body", kind: "markdown", hint: "One H3 per question; plain markdown answers below" }],
+  },
+  faq_for_students: {
+    label: "Pragyaan FAQ — For students",
+    page:  "Pragyaan",
+    fields: [{ key: "body", label: "Q&A body", kind: "markdown", hint: "One H3 per question; plain markdown answers below" }],
+  },
+  faq_for_employers: {
+    label: "Pragyaan FAQ — For employers",
+    page:  "Pragyaan",
+    fields: [{ key: "body", label: "Q&A body", kind: "markdown", hint: "One H3 per question; plain markdown answers below" }],
+  },
 } satisfies Record<string, SlotDef>;
 
 export type SlotSlug = keyof typeof SITE_SLOTS;

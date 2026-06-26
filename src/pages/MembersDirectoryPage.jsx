@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import PageHeader from '../components/layout/PageHeader';
-import { useAuth } from '../context/AuthContext';
 import { cachedGet } from '../lib/apiCache';
-import { IconSearch, IconLock, IconArrowRight } from '../icons';
+import { IconSearch, IconArrowRight, IconLock } from '../icons';
 import { ShimmerTableRow } from '../components/ui/Shimmer';
 
 const STATUS_COLORS = {
@@ -10,6 +9,9 @@ const STATUS_COLORS = {
   ACA: { bg: '#f0fdf4', color: '#16a34a' },
 };
 
+// Send status to the server so pagination/total are correct per filter
+// (filtering client-side over a 25-row page would show "0 results" any
+// time the page happens to contain only the opposite-status members).
 function useDirectoryData(q, statusFilter, page) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -17,24 +19,25 @@ function useDirectoryData(q, statusFilter, page) {
   const fetch = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams({ page, pageSize: 25 });
-    if (q.trim())               params.set('q', q.trim());
+    if (q.trim())                 params.set('q', q.trim());
+    if (statusFilter !== 'All')   params.set('status', statusFilter);
     cachedGet(`/api/members/directory?${params}`, null, 0)
       .then(setData)
-      .catch(() => setData({ rows: [], total: 0, page: 1, pageSize: 25 }))
+      .catch(() => setData({ rows: [], total: 0, page: 1, pageSize: 25, authed: false }))
       .finally(() => setLoading(false));
-  }, [q, page]);
+  }, [q, page, statusFilter]);
 
   useEffect(() => { fetch(); }, [fetch]);
 
-  const rows = (data?.rows ?? []).filter(
-    (m) => statusFilter === 'All' || m.status === statusFilter,
-  );
-
-  return { rows, total: data?.total ?? 0, loading };
+  return {
+    rows: data?.rows ?? [],
+    total: data?.total ?? 0,
+    authed: !!data?.authed,
+    loading,
+  };
 }
 
 export default function MembersDirectoryPage() {
-  const { user } = useAuth();
   const [query, setQuery]           = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -45,40 +48,7 @@ export default function MembersDirectoryPage() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const { rows, total, loading } = useDirectoryData(debouncedQ, statusFilter, page);
-
-  if (!user) {
-    return (
-      <>
-        <PageHeader title="Members' Directory" subtitle="Accessible only to logged-in members" />
-        <section className="container" style={{ padding: '5rem 1rem', display: 'flex', justifyContent: 'center' }}>
-          <div className="card" style={{ maxWidth: '28rem', width: '100%', textAlign: 'center', padding: '2.5rem' }}>
-            <div style={{
-              width: '3.5rem', height: '3.5rem', borderRadius: 999,
-              background: 'oklch(0.36 0.13 255 / 0.1)', color: 'var(--primary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 1.25rem',
-            }}>
-              <IconLock size="lg" />
-            </div>
-            <h2 style={{ fontWeight: 700, fontSize: '1.25rem' }}>Login Required</h2>
-            <p className="muted-text" style={{ marginTop: '.625rem', fontSize: '.875rem', lineHeight: 1.55 }}>
-              The Members' Directory is accessible only to registered members of the Nagpur Branch.
-              Please sign in to view the directory.
-            </p>
-            <div className="col gap-2" style={{ marginTop: '1.5rem' }}>
-              <a href="#/login" className="btn btn-primary" style={{ justifyContent: 'center' }}>
-                Sign in to your account <IconArrowRight size="sm" />
-              </a>
-              <a href="#/signup" className="btn btn-outline" style={{ justifyContent: 'center' }}>
-                Create account
-              </a>
-            </div>
-          </div>
-        </section>
-      </>
-    );
-  }
+  const { rows, total, authed, loading } = useDirectoryData(debouncedQ, statusFilter, page);
 
   return (
     <>
@@ -86,15 +56,33 @@ export default function MembersDirectoryPage() {
 
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
 
-        {/* Policy notice */}
-        <div style={{
-          background: 'oklch(0.50 0.16 145 / 0.07)',
-          border: '1px solid oklch(0.50 0.16 145 / 0.2)',
-          borderRadius: '.5rem', padding: '.875rem 1rem', marginBottom: '1.5rem', fontSize: '.8125rem',
-        }}>
-          <strong>Confidential:</strong> This directory is restricted to members under the jurisdiction of the Nagpur Branch.
-          Do not share or reproduce member contact details outside authorised use.
-        </div>
+        {/* Policy / sign-in nudge — wording depends on auth state. */}
+        {authed ? (
+          <div style={{
+            background: 'oklch(0.50 0.16 145 / 0.07)',
+            border: '1px solid oklch(0.50 0.16 145 / 0.2)',
+            borderRadius: '.5rem', padding: '.875rem 1rem', marginBottom: '1.5rem', fontSize: '.8125rem',
+          }}>
+            <strong>Confidential:</strong> This directory is restricted to members under the jurisdiction
+            of the Nagpur Branch. Do not share or reproduce member contact details outside authorised use.
+          </div>
+        ) : (
+          <div className="row gap-2" style={{
+            background: 'oklch(0.85 0.16 90 / 0.18)',
+            border: '1px solid oklch(0.78 0.13 90 / 0.5)',
+            borderRadius: '.5rem', padding: '.875rem 1rem', marginBottom: '1.5rem', fontSize: '.8125rem',
+            alignItems: 'flex-start', flexWrap: 'wrap',
+          }}>
+            <span style={{ color: 'oklch(0.45 0.18 75)', marginTop: 2 }}><IconLock size="sm" /></span>
+            <div style={{ flex: 1, minWidth: '14rem' }}>
+              <strong>Sign in to see contact details.</strong>{' '}
+              You're viewing the public roster. Members can sign in to access phone, email and firm information.
+            </div>
+            <a href="#/login" className="btn btn-primary" style={{ padding: '.3rem .75rem', fontSize: '.75rem', whiteSpace: 'nowrap' }}>
+              Sign in <IconArrowRight size="sm" />
+            </a>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="row gap-3" style={{ marginBottom: '1.5rem', flexWrap: 'wrap' }}>
@@ -130,19 +118,25 @@ export default function MembersDirectoryPage() {
           {loading ? 'Loading…' : `Showing ${rows.length} of ${total} members`}
         </p>
 
-        {/* Directory table */}
+        {/* Directory table — columns vary by auth state. Anonymous callers
+            see the same 5 columns as before; authed callers also get Phone,
+            Email and Firm. The Email column gets a mailto:, and Phone gets
+            a tel: link so members can tap to dial / mail on mobile. */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
-                {['#', 'Name', 'Membership No.', 'Status', 'City'].map((h) => (
+                {(authed
+                  ? ['#', 'Name', 'Membership No.', 'Status', 'City', 'Phone', 'Email', 'Firm']
+                  : ['#', 'Name', 'Membership No.', 'Status', 'City']
+                ).map((h) => (
                   <th key={h} style={{ padding: '.625rem .75rem', fontWeight: 600, color: 'var(--muted-foreground)', fontSize: '.8125rem' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading && rows.length === 0 && Array.from({ length: 8 }).map((_, i) => (
-                <ShimmerTableRow key={'mds-' + i} cols={5} />
+                <ShimmerTableRow key={'mds-' + i} cols={authed ? 8 : 5} />
               ))}
               {rows.map((m, i) => {
                 const sc = STATUS_COLORS[m.status] || { bg: '#f9fafb', color: '#6b7280' };
@@ -176,12 +170,30 @@ export default function MembersDirectoryPage() {
                       }}>{m.status}</span>
                     </td>
                     <td style={{ padding: '.625rem .75rem', color: 'var(--muted-foreground)' }}>{m.city || '—'}</td>
+                    {authed && (
+                      <>
+                        <td style={{ padding: '.625rem .75rem', fontFamily: 'monospace', fontSize: '.8125rem' }}>
+                          {m.phone ? (
+                            <a href={`tel:${m.phone}`} style={{ color: 'var(--primary)' }}>{m.phone}</a>
+                          ) : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '.625rem .75rem', fontSize: '.8125rem' }}>
+                          {m.email ? (
+                            <a href={`mailto:${m.email}`} style={{ color: 'var(--primary)' }}>{m.email}</a>
+                          ) : <span style={{ color: 'var(--muted-foreground)' }}>—</span>}
+                        </td>
+                        <td style={{ padding: '.625rem .75rem', color: 'var(--muted-foreground)', fontSize: '.8125rem', maxWidth: '14rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={m.firm_name || ''}>
+                          {m.firm_name || '—'}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 );
               })}
               {!loading && rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
+                  <td colSpan={authed ? 8 : 5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted-foreground)' }}>
                     No members found matching your search.
                   </td>
                 </tr>
@@ -216,7 +228,9 @@ export default function MembersDirectoryPage() {
         )}
 
         <p className="muted-text" style={{ marginTop: '1.25rem', fontSize: '.75rem' }}>
-          Data is accessible to logged-in members only, per ICAI Web-Media Policy 5(n).
+          {authed
+            ? 'Contact details are visible to signed-in members only, per ICAI Web-Media Policy 5(n).'
+            : 'Sign in to view phone, email and firm details. The roster itself is public.'}
         </p>
       </section>
     </>

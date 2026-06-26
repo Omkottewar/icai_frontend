@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import { IconArrowLeft, IconCheckCircle, IconX } from '../../icons';
+import Button from '../../components/ui/Button';
 
 export default function ForgotPage() {
   const { forgotPassword } = useAuth();
@@ -58,14 +59,14 @@ export default function ForgotPage() {
                 />
               </div>
               {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
-              <button
+              <Button
                 className="btn btn-primary"
                 type="submit"
-                disabled={submitting}
+                loading={submitting}
                 style={{ width: '100%', justifyContent: 'center', padding: '.75rem' }}
               >
                 {submitting ? 'Sending…' : 'Send reset link'}
-              </button>
+              </Button>
             </form>
           )}
         </div>

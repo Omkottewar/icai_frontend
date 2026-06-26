@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useRoute } from '../hooks/useRoute';
 import { IconCheckCircle, IconX } from '../icons';
+import Button from '../components/ui/Button';
 
 const STATUS_LABELS = {
   open:       'Open · awaiting review',
@@ -73,10 +74,10 @@ export default function TrackGrievancePage() {
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value.trim() }))} />
           </div>
-          <button className="btn btn-primary" type="submit" disabled={busy}
+          <Button className="btn btn-primary" type="submit" loading={busy}
             style={{ justifyContent: 'center' }}>
             {busy ? 'Looking up…' : 'Track'}
-          </button>
+          </Button>
         </form>
 
         {err && (

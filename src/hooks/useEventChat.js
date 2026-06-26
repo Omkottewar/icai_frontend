@@ -432,6 +432,14 @@ export function useEventChat(eventId, { enabled = true } = {}) {
         return;
       }
 
+      if (frame.type === 'answered:added' || frame.type === 'answered:removed') {
+        const { channel_id: ch, message_id, answered_at, answered_by } = frame;
+        if (!ch || !message_id) return;
+        const update = (msg) => msg.id === message_id ? { ...msg, answered_at, answered_by } : msg;
+        setMessagesByCh((m) => ({ ...m, [ch]: (m[ch] || []).map(update) }));
+        return;
+      }
+
       if (frame.type === 'typing' && frame.channel_id && frame.user_id) {
         const my = meRef.current;
         if (my && frame.user_id === my.id) return;
@@ -1010,6 +1018,46 @@ export function useEventChat(eventId, { enabled = true } = {}) {
     }
   }, [eventId]);
 
+  // Q&A: toggle answered_at on a top-level question. Same optimistic
+  // pattern as togglePin — flip locally, hit the REST endpoint, rollback
+  // on failure. WS broadcast (`answered:added` / `answered:removed`)
+  // reconciles with the server timestamp.
+  const toggleAnswered = useCallback(async (messageId, currentlyAnswered) => {
+    if (typeof messageId === 'string' && messageId.startsWith('tmp_')) return;
+    const newAnsweredAt = currentlyAnswered ? null : new Date().toISOString();
+    setMessagesByCh((m) => {
+      const next = { ...m };
+      for (const [ch, list] of Object.entries(m)) {
+        const idx = list.findIndex((x) => x.id === messageId);
+        if (idx < 0) continue;
+        const copy = list.slice();
+        copy[idx] = { ...copy[idx], answered_at: newAnsweredAt };
+        next[ch] = copy;
+        return next;
+      }
+      return m;
+    });
+    try {
+      const r = await fetch(`${REST_BASE}/${eventId}/chat/messages/${messageId}/${currentlyAnswered ? 'unanswered' : 'answered'}`, {
+        method: 'POST', credentials: 'include',
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch {
+      setMessagesByCh((m) => {
+        const next = { ...m };
+        for (const [ch, list] of Object.entries(m)) {
+          const idx = list.findIndex((x) => x.id === messageId);
+          if (idx < 0) continue;
+          const copy = list.slice();
+          copy[idx] = { ...copy[idx], answered_at: currentlyAnswered ? new Date().toISOString() : null };
+          next[ch] = copy;
+          return next;
+        }
+        return m;
+      });
+    }
+  }, [eventId]);
+
   const loadPinned = useCallback(async (channelId) => {
     if (!channelId) return;
     const r = await fetch(`${REST_BASE}/${eventId}/chat/channels/${channelId}/pinned`, { credentials: 'include' });
@@ -1118,7 +1166,7 @@ export function useEventChat(eventId, { enabled = true } = {}) {
     typingUserIds, onlineCount,
     status, error,
     // operations
-    send, retrySend, editMessage, deleteMessage, toggleReaction, togglePin,
+    send, retrySend, editMessage, deleteMessage, toggleReaction, togglePin, toggleAnswered,
     loadOlder, loadPinned,
     searchInActive, searchParticipants, uploadAttachment, emitTyping,
     // moderation + extras

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import EventRow from '../components/ui/EventRow';
 import CategoryCard from '../components/ui/CategoryCard';
+import EventMonthCalendar from '../components/events/EventMonthCalendar';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { IconArrowLeft } from '../icons';
 import { usePublicEvents } from '../hooks/usePublicEvents';
@@ -96,7 +97,11 @@ function toCardInfo(committee) {
 export default function EventsPage() {
   const route = useRoute();
   const selectedCommittee = route.query.committee || null;
-  const [audience, setAudience] = useState('All');
+  // Seed audience from ?audience= so deep-links from the public Students /
+  // Members pages land pre-filtered. Falls back to 'All' for stray values.
+  const initialAudience = AUDIENCE_TABS.find((t) => t.key === route.query.audience)?.key || 'All';
+  const [audience, setAudience] = useState(initialAudience);
+  const [view, setView] = useState('list'); // 'list' | 'month'
 
   const { data: eventsData, loading: eventsLoading } = usePublicEvents();
   const { data: committeesData } = usePublicCommittees();
@@ -207,7 +212,7 @@ export default function EventsPage() {
         </div>
       </div>
 
-      {/* Upcoming events list */}
+      {/* Upcoming events — list / month toggle */}
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
         <div className="row" style={{ marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>
@@ -217,8 +222,44 @@ export default function EventsPage() {
           <div className="muted-text" style={{ fontSize: '.8125rem' }}>{audienceFiltered.length} programme{audienceFiltered.length !== 1 ? 's' : ''} scheduled</div>
         </div>
 
-        <div className="tiny-eyebrow" style={{ marginBottom: '.75rem' }}>UPCOMING EVENTS</div>
-        {eventsLoading ? (
+        <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem' }}>
+          <div className="tiny-eyebrow">UPCOMING EVENTS</div>
+          <div role="tablist" aria-label="View as" className="row" style={{ background: 'var(--muted)', borderRadius: '.4rem', padding: '.2rem' }}>
+            {[
+              { key: 'list',  label: 'List' },
+              { key: 'month', label: 'Month' },
+            ].map((v) => {
+              const active = view === v.key;
+              return (
+                <button
+                  key={v.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setView(v.key)}
+                  style={{
+                    padding: '.35rem .85rem',
+                    fontSize: '.8125rem',
+                    fontWeight: 600,
+                    background: active ? 'var(--card)' : 'transparent',
+                    color: active ? 'var(--primary)' : 'var(--muted-foreground)',
+                    border: 0,
+                    borderRadius: '.3rem',
+                    boxShadow: active ? '0 1px 2px rgba(0,0,0,.06)' : 'none',
+                    cursor: 'pointer',
+                    transition: 'all .12s',
+                  }}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {view === 'month' ? (
+          <EventMonthCalendar events={audienceFiltered} loading={eventsLoading} />
+        ) : eventsLoading ? (
           <EventRowsShimmer count={4} />
         ) : audienceFiltered.length > 0 ? (
           <div>{audienceFiltered.map((e) => <EventRow key={e.id ?? e.title} event={e} detailed />)}</div>

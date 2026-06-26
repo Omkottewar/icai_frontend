@@ -7,6 +7,8 @@ import {
   IconBookOpen, IconCheckCircle, IconStar,
 } from '../icons';
 import { Shimmer, ShimmerLines, ShimmerPageBody } from '../components/ui/Shimmer';
+import { toast } from '../lib/notify';
+import Button from '../components/ui/Button';
 
 // Single paper detail page. Renders:
 //   • Title + abstract + author byline
@@ -293,7 +295,7 @@ function CommentsThread({ paper, user }) {
       setReplyTo(null);
       load();
     } catch (e2) {
-      alert(e2.message);
+      toast.error(e2.message);
     } finally {
       setPosting(false);
     }
@@ -336,9 +338,9 @@ function CommentsThread({ paper, user }) {
           />
           <div className="pp-comment-form-foot">
             <span className="muted-text" style={{ fontSize: '.72rem' }}>Comments appear immediately; admins moderate.</span>
-            <button type="submit" className="btn btn-primary" disabled={posting || !draft.trim()}>
+            <Button type="submit" className="btn btn-primary" disabled={!draft.trim()} loading={posting}>
               {posting ? 'Posting…' : 'Post'}
-            </button>
+            </Button>
           </div>
         </form>
       ) : (

@@ -1,14 +1,17 @@
-import { useState } from 'react';
 import GenericPage from '../components/ui/GenericPage';
-import { IconCheck, IconCheckCircle } from '../icons';
+import { IconCheck } from '../icons';
 
+// Branch has flagged Career Counselling (CLIENT_REQUIREMENTS M.4) as
+// "kept on hold" — they still need to supply the volunteer counsellor
+// list, pricing decision, and confirmation-email copy before we can wire
+// real bookings. Until then the page shows the planned offering as a
+// preview, with a clear "launching soon" banner and a CTA that routes
+// urgent queries to the Contact form (which IS live).
 export default function CareerCounsellingPage() {
-  const [booked, setBooked] = useState(false);
-
   return (
     <GenericPage
       title="Career Counselling"
-      subtitle="One-to-one sessions with volunteer CAs and alma-mater mentors."
+      subtitle="One-to-one sessions with volunteer CAs and alma-mater mentors — launching soon."
       body={
         <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
           <div className="card">
@@ -19,31 +22,22 @@ export default function CareerCounsellingPage() {
               <li className="row gap-2"><IconCheck size="sm" style={{ color: 'var(--secondary)' }} /> Optional follow-up over email</li>
             </ul>
           </div>
+
           <div className="card">
-            <h3 style={{ fontWeight: 600 }}>Book a session</h3>
-            {booked ? (
-              <div className="alert alert-success" style={{ marginTop: '1rem' }}>
-                <IconCheckCircle size="sm" /> Booked! A volunteer CA will reach out within 48 hours.
-              </div>
-            ) : (
-              <form onSubmit={(e) => { e.preventDefault(); setBooked(true); }} className="col gap-3" style={{ marginTop: '1rem' }}>
-                <div><label className="field-label">Your name</label><input className="input-base" required /></div>
-                <div>
-                  <label className="field-label">CA stage</label>
-                  <select className="input-base">
-                    <option>Foundation</option>
-                    <option>Intermediate</option>
-                    <option>Final</option>
-                    <option>Articleship</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="field-label">What do you want to discuss?</label>
-                  <textarea className="input-base" rows="3" />
-                </div>
-                <button className="btn btn-primary" style={{ justifyContent: 'center' }}>Request session</button>
-              </form>
-            )}
+            <h3 style={{ fontWeight: 600 }}>Bookings open soon</h3>
+            <p className="muted-text" style={{ marginTop: '.75rem', fontSize: '.875rem', lineHeight: 1.5 }}>
+              The Nagpur Branch is onboarding its volunteer counsellor panel for this term. Once the
+              roster is in place, you'll be able to pick a counsellor and a time slot directly from
+              this page. We'll announce the launch in the branch newsletter and via the homepage
+              announcement ticker.
+            </p>
+            <p className="muted-text" style={{ marginTop: '.75rem', fontSize: '.875rem', lineHeight: 1.5 }}>
+              Need career guidance now? Reach out via the contact form and we'll route your request
+              to the right person at the branch.
+            </p>
+            <a href="#/contact" className="btn btn-primary" style={{ marginTop: '1rem', justifyContent: 'center' }}>
+              Open the contact form
+            </a>
           </div>
         </div>
       }

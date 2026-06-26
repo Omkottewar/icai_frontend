@@ -50,7 +50,7 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/events',        label: 'Events',        Icon: IconCalendar,     roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
       { to: '/admin/registrations', label: 'Registrations', Icon: IconCheckCircle,  roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_TREASURER, ROLE_WICASA] },
-      { to: '/admin/cpe',           label: 'CPE credits',   Icon: IconAward, soon: true, roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/cpe',           label: 'CPE credits',   Icon: IconAward, roles: [ROLE_CHAIRMAN] },
     ],
   },
   {
@@ -67,23 +67,24 @@ const NAV_GROUPS = [
       { to: '/admin/bills',          label: 'Bills',           Icon: IconFileText, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
       { to: '/admin/refunds',        label: 'Refunds',         Icon: IconFileText, roles: [ROLE_TREASURER] },
       { to: '/admin/iut-transfers',  label: 'IUT transfers',   Icon: IconFileText, roles: [ROLE_TREASURER] },
-      { to: '/admin/payments',       label: 'Payments',        Icon: IconFileText, soon: true, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
-      { to: '/admin/cabf',           label: 'CABF requests',   Icon: IconHeart,    soon: true, roles: [ROLE_TREASURER] },
+      { to: '/admin/payments',       label: 'Payments',        Icon: IconFileText, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
+      { to: '/admin/cabf',           label: 'CABF requests',   Icon: IconHeart,    roles: [ROLE_TREASURER] },
     ],
   },
   {
     label: 'People',
     items: [
-      { to: '/admin/users',         label: 'Users',       Icon: IconUsers, roles: [] /* admin-only */ },
-      { to: '/admin/committees',    label: 'Committees',  Icon: IconShield, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
+      { to: '/admin/users',           label: 'Users',             Icon: IconUsers, roles: [] /* admin-only */ },
+      { to: '/admin/committees',      label: 'Committees',        Icon: IconShield, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
+      { to: '/admin/icai-directory',  label: 'ICAI directory',    Icon: IconUsers, roles: [] /* admin-only */ },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { to: '/admin/approvals',  label: 'Approvals',     Icon: IconCheckCircle, soon: true, roles: [ROLE_CHAIRMAN, ROLE_TREASURER] },
-      { to: '/admin/rooms',      label: 'Rooms',         Icon: IconMapPin,      soon: true, roles: [ROLE_CHAIRMAN] },
-      { to: '/admin/bookings',   label: 'Room bookings', Icon: IconBookOpen,    soon: true, roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/approvals',  label: 'Approvals',     Icon: IconCheckCircle, roles: [ROLE_CHAIRMAN, ROLE_TREASURER] },
+      { to: '/admin/rooms',      label: 'Rooms',         Icon: IconMapPin,      roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/bookings',   label: 'Room bookings', Icon: IconBookOpen,    roles: [ROLE_CHAIRMAN] },
       { to: '/admin/grievances',         label: 'Grievances',         Icon: IconHandshake, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/grievance-routes',   label: 'Grievance routing',  Icon: IconSettings,  roles: [] /* admin-only */ },
       { to: '/admin/checklist-templates', label: 'Checklist templates', Icon: IconCheckCircle, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
@@ -101,6 +102,7 @@ const NAV_GROUPS = [
       { to: '/admin/office-bearers',       label: 'Office bearers',       Icon: IconUsers,    roles: [ROLE_CHAIRMAN] },
       { to: '/admin/annual-reports',       label: 'Annual reports',       Icon: IconFileText, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/site-settings',        label: 'Site settings',        Icon: IconSettings, roles: [] /* admin-only */ },
+      { to: '/admin/pragyaan',             label: 'Pragyaan AI',          Icon: IconBookOpen, roles: [ROLE_CHAIRMAN] },
     ],
   },
   {
@@ -112,7 +114,6 @@ const NAV_GROUPS = [
   {
     label: 'System',
     items: [
-      { to: '/admin/files',                  label: 'Files',                  Icon: IconFileText, soon: true, roles: [] /* admin-only */ },
       { to: '/admin/notifications-log',      label: 'Notifications log',      Icon: IconBookOpen, roles: [] /* admin-only */ },
     ],
   },

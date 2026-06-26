@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
+import Button from '../components/ui/Button';
 
 // Member paper submission. Goes to status='pending_review' and shows up in
 // admin moderation queue. Submitter gets notified on approve / reject.
@@ -155,9 +156,9 @@ export default function ResourceSubmitPage() {
             }}>{msg.text}</p>
           )}
 
-          <button type="submit" className="btn btn-primary" disabled={busy}>
+          <Button type="submit" className="btn btn-primary" loading={busy}>
             {busy ? 'Submitting…' : 'Submit for review'}
-          </button>
+          </Button>
         </form>
 
         {/* My submissions log */}

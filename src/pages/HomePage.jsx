@@ -5,7 +5,8 @@ import EventRow from '../components/ui/EventRow';
 import CategoryCard from '../components/ui/CategoryCard';
 import WicasaCard from '../components/ui/WicasaCard';
 import HeroCarousel from '../components/ui/HeroCarousel';
-import heroImage from '../assets/icai.png';
+import heroImage from '../assets/heroImage.png';
+import heroLogo from '../assets/heroLogo.png';
 import swaroopa from '../assets/swaroopa.png';
 
 // TODO: replace with branch photos in src/assets/ once available
@@ -59,9 +60,11 @@ export default function HomePage() {
 
   // Live announcements from /api/announcements. When the list is empty
   // (no active rows in the window) the entire ticker bar is hidden — see
-  // the conditional render below.
+  // the conditional render below. We keep the full row (id, title, link)
+  // so each ticker pill can route to the announcement's link or to the
+  // archive page.
   const { data: annData } = useAnnouncements();
-  const tickerItems = (annData?.items ?? []).map((a) => a.title);
+  const tickerItems = annData?.items ?? [];
 
   // Admin-editable site content (defaults baked in so a fresh DB still renders).
   const hero            = useSiteContent('home_hero');
@@ -72,18 +75,54 @@ export default function HomePage() {
 
   return (
     <>
-      {/* Ticker — only rendered when there is at least one active announcement */}
+      {/* Announcement ticker — industry-standard pattern:
+            • Slow, continuous marquee (90s/cycle for readability)
+            • Pause on hover OR keyboard focus so users can read + click
+            • Every item is a real link — to its `link_url` (opens in a
+              new tab) if set, else to the /announcements archive
+            • Hidden when there are no active announcements
+            • Respects prefers-reduced-motion (CSS) and is announced once
+              via aria-live="polite" on mount */}
       {tickerItems.length > 0 && (
-        <div style={{ borderBottom: '1px solid var(--border)', background: 'oklch(0.85 0.16 90 / 0.4)' }}>
-          <div className="container row gap-3" style={{ padding: '.5rem 1rem', fontSize: '.875rem' }}>
-            <span className="badge badge-primary" style={{ flexShrink: 0 }}>LATEST</span>
-            <div style={{ overflow: 'hidden', flex: 1 }}>
+        <div className="ticker-bar" aria-label="Branch announcements" role="region">
+          <div className="container ticker-row">
+            <a href="#/announcements" className="ticker-label" aria-label="View all announcements">
+              LATEST
+            </a>
+            <div className="ticker-viewport" aria-live="polite">
+              {/* Duplicating the list lets the keyframe scroll seamlessly
+                  by translating exactly -50% before wrapping. */}
               <div className="ticker-track">
-                {[...tickerItems, ...tickerItems].map((a, i) => (
-                  <span key={i} style={{ color: 'rgba(0,0,0,.7)' }}>• {a}</span>
-                ))}
+                {[...tickerItems, ...tickerItems].map((a, i) => {
+                  // Prefer the uploaded PDF over an external link. If both
+                  // are absent, fall through to the announcements archive.
+                  const targetUrl = a.file_url || a.link_url;
+                  const isExternal = !!targetUrl;
+                  const href = isExternal ? targetUrl : '#/announcements';
+                  return (
+                    <a
+                      key={`${a.id}-${i}`}
+                      href={href}
+                      target={isExternal ? '_blank' : undefined}
+                      rel={isExternal ? 'noopener noreferrer' : undefined}
+                      className="ticker-item"
+                      // Items after the first set are visual duplicates for
+                      // the seamless loop — hide them from the a11y tree to
+                      // avoid screen-reader echoes.
+                      aria-hidden={i >= tickerItems.length ? 'true' : undefined}
+                      tabIndex={i >= tickerItems.length ? -1 : 0}
+                    >
+                      <span className="ticker-dot" aria-hidden="true">•</span>
+                      <span className="ticker-title">{a.title}</span>
+                      {a.file_url && <span className="ticker-pdf" aria-hidden="true">PDF</span>}
+                    </a>
+                  );
+                })}
               </div>
             </div>
+            <a href="#/announcements" className="ticker-viewall">
+              View all <IconArrowRight size="sm" />
+            </a>
           </div>
         </div>
       )}
@@ -99,19 +138,45 @@ export default function HomePage() {
         alignItems: 'center',
         padding: 'clamp(2rem, 6vw, 3rem) 0',
       }}>
-        {/* Background image + readability overlay */}
-        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-          {/* TODO: replace with real ICAI Bhawan / Nagpur landmark photo */}
+        {/* Background — three stacked layers (paint order, bottom up):
+            1. heroImage as a full-cover photo
+            2. A soft white gradient so hero text stays legible
+            3. heroLogo centered as a watermark — painted ABOVE the
+              gradient so the white wash doesn't double-fade it */}
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
           <img
             src={heroImage}
-            alt="ICAI Bhawan, Nagpur"
+            alt=""
             loading="eager"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
+          {/* Readability gradient — keeps the left-side text crisp while
+              letting the photo show through on the right. */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(100deg, rgba(255,255,255,.97) 0%, rgba(255,255,255,.94) 35%, rgba(255,255,255,.78) 65%, rgba(255,255,255,.60) 100%)',
+            background: 'linear-gradient(100deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.88) 35%, rgba(255,255,255,.62) 65%, rgba(255,255,255,.45) 100%)',
           }} />
+          {/* Centered watermark logo. Sized via clamp() so it scales with
+              the viewport (small on phones, generous on desktops) without
+              ever overflowing its container. Pointer-events off so it
+              never blocks clicks on the hero CTAs. */}
+          <img
+            src={heroLogo}
+            alt=""
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'clamp(220px, 45vw, 560px)',
+              maxHeight: '70%',
+              objectFit: 'contain',
+              opacity: 0.32,
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          />
         </div>
         <div className="container" style={{ position: 'relative', zIndex: 1, width: '100%', display: 'grid', gap: '2.5rem', gridTemplateColumns: '1fr', alignItems: 'center' }} data-hero-grid>
           <div>

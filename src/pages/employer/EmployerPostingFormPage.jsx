@@ -4,6 +4,7 @@ import { useRoute, navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
 import { IconArrowRight, IconX } from '../../icons';
 import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
+import Button from '../../components/ui/Button';
 
 const EMPTY = {
   type:        'job',
@@ -152,11 +153,11 @@ export default function EmployerPostingFormPage() {
 
           <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.5rem' }}>
             <button type="button" className="btn btn-ghost" onClick={() => navigate('/employer/postings')}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <Button type="submit" className="btn btn-primary" loading={saving}>
               {saving ? 'Saving…' : (
                 <>{isNew ? 'Publish' : 'Save'} <IconArrowRight size="sm" /></>
               )}
-            </button>
+            </Button>
           </div>
         </form>
       )}
