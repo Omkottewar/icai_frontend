@@ -148,11 +148,13 @@ export default function HomePage() {
             src={heroImage}
             alt=""
             loading="eager"
+            className="home-hero-photo"
             style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
           />
           {/* Readability gradient — keeps the left-side text crisp while
-              letting the photo show through on the right. */}
-          <div style={{
+              letting the photo show through on the right. On mobile the
+              CSS below replaces this with a cleaner near-solid wash. */}
+          <div className="home-hero-overlay" style={{
             position: 'absolute', inset: 0,
             background: 'linear-gradient(100deg, rgba(255,255,255,.95) 0%, rgba(255,255,255,.88) 35%, rgba(255,255,255,.62) 65%, rgba(255,255,255,.45) 100%)',
           }} />
@@ -164,6 +166,7 @@ export default function HomePage() {
             src={heroLogo}
             alt=""
             aria-hidden="true"
+            className="home-hero-watermark"
             style={{
               position: 'absolute',
               top: '50%',
@@ -184,7 +187,7 @@ export default function HomePage() {
               <IconAward size="sm" /> Branch of WIRC of ICAI
             </div>
             <h1 style={{ marginTop: '1rem', fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
-              Nagpur Branch of <span style={{ color: 'var(--accent)' }}>ICAI</span>
+              Nagpur Branch of <span className="home-hero-icai">ICAI</span>
             </h1>
             <div style={{ marginTop: '1rem', maxWidth: '32rem', color: 'rgba(0,0,0,.7)' }}>
               {renderMarkdown(hero.tagline)}

@@ -2211,26 +2211,138 @@ html[data-standalone="true"] body {
   .page-enter { animation: none; }
 }
 
-/* ── Pragyaan FAB — lift above the bottom nav on mobile ──────────────
-   Targets the absolute-positioned FAB inside the widget. Phones get
-   smaller FAB + lifted position so it never overlaps the nav strip. */
+/* ── Pragyaan FAB — lift above bottom nav, animate the Garud logo ────
+   The original Garud bird artwork is kept as-is (no invert filter, no
+   solid pill background). Animation: a slow, breathing hover + a
+   gentle wing-tilt sway so it reads as a living mascot rather than a
+   static sticker. Animations disabled for reduced-motion users. */
 @media (max-width: 768px) {
   #icai-pragyaan-fab {
     bottom: calc(.75rem + var(--bottom-nav-h)) !important;
-    right: .75rem !important;
-    width: 3.5rem !important;
-    height: 3.5rem !important;
-    box-shadow: 0 8px 24px -8px oklch(0.18 0.05 250 / 0.45) !important;
-    background: var(--primary) !important;
-    color: white !important;
-    border-radius: 999px !important;
-    padding: .55rem !important;
+    right: .5rem !important;
+    width: 4rem !important;
+    height: 4rem !important;
   }
-  #icai-pragyaan-fab img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: contain;
-    filter: brightness(0) invert(1);
+}
+/* Pragyaan Garud — keep the original artwork still, just a soft drop-
+   shadow so it reads as floating above the page. No flap, no drift. */
+#icai-pragyaan-fab img {
+  filter: drop-shadow(0 6px 10px oklch(0.18 0.05 250 / 0.25));
+  transition: filter .25s ease;
+}
+#icai-pragyaan-fab:hover img,
+#icai-pragyaan-fab:focus-visible img {
+  filter: drop-shadow(0 10px 14px oklch(0.36 0.13 255 / 0.45));
+}
+
+/* ── Pragyaan greeting bubble ─────────────────────────────────────────
+   Speech-bubble that appears next to the FAB ~1.5 s after the page
+   loads, introducing the assistant. Auto-fades after 10 s. Dismissable
+   via the × button. Hidden once the chat is opened or once the user
+   has dismissed it (state owned by the React component — CSS just
+   styles it). */
+.pg-greet {
+  position: fixed;
+  /* Above the FAB (z 201) and any cookie banner. */
+  z-index: 220;
+  right: calc(1.5rem + 5.5rem + .75rem);   /* sit left of the FAB */
+  bottom: 2.4rem;
+  max-width: 17rem;
+  padding: .75rem .9rem .8rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: .9rem;
+  box-shadow:
+    0 4px 10px oklch(0.18 0.05 250 / 0.12),
+    0 18px 40px -14px oklch(0.18 0.05 250 / 0.28);
+  font-size: .875rem;
+  line-height: 1.45;
+  color: var(--foreground);
+  animation: pgGreetIn .35s cubic-bezier(.2, .7, .2, 1) both;
+  transform-origin: bottom right;
+}
+.pg-greet-row {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+}
+.pg-greet-text { flex: 1 1 auto; min-width: 0; }
+.pg-greet-name {
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: -.005em;
+}
+.pg-greet-close {
+  flex: 0 0 auto;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: .25rem;
+  cursor: pointer;
+  font-size: .9rem;
+  line-height: 1;
+}
+.pg-greet-close:hover { background: var(--muted); color: var(--foreground); }
+/* Speech bubble tail pointing right toward the FAB. Two triangles
+   stacked — one for the border, one for the fill — so the outline
+   reads cleanly along the diagonal edge. */
+.pg-greet::before,
+.pg-greet::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  bottom: 14px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 8px 0 8px 8px;
+  border-color: transparent transparent transparent var(--card);
+}
+.pg-greet::before {
+  right: -9px;
+  border-color: transparent transparent transparent var(--border);
+}
+.pg-greet.pg-greet-leaving {
+  animation: pgGreetOut .25s ease both;
+}
+@keyframes pgGreetIn {
+  from { opacity: 0; transform: translateY(6px) scale(.94); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+@keyframes pgGreetOut {
+  from { opacity: 1; transform: translateY(0)   scale(1); }
+  to   { opacity: 0; transform: translateY(4px) scale(.96); }
+}
+@media (max-width: 768px) {
+  .pg-greet {
+    /* On mobile the FAB lives `bottom: .75rem + bottom-nav-h` and is
+       4rem tall on the right. Stack the bubble well above the bird
+       (with extra gap so it's clearly visible, not crammed against
+       the FAB's drop-shadow). */
+    right: .75rem;
+    bottom: calc(.75rem + var(--bottom-nav-h) + 4.75rem);
+    left: .75rem;                   /* span full width on phones */
+    max-width: none;
+    width: auto;
+    transform-origin: bottom right;
+  }
+  /* Move the tail to the BOTTOM of the bubble, pointing down at the bird. */
+  .pg-greet::before,
+  .pg-greet::after {
+    right: 1.5rem;
+    left: auto;
+    bottom: -8px;
+    border-width: 8px 8px 0 8px;
+    border-color: var(--card) transparent transparent transparent;
+  }
+  .pg-greet::before {
+    bottom: -9px;
+    border-color: var(--border) transparent transparent transparent;
   }
 }
 
@@ -2287,5 +2399,43 @@ html[data-standalone="true"] body {
     max-width: 240px !important;
     border-radius: 1rem !important;
     box-shadow: 0 16px 32px -16px oklch(0.18 0.05 250 / 0.35) !important;
+  }
+}
+
+/* ── Home hero — ICAI accent colour by breakpoint ─────────────────────
+   Desktop wants primary-blue ICAI (matches official ICAI wordmark style);
+   mobile wants the warm amber accent so it pops on the lighter mobile
+   hero background. */
+.home-hero-icai { color: var(--primary); }
+@media (max-width: 768px) {
+  .home-hero-icai { color: var(--accent); }
+}
+
+/* ── Home hero background — mobile rewrite ────────────────────────────
+   On phones we drop the building photo entirely and let the heroLogo
+   itself BE the background — bigger, recentred, slightly more visible
+   than a typical watermark, sitting on a clean white wash. Less visual
+   noise, stronger brand presence. */
+@media (max-width: 768px) {
+  /* Building photo hidden — too noisy on a narrow viewport. */
+  .home-hero-photo { display: none !important; }
+
+  /* Overlay collapses to a clean near-white wash with a soft amber
+     corner accent so the section doesn't feel flat. */
+  .home-hero-overlay {
+    background:
+      radial-gradient(circle at 90% 10%, oklch(0.85 0.16 90 / 0.16) 0%, transparent 42%),
+      linear-gradient(180deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.94) 100%) !important;
+  }
+
+  /* The logo IS the background now — bigger, more visible, perfectly
+     centred so it reads as a watermark seal behind the content. */
+  .home-hero-watermark {
+    width: clamp(220px, 65vw, 380px) !important;
+    opacity: .18 !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-height: 70% !important;
   }
 }

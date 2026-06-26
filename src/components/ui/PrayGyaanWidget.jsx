@@ -52,6 +52,20 @@ export default function PrayGyaanWidget() {
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [lang, setLang] = useState('en');
+  // Track FAB image load so the greeting bubble doesn't appear pointing
+  // at an empty spot before the bird has rendered. Preload via
+  // new Image() so the browser starts fetching the moment this widget
+  // mounts, not when React paints the <img>.
+  const [fabReady, setFabReady] = useState(false);
+  useEffect(() => {
+    if (typeof Image === 'undefined') { setFabReady(true); return; }
+    const img = new Image();
+    img.onload = img.onerror = () => setFabReady(true);
+    img.src = garudImg;
+    // Safety net — never block the bubble forever if the image hangs.
+    const failsafe = setTimeout(() => setFabReady(true), 3000);
+    return () => clearTimeout(failsafe);
+  }, []);
   const [config, setConfig] = useState({ disclaimer: DEFAULT_DISCLAIMER, languages: ['en', 'hi', 'mr'] });
   const [starters, setStarters] = useState([]);
   const [conversationId, setConversationId] = useState(null);
@@ -330,11 +344,21 @@ export default function PrayGyaanWidget() {
         </div>
       )}
 
-      {/* Floating trigger button */}
+      {/* First-load greeting bubble — small intro speech bubble that pops
+          up beside the FAB the first time a user lands on a page in this
+          session. Waits for `fabReady` (Garud image fully loaded) so the
+          bubble never appears pointing at a not-yet-rendered FAB. */}
+      {!open && fabReady && <PragyaanGreeting />}
+
+      {/* Floating trigger button — held offscreen until the Garud image
+          has finished loading so the user never sees an empty
+          placeholder ring. Uses opacity (not display:none) so its
+          fade-in transition is smooth. */}
       <button
         id="icai-pragyaan-fab"
         onClick={() => setOpen((v) => !v)}
         title="Chat with Pragyaan AI"
+        aria-hidden={!fabReady ? 'true' : undefined}
         style={{
           position: 'fixed',
           bottom: '1.5rem',
@@ -353,7 +377,11 @@ export default function PrayGyaanWidget() {
           alignItems: 'center',
           justifyContent: 'center',
           zIndex: 201,
-          transition: 'transform .15s, box-shadow .15s',
+          // Held invisible until the Garud image is preloaded so the user
+          // never sees a hollow circle before the bird paints.
+          opacity: fabReady ? 1 : 0,
+          pointerEvents: fabReady ? 'auto' : 'none',
+          transition: 'opacity .35s ease, transform .15s, box-shadow .15s',
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = 'scale(1.08)';
@@ -401,6 +429,63 @@ function TypingDots() {
         }} />
       ))}
     </span>
+  );
+}
+
+// Greeting speech-bubble that appears once per session next to the FAB.
+// Surfaces after a short delay so it doesn't clash with the initial page
+// paint; auto-hides after 15 s; dismissable via the × button.
+//
+// Key versioning: bumping the suffix invalidates any prior dismissals so
+// every tester sees the bubble again on next reload. Bump it when you
+// substantively change the copy or position.
+const GREET_DISMISSED_KEY = 'pg-greet-dismissed-v3';
+function PragyaanGreeting() {
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    if (typeof sessionStorage === 'undefined') {
+      // SSR / no-storage env — still show.
+      const t = setTimeout(() => setVisible(true), 1200);
+      return () => clearTimeout(t);
+    }
+    if (sessionStorage.getItem(GREET_DISMISSED_KEY)) return;
+    // Wait for the page to settle before popping in.
+    const showTimer = setTimeout(() => setVisible(true), 1200);
+    return () => clearTimeout(showTimer);
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    const t = setTimeout(() => dismiss(), 15000);
+    return () => clearTimeout(t);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function dismiss() {
+    setLeaving(true);
+    try { sessionStorage.setItem(GREET_DISMISSED_KEY, '1'); } catch { /* incognito */ }
+    setTimeout(() => setVisible(false), 250);   // matches pgGreetOut keyframe
+  }
+
+  if (!visible) return null;
+
+  return (
+    <div className={'pg-greet' + (leaving ? ' pg-greet-leaving' : '')} role="status" aria-live="polite">
+      <div className="pg-greet-row">
+        <div className="pg-greet-text">
+          Hi! I'm <span className="pg-greet-name">Pragyaan</span> — ask me anything about the branch, events, or membership.
+        </div>
+        <button
+          type="button"
+          className="pg-greet-close"
+          aria-label="Dismiss greeting"
+          onClick={dismiss}
+        >
+          ×
+        </button>
+      </div>
+    </div>
   );
 }
 
