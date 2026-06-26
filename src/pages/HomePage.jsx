@@ -72,6 +72,14 @@ export default function HomePage() {
   const leadership      = useSiteContent('home_leadership_banner');
   const chairman        = useSiteContent('chairman_message');
   const premises        = useSiteContent('home_branch_premises');
+  // New section-text slots — every label/heading/CTA on the home page
+  // is now driven from these so admins can rephrase anything.
+  const heroText        = useSiteContent('home_hero_text');
+  const leadershipExtra = useSiteContent('home_leadership_extras');
+  const servicesText    = useSiteContent('home_services_section');
+  const eventsText      = useSiteContent('home_events_section');
+  const premisesText    = useSiteContent('home_premises_section');
+  const knowledgeText   = useSiteContent('home_knowledge_section');
 
   return (
     <>
@@ -184,10 +192,10 @@ export default function HomePage() {
         <div className="container" style={{ position: 'relative', zIndex: 1, width: '100%', display: 'grid', gap: '2.5rem', gridTemplateColumns: '1fr', alignItems: 'center' }} data-hero-grid>
           <div>
             <div className="row gap-2" style={{ width: 'fit-content', padding: '.25rem .75rem', borderRadius: 999, border: '1px solid var(--border)', background: 'rgba(54,34,255,.06)', fontSize: '.75rem', fontWeight: 500, color: 'var(--primary)' }}>
-              <IconAward size="sm" /> Branch of WIRC of ICAI
+              <IconAward size="sm" /> {heroText.badge}
             </div>
             <h1 style={{ marginTop: '1rem', fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
-              Nagpur Branch of <span className="home-hero-icai">ICAI</span>
+              {heroText.title_prefix} <span className="home-hero-icai">{heroText.title_highlight}</span>
             </h1>
             <div style={{ marginTop: '1rem', maxWidth: '32rem', color: 'rgba(0,0,0,.7)' }}>
               {renderMarkdown(hero.tagline)}
@@ -207,9 +215,9 @@ export default function HomePage() {
               <button className="btn btn-primary" style={{ padding: '.4rem 1rem' }}>Search</button>
             </form> */}
             <div className="row gap-3" style={{ marginTop: '1.25rem', flexWrap: 'wrap' }}>
-              <a href="#/events" className="btn btn-primary">Upcoming Events <IconArrowRight size="sm" /></a>
-              <a href="#/praygyaan" className="btn btn-outline"><IconBot size="sm" /> Ask PrayGyaan AI</a>
-              {!user && <a href="#/signup" className="btn btn-outline">Create account <IconArrowRight size="sm" /></a>}
+              <a href="#/events" className="btn btn-primary">{heroText.cta_events_label} <IconArrowRight size="sm" /></a>
+              <a href="#/praygyaan" className="btn btn-outline"><IconBot size="sm" /> {heroText.cta_ai_label}</a>
+              {!user && <a href="#/signup" className="btn btn-outline">{heroText.cta_signup_label} <IconArrowRight size="sm" /></a>}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(.6rem, 2vw, 1rem)' }}>
@@ -236,15 +244,15 @@ export default function HomePage() {
               {renderMarkdown(leadership.body)}
             </div>
             <div className="row gap-3" style={{ marginTop: '1.75rem', flexWrap: 'wrap' }}>
-              <a href="#/events" className="btn btn-primary"><IconCalendar size="sm" /> Book CPE Event</a>
-              <a href="#/resources" className="btn btn-outline"><IconDownload size="sm" /> Download Circulars</a>
+              <a href="#/events" className="btn btn-primary"><IconCalendar size="sm" /> {leadershipExtra.cta_book_label}</a>
+              <a href="#/resources" className="btn btn-outline"><IconDownload size="sm" /> {leadershipExtra.cta_download_label}</a>
             </div>
           </div>
           <div style={{ position: 'relative' }}>
             <HeroCarousel slides={LEADERSHIP_SLIDES} />
             <div style={{ position: 'absolute', bottom: '-1rem', left: '-1rem', padding: '.75rem 1rem', background: 'white', border: '1px solid var(--border)', borderRadius: '.75rem', boxShadow: '0 8px 24px -10px rgba(0,0,0,.15)', display: 'none', zIndex: 3 }} className="show-md">
-              <div className="tiny-eyebrow">SINCE</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>1962</div>
+              <div className="tiny-eyebrow">{leadershipExtra.since_label}</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{leadershipExtra.since_year}</div>
             </div>
           </div>
         </div>
@@ -285,12 +293,11 @@ export default function HomePage() {
       {/* Services grid */}
       <section className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
         <div style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', maxWidth: '40rem' }}>
-          <div className="tiny-eyebrow">SERVICES</div>
-          <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Explore the Branch</h2>
-          <p className="muted-text" style={{ marginTop: '1rem', fontSize: '1rem', lineHeight: 1.65 }}>
-            Everything the Nagpur Branch offers — from CPE programmes and student mentorship to
-            career counselling and member welfare initiatives.
-          </p>
+          <div className="tiny-eyebrow">{servicesText.eyebrow}</div>
+          <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>{servicesText.title}</h2>
+          <div className="muted-text" style={{ marginTop: '1rem', fontSize: '1rem', lineHeight: 1.65 }}>
+            {renderMarkdown(servicesText.body)}
+          </div>
         </div>
         <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
           {SERVICES.map((s) => (
@@ -312,21 +319,21 @@ export default function HomePage() {
           {/* Upcoming list */}
           <div className="row" style={{ flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
             <div style={{ maxWidth: '40rem' }}>
-              <div className="tiny-eyebrow">EVENTS</div>
-              <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Upcoming programmes and committees</h2>
+              <div className="tiny-eyebrow">{eventsText.events_eyebrow}</div>
+              <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>{eventsText.events_title}</h2>
             </div>
-            <a href="#/events" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>View full calendar →</a>
+            <a href="#/events" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>{eventsText.events_view_all_label}</a>
           </div>
 
-          <div className="tiny-eyebrow" style={{ marginBottom: '1rem' }}>UPCOMING EVENTS</div>
+          <div className="tiny-eyebrow" style={{ marginBottom: '1rem' }}>{eventsText.upcoming_eyebrow}</div>
           <div>
             {upcoming.map((e) => <EventRow key={e.title} event={e} />)}
           </div>
 
           {/* Committee categories */}
           <div style={{ marginTop: 'clamp(2.5rem, 6vw, 5rem)' }}>
-            <div className="tiny-eyebrow">BROWSE BY COMMITTEE</div>
-            <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em', marginBottom: '2rem' }}>Committee categories</h2>
+            <div className="tiny-eyebrow">{eventsText.committees_eyebrow}</div>
+            <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em', marginBottom: '2rem' }}>{eventsText.committees_title}</h2>
             {committees.length === 0 ? (
               <p className="muted-text">No committees configured yet.</p>
             ) : (
@@ -351,8 +358,8 @@ export default function HomePage() {
       {/* Branch Premises + NICASA */}
       <section className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
         <div style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', maxWidth: '40rem' }}>
-          <div className="tiny-eyebrow">OUR HOME</div>
-          <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Branch premises &amp; student wing</h2>
+          <div className="tiny-eyebrow">{premisesText.outer_eyebrow}</div>
+          <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>{premisesText.outer_title}</h2>
         </div>
         <div style={{ display: 'grid', gap: '1.75rem', gridTemplateColumns: '1fr' }} data-premises-grid>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -364,8 +371,8 @@ export default function HomePage() {
               style={{ width: '100%', display: 'block', aspectRatio: '16/7', objectFit: 'cover' }}
             />
             <div style={{ padding: '1.5rem' }}>
-              <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>BRANCH PREMISES</div>
-              <h3 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.2vw, 1.5rem)', fontWeight: 700, color: 'var(--primary)', lineHeight: 1.2 }}>ICAI Bhawan, Dhantoli</h3>
+              <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>{premisesText.inner_eyebrow}</div>
+              <h3 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.2vw, 1.5rem)', fontWeight: 700, color: 'var(--primary)', lineHeight: 1.2 }}>{premisesText.inner_title}</h3>
               <div className="muted-text" style={{ marginTop: '.5rem', lineHeight: 1.6 }}>
                 {renderMarkdown(premises.body)}
               </div>
@@ -382,7 +389,7 @@ export default function HomePage() {
                 className="btn btn-primary"
                 style={{ marginTop: '.85rem' }}
               >
-                Book the Reading Room <IconArrowRight size="sm" />
+                {premisesText.reading_room_label} <IconArrowRight size="sm" />
               </a>
             </div>
           </div>
@@ -397,10 +404,10 @@ export default function HomePage() {
         <div className="container" style={{ padding: '0 1rem' }}>
           <div className="row" style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div style={{ maxWidth: '40rem' }}>
-              <div className="tiny-eyebrow">KNOWLEDGE HUB</div>
-              <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>Circulars, standards &amp; e-Journal</h2>
+              <div className="tiny-eyebrow">{knowledgeText.eyebrow}</div>
+              <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>{knowledgeText.title}</h2>
             </div>
-            <a href="#/resources" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>All resources →</a>
+            <a href="#/resources" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>{knowledgeText.view_all_label}</a>
           </div>
           <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             {[

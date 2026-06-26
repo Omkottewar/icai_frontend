@@ -37,6 +37,48 @@ export const SITE_CONTENT_DEFAULTS = {
       { k: '4,200+ titles', v: 'LIBRARY' },
     ],
   },
+  // ── Defaults for the new section slots ──────────────────────────────
+  // Each mirrors the current hardcoded copy so behaviour is identical
+  // until an admin overrides a field.
+  home_hero_text: {
+    badge:            'Branch of WIRC of ICAI',
+    title_prefix:     'Nagpur Branch of',
+    title_highlight:  'ICAI',
+    cta_events_label: 'Upcoming Events',
+    cta_ai_label:     'Ask PrayGyaan AI',
+    cta_signup_label: 'Create account',
+  },
+  home_leadership_extras: {
+    cta_book_label:     'Book CPE Event',
+    cta_download_label: 'Download Circulars',
+    since_label:        'SINCE',
+    since_year:         '1962',
+  },
+  home_services_section: {
+    eyebrow: 'SERVICES',
+    title:   'Explore the Branch',
+    body:    'Everything the Nagpur Branch offers — from CPE programmes and student mentorship to career counselling and member welfare initiatives.',
+  },
+  home_events_section: {
+    events_eyebrow:        'EVENTS',
+    events_title:          'Upcoming programmes and committees',
+    events_view_all_label: 'View full calendar →',
+    upcoming_eyebrow:      'UPCOMING EVENTS',
+    committees_eyebrow:    'BROWSE BY COMMITTEE',
+    committees_title:      'Committee categories',
+  },
+  home_premises_section: {
+    outer_eyebrow:      'OUR HOME',
+    outer_title:        'Branch premises & student wing',
+    inner_eyebrow:      'BRANCH PREMISES',
+    inner_title:        'ICAI Bhawan, Dhantoli',
+    reading_room_label: 'Book the Reading Room',
+  },
+  home_knowledge_section: {
+    eyebrow:        'KNOWLEDGE HUB',
+    title:          'Circulars, standards & e-Journal',
+    view_all_label: 'All resources →',
+  },
   about_vision: {
     body: 'To be a leading branch dedicated to the holistic development of members and students through quality education, networking, and innovative initiatives.',
   },
