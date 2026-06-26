@@ -134,33 +134,98 @@ For pricing and to begin verification, contact the branch office (Contact page).
 };
 
 // Internal — fetch the bundle once per ~5 min. EventsPage, HomePage and
-// AboutPage will all share this single cache entry.
+// AboutPage all share this one cache entry.
+//
+// To kill the "flash of default content" on refresh, we ALSO persist the
+// last successful response in localStorage. On reload we hydrate from
+// localStorage synchronously (no flash), then refetch in the background
+// and refresh the cache + UI when newer data arrives.
+//
+// `loaded` distinguishes between "we have data to show (whether from
+// cache or network)" and "still waiting for the very first response on
+// a brand-new install" — pages can render shimmers in the latter case
+// instead of falling back to the baked-in default copy that caused the
+// flash.
+
+const SITE_CONTENT_LS_KEY = 'icai-site-content-cache-v1';
+
+function readPersistedSiteContent() {
+  if (typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SITE_CONTENT_LS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    // Sanity-check the shape so a corrupted/old payload doesn't crash render.
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.rows)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedSiteContent(payload) {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(SITE_CONTENT_LS_KEY, JSON.stringify(payload));
+  } catch { /* quota / incognito — silently skip, in-memory state still works */ }
+}
+
 function useAllSiteContent() {
-  const [data, setData] = useState(null);
+  // Hydrate synchronously from localStorage on first render. This is the
+  // bit that eliminates the flash — the very first React paint already
+  // has the data from the user's previous visit.
+  const [data, setData] = useState(() => readPersistedSiteContent());
 
   useEffect(() => {
     let cancelled = false;
     cachedGet('/api/site/content', null, 300_000)
-      .then((j) => { if (!cancelled) setData(j); })
-      .catch(() => { if (!cancelled) setData({ rows: [] }); });
+      .then((j) => {
+        if (cancelled) return;
+        setData(j);
+        writePersistedSiteContent(j);
+      })
+      .catch(() => {
+        // Network failed — keep whatever we already had (cached or null).
+        // Only fall through to an empty payload if we have nothing at all,
+        // so a stale-but-real cache wins over a fresh empty one.
+        if (cancelled) return;
+        setData((prev) => prev ?? { rows: [] });
+      });
     return () => { cancelled = true; };
   }, []);
 
   return data;
 }
 
-// Returns merged { default, ...db } payload for a single slot. While the
-// initial fetch is in flight the default fires immediately so the page
-// doesn't shimmer.
+// Returns merged { default, ...db } payload for a single slot.
+//
+// `loaded` is true once we have data from either localStorage or the
+// API; while loaded is false, callers can render a shimmer instead of
+// the hardcoded defaults so the page doesn't show stale copy that
+// immediately gets replaced.
+//
+// The hardcoded defaults still serve as a final safety net: if the DB
+// has nothing for this slug (fresh install) AND no cached data exists,
+// the defaults render so the page never shows blank text.
 export function useSiteContent(slug) {
   const all = useAllSiteContent();
+  const loaded = all !== null;
 
   return useMemo(() => {
     const fallback = SITE_CONTENT_DEFAULTS[slug] || {};
     const row = all?.rows?.find((r) => r.slug === slug);
     const data = row?.data || {};
-    // shallow merge — fallback fills gaps when the DB row is partial (e.g.
-    // admin only set the quote, didn't upload a photo yet).
-    return { ...fallback, ...data };
-  }, [all, slug]);
+    // Shallow merge — fallback fills gaps when the DB row is partial
+    // (e.g. admin set the quote but didn't upload a photo yet).
+    const merged = { ...fallback, ...data };
+    Object.defineProperty(merged, '_loaded', { value: loaded, enumerable: false });
+    return merged;
+  }, [all, loaded, slug]);
+}
+
+// Helper: returns true once the site-content bundle has been delivered
+// either from localStorage cache or the network. Pages can use this to
+// decide whether to render a shimmer or the real content.
+export function useSiteContentLoaded() {
+  return useAllSiteContent() !== null;
 }
