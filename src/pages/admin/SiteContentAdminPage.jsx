@@ -9,6 +9,7 @@ import { SITE_SLOTS, SLOT_SLUGS } from '../../lib/siteContentSlots';
 import { SITE_CONTENT_DEFAULTS } from '../../hooks/useSiteContent';
 import { renderMarkdown } from '../../lib/markdown.jsx';
 import Button from '../../components/ui/Button';
+import ImageCropper from '../../components/ui/ImageCropper';
 
 function formatWhen(ts) {
   if (!ts) return '—';
@@ -315,29 +316,32 @@ function FieldEditor({ field, value, onChange, previewing, onTogglePreview, show
 
 function ImageField({ field, value, onChange, showToast }) {
   const [uploading, setUploading] = useState(false);
+  // A picked-but-not-yet-cropped file. While this is set the ImageCropper
+  // modal is rendered; the admin confirms or cancels.
+  const [pendingFile, setPendingFile] = useState(null);
 
-  async function onFile(e) {
+  function onFilePicked(e) {
     const file = e.target.files?.[0];
+    e.target.value = '';           // allow picking the same file again later
     if (!file) return;
+    setPendingFile(file);
+  }
+
+  async function uploadCropped(cropped) {
     setUploading(true);
     try {
-      const data_base64 = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result || ''));
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      });
       const resp = await apiWrite('/api/admin/files', {
         method: 'POST',
         body: {
-          name: file.name,
-          mime_type: file.type,
-          bucket: 'site',
-          data_base64,
+          name:        cropped.name,
+          mime_type:   cropped.mime_type,
+          bucket:      'site',
+          data_base64: cropped.data_base64,
         },
       });
       onChange(resp.url);
       showToast?.('Image uploaded', 'success');
+      setPendingFile(null);
     } catch (err) {
       showToast?.(err.message || 'Upload failed', 'error');
     } finally {
@@ -356,9 +360,9 @@ function ImageField({ field, value, onChange, showToast }) {
           />
         )}
         <div className="row gap-2">
-          <label className="btn btn-outline" style={{ padding: '.45rem .85rem', cursor: 'pointer' }}>
-            {uploading ? 'Uploading…' : (value ? 'Replace' : 'Upload image')}
-            <input type="file" accept="image/*" onChange={onFile} disabled={uploading} style={{ display: 'none' }} />
+          <label className="btn btn-outline" style={{ padding: '.45rem .85rem', cursor: uploading ? 'wait' : 'pointer' }}>
+            {uploading ? 'Uploading…' : (value ? 'Replace' : 'Choose image')}
+            <input type="file" accept="image/*" onChange={onFilePicked} disabled={uploading} style={{ display: 'none' }} />
           </label>
           {value && (
             <button
@@ -371,7 +375,17 @@ function ImageField({ field, value, onChange, showToast }) {
             </button>
           )}
         </div>
+        <div className="muted-text" style={{ fontSize: '.7rem' }}>
+          You'll be able to crop the image after picking it.
+        </div>
       </div>
+      {pendingFile && (
+        <ImageCropper
+          file={pendingFile}
+          onConfirm={uploadCropped}
+          onCancel={() => setPendingFile(null)}
+        />
+      )}
     </FormField>
   );
 }

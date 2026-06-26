@@ -57,4 +57,5 @@ export const IconPhone = (p) => <I {...p}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 
 export const IconLock = (p) => <I {...p}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></I>;
 export const IconChevronDown = (p) => <I {...p}><path d="M6 9l6 6 6-6"/></I>;
 export const IconBell = (p) => <I {...p}><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></I>;
+export const IconHome = (p) => <I {...p}><path d="M3 12l9-9 9 9M5 10v10a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V10"/></I>;
 export const IconHandshake = (p) => <I {...p}><path d="M11 17l2 2a1 1 0 1 0 3-3M14 14l2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a3 3 0 0 1-4.24 0l-2.12-2.12a3 3 0 0 1 0-4.24l2.83-2.83a3 3 0 0 1 4.24 0L13 4M21 3l-3 3M3 21l3-3"/></I>;

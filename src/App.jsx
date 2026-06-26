@@ -14,6 +14,20 @@ export default function App() {
   // is usually already parsed, so navigation feels instant.
   useEffect(() => { installLinkPrefetchListener(); }, []);
 
+  // Tag <html> with `data-standalone` when running as an installed PWA so
+  // CSS can adjust (e.g. heavier bottom-nav shadow, status-bar safe area).
+  // Listens for changes too in case the user adds-to-home-screen mid-session.
+  useEffect(() => {
+    const mq = window.matchMedia('(display-mode: standalone)');
+    const apply = () => {
+      const standalone = mq.matches || window.navigator.standalone === true;
+      document.documentElement.dataset.standalone = standalone ? 'true' : 'false';
+    };
+    apply();
+    mq.addEventListener?.('change', apply);
+    return () => mq.removeEventListener?.('change', apply);
+  }, []);
+
   return (
     <ToastProvider>
       <ConfirmDialogProvider>

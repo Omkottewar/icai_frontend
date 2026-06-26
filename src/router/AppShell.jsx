@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import caIndiaLogo from '../assets/CA India Logo.png';
 import Header from '../components/layout/Header';
 import Footer from '../components/layout/Footer';
+import BottomNav from '../components/layout/BottomNav';
+import MobileAppBar from '../components/layout/MobileAppBar';
 import PushPermissionBanner from '../components/PushPermissionBanner';
 import CookieConsentBanner from '../components/CookieConsentBanner';
 import { ShimmerFullPageSplash, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
@@ -377,11 +379,20 @@ export default function AppShell() {
       {/* WCAG 2.4.1 Bypass Blocks — visually hidden until focused. */}
       <a href="#main-content" className="skip-link">Skip to main content</a>
       <ScrollToTop />
-      <Header />
+      {/* Desktop header — CSS-hidden ≤768 px. */}
+      <div className="hide-on-mobile-only"><Header /></div>
+      {/* Mobile-only slim app bar. The CSS gate is on the component so
+          desktop never even paints it. */}
+      <MobileAppBar />
       <PushPermissionBanner />
       <main id="main-content" style={{ flex: 1 }} tabIndex={-1}>
         <Suspense fallback={<ShimmerFullPageSplash />}>
-          <Page />
+          {/* `key` on the wrapper forces a remount per route, which
+              re-triggers the .page-enter animation — that's how we get
+              the native-feeling slide-in on every navigation. */}
+          <div key={route.path} className="page-enter">
+            <Page />
+          </div>
         </Suspense>
       </main>
       <Footer />
@@ -389,6 +400,8 @@ export default function AppShell() {
         <PrayGyaanWidget />
       </Suspense>
       <CookieConsentBanner />
+      {/* Bottom tab bar — CSS-gated to ≤768 px so it's a no-op on desktop. */}
+      <BottomNav />
     </div>
   );
 }

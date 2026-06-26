@@ -127,13 +127,13 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* Hero */}
-      <section style={{
+      {/* Hero — capped height on phones so users see something below the
+          fold immediately. Desktop keeps the full-viewport feel. */}
+      <section className="home-hero-section" style={{
         position: 'relative',
         overflow: 'hidden',
         color: 'var(--foreground)',
         background: 'white',
-        minHeight: 'calc(100vh - var(--header-h, 104px))',
         display: 'flex',
         alignItems: 'center',
         padding: 'clamp(2rem, 6vw, 3rem) 0',

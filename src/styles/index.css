@@ -1722,3 +1722,570 @@ a:focus-visible,
   .event-acc-cta { margin: 0 .9rem .9rem; }
   .committee-panel-body { padding: 1rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MOBILE EXPERIENCE — bottom nav, safe-areas, input zoom prevention,
+   minimum touch targets. Applies only below 768px so desktop is unaffected.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Reserved height for the bottom nav. Reads safe-area-inset-bottom so
+     iPhones with a home indicator don't paint the strip over it. */
+  --bottom-nav-h: calc(4rem + env(safe-area-inset-bottom, 0px));
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Prevent iOS Safari from auto-zooming when a form field gets focus.
+   Trigger threshold is 16 px; anything smaller forces the zoom. The
+   site-wide font scale shrinks below 1rem on small screens (see line 38)
+   so we bump the inputs explicitly. */
+@media (max-width: 768px) {
+  .input-base,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="url"],
+  input[type="search"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/* Minimum tappable area — Apple HIG asks for ≥44 px, Material ≥48 dp.
+   Buttons & links inside `.btn` already meet this on default size, but
+   small variants (padding .25rem .55rem) used by table actions don't.
+   Bump them so a thumb can hit them on a phone without misfiring. */
+@media (max-width: 768px) {
+  .btn, button.btn-ghost, [role="button"] {
+    min-height: 44px;
+  }
+}
+
+/* ── Bottom navigation strip ──────────────────────────────────────────── */
+.bottom-nav {
+  display: none;          /* shown on mobile only — see media query below */
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 60;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  /* The bar itself sits above the home indicator; the inset is added as
+     padding so the icons stay clear of it. */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-shadow: 0 -4px 16px -8px oklch(0.18 0.05 250 / 0.15);
+}
+.bottom-nav-tab {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .2rem;
+  padding: .55rem .25rem .65rem;
+  min-height: 56px;
+  background: transparent;
+  border: 0;
+  color: var(--muted-foreground);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: .65rem;
+  font-weight: 500;
+  line-height: 1;
+  transition: color .15s ease;
+}
+.bottom-nav-tab:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.bottom-nav-tab.is-active {
+  color: var(--primary);
+  font-weight: 600;
+}
+.bottom-nav-icon {
+  display: inline-flex;
+  width: 1.4rem;
+  height: 1.4rem;
+}
+.bottom-nav-label {
+  letter-spacing: .01em;
+}
+
+/* ── Slide-up "More" sheet ────────────────────────────────────────────── */
+.bottom-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: oklch(0.18 0.05 250 / 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: flex-end;
+  animation: fadeIn .18s ease;
+}
+.bottom-sheet {
+  background: var(--card);
+  width: 100%;
+  max-height: 85vh;
+  border-radius: 1rem 1rem 0 0;
+  padding: .5rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  animation: slideUp .22s cubic-bezier(.2,.7,.2,1);
+  box-shadow: 0 -20px 40px -10px oklch(0.18 0.05 250 / 0.3);
+}
+.bottom-sheet-handle {
+  width: 38px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 999px;
+  margin: .25rem auto .75rem;
+}
+.bottom-sheet-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 .75rem;
+  color: var(--foreground);
+}
+.bottom-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+.bottom-sheet-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .35rem;
+  padding: .85rem .5rem;
+  border: 1px solid var(--border);
+  border-radius: .625rem;
+  background: var(--background);
+  color: var(--foreground);
+  text-decoration: none;
+  transition: border-color .15s, transform .1s;
+  min-height: 88px;
+  justify-content: center;
+  text-align: center;
+}
+.bottom-sheet-item:active { transform: scale(.97); }
+.bottom-sheet-item:hover  { border-color: oklch(0.36 0.13 255 / 0.45); }
+.bottom-sheet-item-icon {
+  display: inline-flex;
+  width: 1.4rem;
+  height: 1.4rem;
+  color: var(--primary);
+}
+.bottom-sheet-item-label {
+  font-size: .7rem;
+  line-height: 1.25;
+  font-weight: 500;
+}
+.bottom-sheet-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Reveal the bottom nav only on mobile widths. Above 768 px the desktop
+   header is enough — no point eating vertical real estate. */
+@media (max-width: 768px) {
+  .bottom-nav {
+    display: flex;
+    align-items: stretch;
+  }
+  /* Push the page body up so its content isn't hidden behind the bar. */
+  body {
+    padding-bottom: var(--bottom-nav-h);
+  }
+}
+
+/* Respect reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .bottom-sheet, .bottom-sheet-backdrop { animation: none; }
+}
+
+/* ── Members Directory — desktop table / mobile card switch ─────────── */
+.dir-mobile-list {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.dir-desktop-table { display: block; }
+@media (max-width: 640px) {
+  .dir-mobile-list   { display: flex; flex-direction: column; gap: .5rem; }
+  .dir-desktop-table { display: none; }
+}
+.dir-mobile-card {
+  display: flex;
+  gap: .75rem;
+  padding: .75rem .85rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: .625rem;
+}
+.dir-mobile-avatar {
+  flex: 0 0 auto;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: oklch(0.36 0.13 255 / 0.1);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .7rem;
+  font-weight: 700;
+}
+.dir-mobile-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.dir-mobile-name {
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--foreground);
+  line-height: 1.3;
+}
+.dir-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  font-size: .7rem;
+  color: var(--muted-foreground);
+}
+.dir-mobile-mrn {
+  font-family: ui-monospace, "SF Mono", monospace;
+  font-size: .7rem;
+}
+.dir-mobile-city {
+  font-size: .7rem;
+}
+.dir-mobile-contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  margin-top: .15rem;
+}
+.dir-mobile-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .2rem;
+  padding: .2rem .55rem;
+  border-radius: 999px;
+  font-size: .7rem;
+  font-weight: 500;
+  background: oklch(0.36 0.13 255 / 0.08);
+  color: var(--primary);
+  text-decoration: none;
+  border: 1px solid oklch(0.36 0.13 255 / 0.18);
+}
+.dir-mobile-chip:active { transform: scale(.97); }
+.dir-mobile-firm {
+  display: inline-block;
+  font-size: .7rem;
+  color: var(--muted-foreground);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dir-mobile-empty {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: var(--muted-foreground);
+  font-size: .875rem;
+}
+/* Quick shimmer keyframe (reuses our existing palette) */
+.shimmer {
+  background: linear-gradient(90deg, var(--muted) 0%, oklch(0.94 0.005 240) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: shimmerMove 1.4s linear infinite;
+}
+@keyframes shimmerMove {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.dir-mobile-avatar.shimmer {
+  background: linear-gradient(90deg, var(--muted) 0%, oklch(0.94 0.005 240) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: shimmerMove 1.4s linear infinite;
+}
+
+/* ── PWA standalone mode polish ─────────────────────────────────────── */
+/* When installed as a PWA the user has no browser back-button or address
+   bar, so the bottom-nav becomes the primary navigation. Strengthen its
+   shadow + reserve top safe area for the iPhone notch. */
+html[data-standalone="true"] .bottom-nav {
+  box-shadow: 0 -8px 24px -10px oklch(0.18 0.05 250 / 0.25);
+}
+html[data-standalone="true"] body {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* ── Home hero — viewport-relative height tuned per breakpoint ─────── */
+.home-hero-section { min-height: calc(100vh - var(--header-h, 104px)); }
+@media (max-width: 768px) {
+  /* On phones, capping at 70vh lets users see "what's below" before
+     scrolling. Saves an entire screen of bounce. */
+  .home-hero-section { min-height: 70vh; }
+}
+@media (max-width: 480px) {
+  .home-hero-section { min-height: 62vh; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   PREMIUM MOBILE — "feels like a React Native app" pass.
+   Active-indicator pill, page slide transitions, press feedback on every
+   tappable surface, mobile-only app bar, FAB lifted above bottom-nav,
+   thin scrollbars, no nasty tap-highlight rectangles.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Mobile-only top app bar ───────────────────────────────────────────
+   Hides on desktop; the desktop Header takes over via .hide-on-mobile-only. */
+.mobile-appbar { display: none; }
+.hide-on-mobile-only { display: block; }
+
+@media (max-width: 768px) {
+  /* The desktop header is hidden on phones — its two-bar layout wastes
+     vertical real estate and the social links don't matter to a thumb. */
+  .hide-on-mobile-only { display: none !important; }
+
+  .mobile-appbar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    position: sticky;
+    top: 0;
+    z-index: 55;
+    padding: .65rem 1rem;
+    padding-top: calc(.65rem + env(safe-area-inset-top, 0px));
+    background: var(--primary);
+    color: var(--primary-foreground);
+    min-height: calc(56px + env(safe-area-inset-top, 0px));
+    transition: box-shadow .2s ease, background .2s ease;
+  }
+  .mobile-appbar.is-scrolled {
+    box-shadow: 0 4px 16px -8px oklch(0.18 0.05 250 / 0.35);
+  }
+}
+
+.mobile-appbar-brand {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+.mobile-appbar-logo {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: .5rem;
+  background: #fff;
+  padding: .2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.mobile-appbar-logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.mobile-appbar-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mobile-appbar-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.mobile-appbar-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.18);
+  color: white;
+  font-size: .75rem;
+  font-weight: 700;
+  text-decoration: none;
+  letter-spacing: .04em;
+  backdrop-filter: blur(8px);
+}
+.mobile-appbar-signin {
+  padding: .35rem .85rem;
+  background: rgba(255,255,255,.18);
+  border-radius: 999px;
+  color: white;
+  font-size: .8rem;
+  font-weight: 600;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+
+/* ── Bottom-nav animated indicator pill ───────────────────────────────
+   Sits at the top of the active tab; slides smoothly when the user
+   navigates. The slot left/width is driven by inline style in the JSX. */
+.bottom-nav { position: fixed; }            /* (already set above) — ensure stacking ctx for indicator */
+.bottom-nav-indicator {
+  position: absolute;
+  top: 0;
+  height: 3px;
+  background: var(--primary);
+  border-radius: 0 0 999px 999px;
+  transition: left .28s cubic-bezier(.2,.7,.2,1), width .28s cubic-bezier(.2,.7,.2,1);
+  pointer-events: none;
+}
+
+/* Active tab icon gently scales up — feels like a Material indicator. */
+.bottom-nav-tab .bottom-nav-icon { transition: transform .22s cubic-bezier(.2,.7,.2,1); }
+.bottom-nav-tab.is-active .bottom-nav-icon { transform: translateY(-1px) scale(1.08); }
+
+/* ── Press feedback (haptic-style scale-down) ──────────────────────────
+   The single biggest "feels native" trick. Anything tappable shrinks
+   slightly when held down. Only triggers on touch devices so desktop
+   click feedback stays calm. */
+@media (hover: none) {
+  .btn:active,
+  .bottom-nav-tab:active,
+  .bottom-sheet-item:active,
+  .mobile-appbar-avatar:active,
+  .mobile-appbar-signin:active,
+  .dir-mobile-card:active,
+  .dir-mobile-chip:active,
+  a[href]:active,
+  [role="button"]:active {
+    transform: scale(.97);
+  }
+  .btn, .bottom-nav-tab, .bottom-sheet-item, .mobile-appbar-avatar,
+  .mobile-appbar-signin, .dir-mobile-card, .dir-mobile-chip,
+  [role="button"] {
+    transition: transform .12s ease, background-color .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+  /* Suppress the grey iOS tap highlight rectangle — we render our own. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* ── Page slide-in transition ─────────────────────────────────────────
+   Re-mounted div under `<main>` gets this animation on every route
+   change — uses key={route.path} in AppShell. Subtle horizontal slide
+   + opacity ramp, ~220 ms — same feel as the native "push" transition
+   on iOS. */
+.page-enter {
+  animation: pageEnter .22s cubic-bezier(.2,.7,.2,1);
+}
+@keyframes pageEnter {
+  from { opacity: 0; transform: translate3d(12px, 0, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
+}
+
+/* ── Pragyaan FAB — lift above the bottom nav on mobile ──────────────
+   Targets the absolute-positioned FAB inside the widget. Phones get
+   smaller FAB + lifted position so it never overlaps the nav strip. */
+@media (max-width: 768px) {
+  #icai-pragyaan-fab {
+    bottom: calc(.75rem + var(--bottom-nav-h)) !important;
+    right: .75rem !important;
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+    box-shadow: 0 8px 24px -8px oklch(0.18 0.05 250 / 0.45) !important;
+    background: var(--primary) !important;
+    color: white !important;
+    border-radius: 999px !important;
+    padding: .55rem !important;
+  }
+  #icai-pragyaan-fab img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain;
+    filter: brightness(0) invert(1);
+  }
+}
+
+/* ── Card press feedback + elevation ──────────────────────────────────
+   On phones, `.card` gets a subtle layered shadow (close + far) so it
+   reads as a real elevated surface rather than a bordered box. */
+@media (max-width: 768px) {
+  .card {
+    border-radius: 1rem;
+    box-shadow:
+      0 1px 3px oklch(0.18 0.05 250 / 0.06),
+      0 4px 12px -4px oklch(0.18 0.05 250 / 0.08);
+  }
+  /* Clickable cards (anchor tags + role=button + cards inside lists)
+     get a slightly stronger lift on hover/active. */
+  a.card:hover,
+  button.card:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 6px oklch(0.18 0.05 250 / 0.10),
+      0 12px 28px -10px oklch(0.18 0.05 250 / 0.18);
+  }
+}
+
+/* ── Premium polish: thin scrollbars, no focus rings on touch ─────── */
+@media (max-width: 768px) {
+  /* Thin, subtle scrollbars — like iOS Safari */
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: oklch(0.65 0.04 250 / 0.4);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  /* Default focus ring removed for touch users (browser still shows it
+     for keyboard users via :focus-visible elsewhere). */
+  *:focus { outline: none; }
+}
+
+/* ── Refined chairman section on mobile ───────────────────────────────
+   The full-bleed photo plus floating name ribbon looked great on
+   desktop but felt unrefined on a phone — too much real estate spent
+   on one image. Mobile version: tighter card, framed photo, the
+   quote and attribution sit in a paired card right below. */
+@media (max-width: 768px) {
+  [data-chair-grid] {
+    gap: 1.25rem !important;
+  }
+  [data-chair-grid] > img {
+    max-width: 240px !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 16px 32px -16px oklch(0.18 0.05 250 / 0.35) !important;
+  }
+}

@@ -118,11 +118,56 @@ export default function MembersDirectoryPage() {
           {loading ? 'Loading…' : `Showing ${rows.length} of ${total} members`}
         </p>
 
-        {/* Directory table — columns vary by auth state. Anonymous callers
-            see the same 5 columns as before; authed callers also get Phone,
-            Email and Firm. The Email column gets a mailto:, and Phone gets
-            a tel: link so members can tap to dial / mail on mobile. */}
-        <div style={{ overflowX: 'auto' }}>
+        {/* MOBILE — vertically-stacked cards (≤640 px). The table doesn't
+            fit on a phone screen, so each member becomes a tappable card.
+            Phone + email get tel:/mailto: chips when the viewer is authed
+            so a thumb can dial or open mail immediately. */}
+        <ul className="dir-mobile-list" aria-label="Members">
+          {loading && rows.length === 0 && Array.from({ length: 6 }).map((_, i) => (
+            <li key={'mds-mob-shim-' + i} className="dir-mobile-card" aria-hidden="true">
+              <div className="dir-mobile-avatar shimmer" />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+                <div className="shimmer" style={{ height: '.85rem', width: '60%', borderRadius: 4 }} />
+                <div className="shimmer" style={{ height: '.7rem', width: '40%', borderRadius: 4 }} />
+              </div>
+            </li>
+          ))}
+          {rows.map((m, i) => {
+            const sc = STATUS_COLORS[m.status] || { bg: '#f9fafb', color: '#6b7280' };
+            return (
+              <li key={'mob-' + m.id} className="dir-mobile-card">
+                <div className="dir-mobile-avatar">
+                  {m.name.split(' ').slice(0, 2).map((w) => w[0]).join('')}
+                </div>
+                <div className="dir-mobile-body">
+                  <div className="dir-mobile-name">{m.name}</div>
+                  <div className="dir-mobile-meta">
+                    <span className="dir-mobile-mrn">{m.mrn}</span>
+                    <span style={{
+                      padding: '.05rem .4rem', borderRadius: '.25rem',
+                      fontSize: '.65rem', fontWeight: 700,
+                      background: sc.bg, color: sc.color,
+                    }}>{m.status}</span>
+                    {m.city && <span className="dir-mobile-city">{m.city}</span>}
+                  </div>
+                  {authed && (m.phone || m.email || m.firm_name) && (
+                    <div className="dir-mobile-contact">
+                      {m.phone && <a href={`tel:${m.phone}`} className="dir-mobile-chip">📞 {m.phone}</a>}
+                      {m.email && <a href={`mailto:${m.email}`} className="dir-mobile-chip">✉ Email</a>}
+                      {m.firm_name && <span className="dir-mobile-firm" title={m.firm_name}>{m.firm_name}</span>}
+                    </div>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+          {!loading && rows.length === 0 && (
+            <li className="dir-mobile-empty">No members found matching your search.</li>
+          )}
+        </ul>
+
+        {/* DESKTOP — original table layout (≥641 px). */}
+        <div className="dir-desktop-table" style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
