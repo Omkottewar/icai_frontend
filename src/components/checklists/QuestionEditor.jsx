@@ -1,6 +1,7 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState } from 'react';
 import { QUESTION_TYPE_MAP, ROLE_OPTIONS, slugifyOptionValue } from '../../lib/checklistQuestions';
 import { IconTrash, IconChevronUp, IconChevronDownAlt, IconCopy, IconChevronDown } from '../../icons';
+import FlipMenu from '../ui/FlipMenu';
 
 // Inline editor for a single question inside the builder.
 //
@@ -31,17 +32,9 @@ export default function QuestionEditor({
   const isSection = question.type === 'section_heading';
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef(null);
-
-  // Close overflow menu on outside click.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const close = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [menuOpen]);
+  // FlipMenu handles outside-click + portal + auto-flip. We just hand it
+  // the trigger ref + the open state.
+  const menuTriggerRef = useRef(null);
 
   return (
     <div className="qe-card">
@@ -50,26 +43,31 @@ export default function QuestionEditor({
           <span className="qe-chip">{meta.label}</span>
           <span className="qe-pos">Q{index + 1}</span>
         </div>
-        <div ref={menuRef} className="qe-menu-wrap">
-          <button type="button" className="qe-menu-trigger" title="More" onClick={() => setMenuOpen((o) => !o)}>
+        <div className="qe-menu-wrap">
+          <button ref={menuTriggerRef} type="button" className="qe-menu-trigger" title="More" onClick={() => setMenuOpen((o) => !o)}>
             <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>⋯</span>
           </button>
-          {menuOpen && (
-            <div className="qe-menu">
-              <button type="button" disabled={index === 0}        onClick={() => { onMove(-1); setMenuOpen(false); }}>
-                <IconChevronUp size="sm" /> Move up
-              </button>
-              <button type="button" disabled={index === count - 1} onClick={() => { onMove(+1); setMenuOpen(false); }}>
-                <IconChevronDownAlt size="sm" /> Move down
-              </button>
-              <button type="button" onClick={() => { onDuplicate(); setMenuOpen(false); }}>
-                <IconCopy size="sm" /> Duplicate
-              </button>
-              <button type="button" onClick={() => { onRemove(); setMenuOpen(false); }} style={{ color: 'var(--destructive, #b91c1c)' }}>
-                <IconTrash size="sm" /> Remove
-              </button>
-            </div>
-          )}
+          <FlipMenu
+            open={menuOpen}
+            triggerRef={menuTriggerRef}
+            onClose={() => setMenuOpen(false)}
+            align="right"
+            minWidth={176}
+            className="qe-menu"
+          >
+            <button type="button" disabled={index === 0}        onClick={() => { onMove(-1); setMenuOpen(false); }}>
+              <IconChevronUp size="sm" /> Move up
+            </button>
+            <button type="button" disabled={index === count - 1} onClick={() => { onMove(+1); setMenuOpen(false); }}>
+              <IconChevronDownAlt size="sm" /> Move down
+            </button>
+            <button type="button" onClick={() => { onDuplicate(); setMenuOpen(false); }}>
+              <IconCopy size="sm" /> Duplicate
+            </button>
+            <button type="button" onClick={() => { onRemove(); setMenuOpen(false); }} style={{ color: 'var(--destructive, #b91c1c)' }}>
+              <IconTrash size="sm" /> Remove
+            </button>
+          </FlipMenu>
         </div>
       </div>
 
@@ -160,11 +158,11 @@ export default function QuestionEditor({
           display: inline-flex; align-items: center; justify-content: center;
         }
         .qe-menu-trigger:hover { background: var(--muted, #f1f5f9); color: var(--foreground); }
+        /* FlipMenu owns position + portal; we just style the surface. */
         .qe-menu {
-          position: absolute; top: 100%; right: 0; margin-top: .25rem;
           background: white; border: 1px solid var(--border);
           border-radius: .375rem; box-shadow: 0 4px 14px rgba(0,0,0,.08);
-          z-index: 5; min-width: 11rem; padding: .25rem;
+          padding: .25rem;
           display: flex; flex-direction: column;
         }
         .qe-menu button {

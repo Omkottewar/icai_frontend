@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { IconX } from '../../icons';
 
 // Lightweight image cropper modal. Opens with a freshly-picked File, lets
@@ -28,7 +29,7 @@ const ASPECTS = [
 // the display-scaled ones.
 const MAX_DISPLAY = 560;
 
-export default function ImageCropper({ file, onConfirm, onCancel }) {
+export default function ImageCropper({ file, onConfirm, onCancel, minWidth = 0, minHeight = 0 }) {
   const [imageBitmap, setImageBitmap] = useState(null);   // HTMLImageElement
   const [aspectKey,   setAspectKey]   = useState('free');
   const [crop,        setCrop]        = useState(null);   // { x, y, w, h } in NATURAL pixels
@@ -36,6 +37,20 @@ export default function ImageCropper({ file, onConfirm, onCancel }) {
   const imgRef = useRef(null);
   const wrapperRef = useRef(null);
   const dragRef = useRef(null);   // {kind: 'move'|'nw'|..., startX, startY, startCrop}
+
+  // Source-dimension check. If the admin picks an image smaller than what
+  // the slot requires, we refuse the upload outright — even a 100% crop
+  // would still look pixelated on the live site. Computed once after the
+  // image loads; falsy when there are no constraints OR the image is large
+  // enough.
+  const sourceTooSmall = useMemo(() => {
+    if (!imageBitmap) return null;
+    const w = imageBitmap.naturalWidth;
+    const h = imageBitmap.naturalHeight;
+    if (minWidth > 0 && w < minWidth)   return { dim: 'width',  actual: w, required: minWidth };
+    if (minHeight > 0 && h < minHeight) return { dim: 'height', actual: h, required: minHeight };
+    return null;
+  }, [imageBitmap, minWidth, minHeight]);
 
   // ── Load the picked file as an Image element ────────────────────────
   useEffect(() => {
@@ -206,15 +221,70 @@ export default function ImageCropper({ file, onConfirm, onCancel }) {
 
   if (!file) return null;
 
-  return (
+  // Render via a portal directly into document.body. The cropper modal is
+  // typically mounted inside a <FormField>, which is itself a <label>
+  // wrapping a hidden <input type="file">. Without a portal, every click
+  // (and drag-end) inside the cropper would bubble to that label and
+  // re-open the file picker. createPortal lifts the modal out of that
+  // ancestor chain so events stay contained.
+  const portalTarget = typeof document !== 'undefined' ? document.body : null;
+  if (!portalTarget) return null;
+
+  return createPortal(
     <div className="dialog-overlay" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onCancel(); }}>
-      <div className="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="cropper-title" style={{ width: 'min(720px, 100%)' }}>
+      <div className="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="cropper-title" style={{ width: 'min(720px, 100%)' }}
+        // Stop clicks inside the modal from bubbling to any ancestor
+        // listeners (belt-and-braces — the portal already removes the
+        // <label> ancestor, but this protects against any future move).
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="dialog-header">
           <h2 id="cropper-title" className="dialog-title">Crop image</h2>
           <button type="button" className="dialog-close" onClick={onCancel} aria-label="Close"><IconX /></button>
         </div>
 
         <div className="dialog-body">
+          {/* Source-too-small banner — shown when the picked image fails the
+              slot's min-dimensions check. The Crop & upload button is also
+              disabled below until the admin picks a bigger one. */}
+          {sourceTooSmall && (
+            <div
+              role="alert"
+              style={{
+                padding: '.75rem 1rem',
+                marginBottom: '.75rem',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '.5rem',
+                color: '#991b1b',
+                fontSize: '.875rem',
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>Image too small.</strong>{' '}
+              The {sourceTooSmall.dim} of this image is <strong>{sourceTooSmall.actual}px</strong>,
+              but this slot needs at least <strong>{sourceTooSmall.required}px</strong>.
+              Cropping a smaller image would look pixelated on the live site.
+              Please cancel and pick a larger image.
+            </div>
+          )}
+          {(minWidth > 0 || minHeight > 0) && !sourceTooSmall && imageBitmap && (
+            <div
+              style={{
+                padding: '.5rem .75rem',
+                marginBottom: '.75rem',
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '.375rem',
+                color: '#166534',
+                fontSize: '.75rem',
+              }}
+            >
+              ✓ Image meets the minimum size for this slot
+              {minWidth > 0 && minHeight > 0 && ` (≥ ${minWidth} × ${minHeight} px)`}.
+            </div>
+          )}
+
           {/* Aspect ratio picker */}
           <div className="row gap-2" style={{ flexWrap: 'wrap', marginBottom: '.75rem' }}>
             {ASPECTS.map((a) => (
@@ -279,12 +349,19 @@ export default function ImageCropper({ file, onConfirm, onCancel }) {
 
         <div className="dialog-footer">
           <button type="button" className="btn btn-outline" onClick={onCancel} disabled={busy}>Cancel</button>
-          <button type="button" className="btn btn-primary" onClick={confirm} disabled={busy || !imageBitmap}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={confirm}
+            disabled={busy || !imageBitmap || !!sourceTooSmall}
+            title={sourceTooSmall ? `Image is too small for this slot — please pick a larger one` : undefined}
+          >
             {busy ? 'Cropping…' : 'Crop & upload'}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    portalTarget,
   );
 }
 

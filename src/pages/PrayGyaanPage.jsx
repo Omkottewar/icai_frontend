@@ -3,6 +3,7 @@ import PageHeader from '../components/layout/PageHeader';
 import { IconBot, IconSparkles, IconMessageSquare, IconShield, IconCheck } from '../icons';
 import garudImg from '../assets/garud.png';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { useSiteContent } from '../hooks/useSiteContent';
 import {
   getAnonId, getConfig, getStarters, streamChat, sendFeedback,
 } from '../lib/pragyaan';
@@ -13,6 +14,8 @@ const DEFAULT_DISCLAIMER =
   'incomplete or out of date. Verify important details with the branch before acting.';
 
 const LANG_LABEL = { en: 'English', hi: 'हिन्दी', mr: 'मराठी' };
+
+const FEATURE_ICONS = [IconBot, IconSparkles, IconMessageSquare];
 
 const ThumbsUp = ({ filled }) => (
   <svg viewBox="0 0 24 24" width="14" height="14" fill={filled ? 'currentColor' : 'none'}
@@ -32,18 +35,23 @@ function cryptoId() {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-const WELCOME = {
-  id: 'welcome',
-  role: 'assistant',
-  text:
-    "Namaste! I'm **Pragyaan**, the ICAI Nagpur Branch AI assistant. " +
-    'Ask me about CPE events, articleship, UDIN, branch services, circulars, professional standards, and more — I answer from the branch knowledge base and cite my sources.',
-  citations: [],
-  streaming: false,
-};
-
 export default function PrayGyaanPage() {
-  const [msgs, setMsgs] = useState([WELCOME]);
+  const header   = useSiteContent('praygyaan_page_header');
+  const features = useSiteContent('praygyaan_features');
+  const welcomeMessage = useMemo(() => ({
+    id: 'welcome',
+    role: 'assistant',
+    text: features.welcome,
+    citations: [],
+    streaming: false,
+  }), [features.welcome]);
+
+  const [msgs, setMsgs] = useState(() => [welcomeMessage]);
+  // Keep the welcome message in sync if an admin edits it while the page
+  // is mounted (rare, but cheap).
+  useEffect(() => {
+    setMsgs((m) => (m.length > 0 && m[0].id === 'welcome' ? [welcomeMessage, ...m.slice(1)] : m));
+  }, [welcomeMessage]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
   const [lang, setLang] = useState('en');
@@ -139,24 +147,23 @@ export default function PrayGyaanPage() {
 
   return (
     <>
-      <PageHeader
-        title="Pragyaan — AI Assistant"
-        subtitle="Your 24×7 grounded guide to ICAI Nagpur Branch services, events, circulars, and resources."
-      />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: '3rem 1rem', maxWidth: '64rem' }}>
-        {/* Feature cards */}
+        {/* Feature cards — admin-editable via the praygyaan_features slot */}
         <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          {[
-            { Icon: IconBot, t: 'Source-cited answers', d: 'Every reply cites the branch document or page it relied on.' },
-            { Icon: IconSparkles, t: 'Smart, scoped search', d: 'Searches branch circulars, events, FAQs and resources for you.' },
-            { Icon: IconMessageSquare, t: 'English · हिन्दी · मराठी', d: 'Ask in your language — Pragyaan replies in the same one.' },
-          ].map((f) => (
-            <div key={f.t} className="card">
-              <f.Icon size="lg" />
-              <div style={{ marginTop: '.75rem', fontWeight: 600 }}>{f.t}</div>
-              <div className="muted-text" style={{ fontSize: '.875rem' }}>{f.d}</div>
-            </div>
-          ))}
+          {[1, 2, 3].map((n) => {
+            const Icon = FEATURE_ICONS[n - 1];
+            const t = features[`card_${n}_title`];
+            const d = features[`card_${n}_desc`];
+            if (!t) return null;
+            return (
+              <div key={n} className="card">
+                <Icon size="lg" />
+                <div style={{ marginTop: '.75rem', fontWeight: 600 }}>{t}</div>
+                <div className="muted-text" style={{ fontSize: '.875rem' }}>{d}</div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Chat card */}
@@ -176,13 +183,13 @@ export default function PrayGyaanPage() {
               }}>
                 <img src={garudImg} alt="Garud" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
-              Chat with Pragyaan
+              {features.chat_title}
             </div>
 
             <div style={{ flex: 1 }} />
 
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', fontSize: '.78rem', color: 'var(--muted-foreground)' }}>
-              Reply in
+              {features.reply_in_label}
               <select
                 value={lang}
                 onChange={(e) => setLang(e.target.value)}
@@ -249,7 +256,7 @@ export default function PrayGyaanPage() {
               borderTop: '1px solid var(--border)',
             }}>
               <span style={{ fontSize: '.72rem', color: 'var(--muted-foreground)', alignSelf: 'center', marginRight: '.25rem' }}>
-                Try:
+                {features.starters_prefix}
               </span>
               {starters.map((s) => (
                 <button
@@ -281,7 +288,7 @@ export default function PrayGyaanPage() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') send(); }}
-              placeholder={streaming ? 'Pragyaan is replying…' : 'Ask Pragyaan a question…'}
+              placeholder={streaming ? features.input_placeholder_streaming : features.input_placeholder}
               disabled={streaming}
               style={{ flex: 1 }}
             />
@@ -290,7 +297,7 @@ export default function PrayGyaanPage() {
               onClick={() => send()}
               disabled={!input.trim() || streaming}
             >
-              {streaming ? 'Replying…' : 'Send'}
+              {streaming ? features.send_label_streaming : features.send_label}
             </button>
           </div>
         </div>

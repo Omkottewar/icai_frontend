@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
+import { useSiteContent } from '../../hooks/useSiteContent';
 import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import PasswordField from '../../components/auth/PasswordField';
 import RolePicker from '../../components/auth/RolePicker';
@@ -11,6 +12,7 @@ import Button from '../../components/ui/Button';
 export default function SignupPage() {
   const { signup, socialLogin } = useAuth();
   const route = useRoute();
+  const header = useSiteContent('auth_signup');
   const [role, setRole] = useState('Member');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -85,10 +87,9 @@ export default function SignupPage() {
       <div className="auth-form-wrap">
         <div className="auth-card">
           <div style={{ marginBottom: '1.5rem' }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Create your account</h1>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{header.title}</h1>
             <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.25rem' }}>
-              Already a member?{' '}
-              <a href="#/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>Sign in</a>
+              {header.subtitle}
             </p>
           </div>
 

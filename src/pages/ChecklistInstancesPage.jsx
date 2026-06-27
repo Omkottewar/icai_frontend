@@ -10,6 +10,7 @@ import { CHECKLIST_STATUS, toneStyle } from '../lib/eventStatus';
 import { useRoleFlags } from '../hooks/useRoleFlags';
 import { dialog } from '../lib/dialog';
 import { Shimmer, ShimmerLines, ShimmerDrawerBody } from '../components/ui/Shimmer';
+import FlipMenu from '../components/ui/FlipMenu';
 
 // Friendly label for an internal role code. Falls back to a prettified
 // version of the code if it's not in our known list.
@@ -1005,14 +1006,12 @@ function SectionAssignmentsDialog({
           }
           .dup-trigger:hover { border-color: var(--primary); }
           .dup-trigger.is-empty { color: var(--muted-foreground); }
+          /* FlipMenu owns position + portal + max-height; we only style. */
           .dup-menu {
-            position: absolute; top: calc(100% + .25rem); right: 0;
-            z-index: 6; min-width: 280px;
             background: white; border: 1px solid var(--border);
             border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.12);
             padding: .35rem;
             display: flex; flex-direction: column;
-            max-height: 280px; overflow-y: auto;
           }
           .dup-item {
             display: flex; align-items: center; gap: .5rem;
@@ -1057,14 +1056,10 @@ function DialogUserPicker({ users, value, placeholder, onChange }) {
   // Internal search box — filters the (already MCM-scoped) users list
   // client-side so the admin doesn't scroll through dozens of names.
   const [search, setSearch] = useState('');
-  const ref = useRef(null);
+  const triggerRef = useRef(null);
   const searchRef = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
+  // FlipMenu handles click-outside + portal positioning so this picker
+  // can't get clipped by drawer / modal overflow.
   useEffect(() => {
     if (open) {
       setSearch('');
@@ -1087,8 +1082,9 @@ function DialogUserPicker({ users, value, placeholder, onChange }) {
   })();
 
   return (
-    <div ref={ref} className="dup-wrap">
+    <div className="dup-wrap">
       <button
+        ref={triggerRef}
         type="button"
         className={'dup-trigger' + (picked ? '' : ' is-empty')}
         onClick={() => setOpen((o) => !o)}
@@ -1098,27 +1094,34 @@ function DialogUserPicker({ users, value, placeholder, onChange }) {
         </span>
         <span style={{ fontSize: '.65rem', opacity: .6, marginLeft: '.3rem' }}>▾</span>
       </button>
-      {open && (
-        <div className="dup-menu">
-          <div style={{
-            position: 'sticky', top: 0, background: 'var(--card)',
-            padding: '.4rem .5rem', borderBottom: '1px solid var(--border)',
-            zIndex: 1,
-          }}>
-            <input
-              ref={searchRef}
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, email or role…"
-              style={{
-                width: '100%', padding: '.35rem .55rem',
-                border: '1px solid var(--border)', borderRadius: '.3rem',
-                fontSize: '.8rem', boxSizing: 'border-box',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
+      <FlipMenu
+        open={open}
+        triggerRef={triggerRef}
+        onClose={() => setOpen(false)}
+        align="stretch"
+        minWidth={280}
+        maxHeight={320}
+        className="dup-menu"
+      >
+        <div style={{
+          position: 'sticky', top: 0, background: 'var(--card)',
+          padding: '.4rem .5rem', borderBottom: '1px solid var(--border)',
+          zIndex: 1,
+        }}>
+          <input
+            ref={searchRef}
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, email or role…"
+            style={{
+              width: '100%', padding: '.35rem .55rem',
+              border: '1px solid var(--border)', borderRadius: '.3rem',
+              fontSize: '.8rem', boxSizing: 'border-box',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
           {filtered.length === 0 ? (
             <div style={{ color: 'var(--muted-foreground)', padding: '.5rem .55rem', fontSize: '.8rem' }}>
               {search ? 'No matches' : 'No MCM users available'}
@@ -1150,17 +1153,16 @@ function DialogUserPicker({ users, value, placeholder, onChange }) {
               </button>
             );
           })}
-          {value && (
-            <button
-              type="button"
-              className="dup-item dup-clear"
-              onClick={() => { onChange(''); setOpen(false); }}
-            >
-              Clear (use default)
-            </button>
-          )}
-        </div>
-      )}
+        {value && (
+          <button
+            type="button"
+            className="dup-item dup-clear"
+            onClick={() => { onChange(''); setOpen(false); }}
+          >
+            Clear (use default)
+          </button>
+        )}
+      </FlipMenu>
     </div>
   );
 }
@@ -1466,9 +1468,11 @@ function InstanceQuestionsDialog({ instanceId, initialQuestions, onClose, onSave
 // exposes every type the template builder supports.
 function AddQuestionMenu({ onAdd }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const triggerRef = useRef(null);
   return (
     <div style={{ marginTop: '.75rem', position: 'relative' }}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setPickerOpen((o) => !o)}
         style={{
@@ -1487,36 +1491,40 @@ function AddQuestionMenu({ onAdd }) {
       >
         <IconPlus size="sm" /> Add a question
       </button>
-      {pickerOpen && (
-        <div style={{
-          position: 'absolute', bottom: 'calc(100% + .25rem)', left: 0, right: 0,
+      <FlipMenu
+        open={pickerOpen}
+        triggerRef={triggerRef}
+        onClose={() => setPickerOpen(false)}
+        align="stretch"
+        minWidth={280}
+        maxHeight={420}
+        style={{
           background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '.4rem',
           boxShadow: '0 10px 25px rgba(0,0,0,.12)',
           padding: '.4rem', display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '.25rem',
-          zIndex: 5,
-        }}>
-          {QUESTION_TYPES.map((t) => (
-            <button
-              key={t.type}
-              type="button"
-              onClick={() => { onAdd(t.type); setPickerOpen(false); }}
-              style={{
-                background: 'transparent', border: 0, padding: '.4rem .55rem',
-                textAlign: 'left', fontSize: '.8rem', cursor: 'pointer',
-                borderRadius: '.3rem',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(30,58,138,.06)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              {t.label}
-              {t.hint && (
-                <div className="muted-text" style={{ fontSize: '.68rem' }}>{t.hint}</div>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+        }}
+      >
+        {QUESTION_TYPES.map((t) => (
+          <button
+            key={t.type}
+            type="button"
+            onClick={() => { onAdd(t.type); setPickerOpen(false); }}
+            style={{
+              background: 'transparent', border: 0, padding: '.4rem .55rem',
+              textAlign: 'left', fontSize: '.8rem', cursor: 'pointer',
+              borderRadius: '.3rem',
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(30,58,138,.06)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            {t.label}
+            {t.hint && (
+              <div className="muted-text" style={{ fontSize: '.68rem' }}>{t.hint}</div>
+            )}
+          </button>
+        ))}
+      </FlipMenu>
     </div>
   );
 }

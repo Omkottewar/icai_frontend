@@ -5,33 +5,13 @@ import EventRow from '../components/ui/EventRow';
 import CategoryCard from '../components/ui/CategoryCard';
 import WicasaCard from '../components/ui/WicasaCard';
 import HeroCarousel from '../components/ui/HeroCarousel';
+import RecentPhotosStrip from '../components/home/RecentPhotosStrip';
+// Bundled fallbacks used only when the admin hasn't uploaded a custom
+// hero image / watermark via /admin/site-content. Once a site-content row
+// exists with bg_image_url / watermark_url set, those URLs win.
 import heroImage from '../assets/heroImage.png';
 import heroLogo from '../assets/heroLogo.png';
 import swaroopa from '../assets/swaroopa.png';
-
-// TODO: replace with branch photos in src/assets/ once available
-const LEADERSHIP_SLIDES = [
-  {
-    src: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=720&h=480&q=80&auto=format&fit=crop',
-    alt: 'Professional gathering of chartered accountants',
-    caption: 'Branch leadership',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=720&h=480&q=80&auto=format&fit=crop',
-    alt: 'CPE seminar audience',
-    caption: 'CPE programmes',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=720&h=480&q=80&auto=format&fit=crop',
-    alt: 'CA professionals collaborating around a meeting table',
-    caption: 'Member community',
-  },
-  {
-    src: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=720&h=480&q=80&auto=format&fit=crop',
-    alt: 'CA students in training session',
-    caption: 'Student community',
-  },
-];
 import { SERVICES } from '../data/constants';
 import { usePublicEvents } from '../hooks/usePublicEvents';
 import { useAnnouncements } from '../hooks/useAnnouncements';
@@ -80,6 +60,25 @@ export default function HomePage() {
   const eventsText      = useSiteContent('home_events_section');
   const premisesText    = useSiteContent('home_premises_section');
   const knowledgeText   = useSiteContent('home_knowledge_section');
+  const carousel        = useSiteContent('home_leadership_carousel');
+
+  // Build the leadership carousel from site-content slots. A slide is
+  // skipped if its url is blank — lets the admin shrink the carousel from
+  // 4 slides to 3/2/1 without touching code.
+  const leadershipSlides = useMemo(() => (
+    [1, 2, 3, 4]
+      .map((n) => ({
+        src:     carousel[`slide_${n}_url`],
+        caption: carousel[`slide_${n}_caption`] || '',
+        alt:     carousel[`slide_${n}_alt`] || '',
+      }))
+      .filter((s) => !!s.src)
+  ), [carousel]);
+
+  // Hero background + watermark: admin uploads via site content; otherwise
+  // we keep using the bundled assets shipped with the build.
+  const heroBgSrc        = heroText.bg_image_url || heroImage;
+  const heroWatermarkSrc = heroText.watermark_url || heroLogo;
 
   return (
     <>
@@ -153,7 +152,7 @@ export default function HomePage() {
               gradient so the white wash doesn't double-fade it */}
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, zIndex: 0, overflow: 'hidden' }}>
           <img
-            src={heroImage}
+            src={heroBgSrc}
             alt=""
             loading="eager"
             className="home-hero-photo"
@@ -171,7 +170,7 @@ export default function HomePage() {
               ever overflowing its container. Pointer-events off so it
               never blocks clicks on the hero CTAs. */}
           <img
-            src={heroLogo}
+            src={heroWatermarkSrc}
             alt=""
             aria-hidden="true"
             className="home-hero-watermark"
@@ -249,7 +248,7 @@ export default function HomePage() {
             </div>
           </div>
           <div style={{ position: 'relative' }}>
-            <HeroCarousel slides={LEADERSHIP_SLIDES} />
+            <HeroCarousel slides={leadershipSlides} />
             <div style={{ position: 'absolute', bottom: '-1rem', left: '-1rem', padding: '.75rem 1rem', background: 'white', border: '1px solid var(--border)', borderRadius: '.75rem', boxShadow: '0 8px 24px -10px rgba(0,0,0,.15)', display: 'none', zIndex: 3 }} className="show-md">
               <div className="tiny-eyebrow">{leadershipExtra.since_label}</div>
               <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--primary)' }}>{leadershipExtra.since_year}</div>
@@ -355,6 +354,11 @@ export default function HomePage() {
       </section>
 
 
+      {/* Recent Photos strip — surfaces the 4 newest gallery albums between
+          the Events block and Premises section. Self-hides when no albums
+          exist so a freshly bootstrapped site doesn't show an empty band. */}
+      <RecentPhotosStrip limit={4} />
+
       {/* Branch Premises + NICASA */}
       <section className="container" style={{ padding: 'clamp(3rem, 8vw, 7rem) 1rem' }}>
         <div style={{ marginBottom: 'clamp(1.75rem, 4vw, 3rem)', maxWidth: '40rem' }}>
@@ -363,13 +367,17 @@ export default function HomePage() {
         </div>
         <div style={{ display: 'grid', gap: '1.75rem', gridTemplateColumns: '1fr' }} data-premises-grid>
           <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-            {/* TODO: replace with real Bhawan photo */}
-            <img
-              src="https://images.unsplash.com/photo-1486325212027-8081e485255e?w=960&h=440&q=80&auto=format&fit=crop"
-              alt="ICAI Bhawan, Dhantoli — Nagpur Branch premises"
-              loading="lazy"
-              style={{ width: '100%', display: 'block', aspectRatio: '16/7', objectFit: 'cover' }}
-            />
+            {/* Admin-editable via /admin/site-content → Home tab →
+                "Branch premises section". Default is a generic exterior
+                photo until the branch uploads the real Bhawan shot. */}
+            {premises.image_url && (
+              <img
+                src={premises.image_url}
+                alt={premisesText.inner_title || 'Branch premises'}
+                loading="lazy"
+                style={{ width: '100%', display: 'block', aspectRatio: '16/7', objectFit: 'cover' }}
+              />
+            )}
             <div style={{ padding: '1.5rem' }}>
               <div className="tiny-eyebrow" style={{ color: 'var(--secondary)' }}>{premisesText.inner_eyebrow}</div>
               <h3 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.2vw, 1.5rem)', fontWeight: 700, color: 'var(--primary)', lineHeight: 1.2 }}>{premisesText.inner_title}</h3>

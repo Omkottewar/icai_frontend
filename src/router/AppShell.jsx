@@ -66,6 +66,7 @@ const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
 const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'));
 const RoomBookingPage    = lazy(() => import('../pages/RoomBookingPage'));
 const TrackGrievancePage = lazy(() => import('../pages/TrackGrievancePage'));
+const StudentSuggestionsPage = lazy(() => import('../pages/StudentSuggestionsPage'));
 const PrayGyaanWidget    = lazy(() => import('../components/ui/PrayGyaanWidget'));
 
 const RequireAdmin               = lazy(() => import('../components/admin/RequireAdmin'));
@@ -92,6 +93,7 @@ const PaymentsAdminPage          = lazy(() => import('../pages/admin/PaymentsAdm
 const PaperPresentationsAdminPage = lazy(() => import('../pages/admin/PaperPresentationsAdminPage'));
 const NewslettersAdminPage       = lazy(() => import('../pages/admin/NewslettersAdminPage'));
 const GalleryAlbumsAdminPage     = lazy(() => import('../pages/admin/GalleryAlbumsAdminPage'));
+const GalleryVideosAdminPage     = lazy(() => import('../pages/admin/GalleryVideosAdminPage'));
 const OfficeBearersAdminPage     = lazy(() => import('../pages/admin/OfficeBearersAdminPage'));
 const AnnualReportsAdminPage     = lazy(() => import('../pages/admin/AnnualReportsAdminPage'));
 const GrievancesAdminPage        = lazy(() => import('../pages/admin/GrievancesAdminPage'));
@@ -100,6 +102,8 @@ const ResourcesAdminPage         = lazy(() => import('../pages/admin/ResourcesAd
 const QuizEditorPage             = lazy(() => import('../pages/admin/QuizEditorPage'));
 const MockTestsAdminPage         = lazy(() => import('../pages/admin/MockTestsAdminPage'));
 const IcaiDirectoryAdminPage     = lazy(() => import('../pages/admin/IcaiDirectoryAdminPage'));
+const StudentSuggestionsAdminPage      = lazy(() => import('../pages/admin/StudentSuggestionsAdminPage'));
+const StudentSuggestionTopicsAdminPage = lazy(() => import('../pages/admin/StudentSuggestionTopicsAdminPage'));
 
 // Section L (Resources) — public-facing pages with slug-based detail routes.
 const ResourcePaperPage   = lazy(() => import('../pages/ResourcePaperPage'));
@@ -146,6 +150,7 @@ const ROUTES = {
   '/members-directory': MembersDirectoryPage,
   '/book-room': RoomBookingPage,
   '/track-grievance': TrackGrievancePage,
+  '/student-suggestions': StudentSuggestionsPage,
   '/my-library': MyLibraryPage,
   '/resources/submit': ResourceSubmitPage,
   '/mock-tests': MockTestsPage,
@@ -188,6 +193,7 @@ const ADMIN_ROUTES = {
   '/admin/paper-presentations': PaperPresentationsAdminPage,
   '/admin/newsletters':         NewslettersAdminPage,
   '/admin/gallery':             GalleryAlbumsAdminPage,
+  '/admin/gallery-videos':      GalleryVideosAdminPage,
   '/admin/office-bearers':      OfficeBearersAdminPage,
   '/admin/annual-reports':      AnnualReportsAdminPage,
   '/admin/grievances':          GrievancesAdminPage,
@@ -196,6 +202,8 @@ const ADMIN_ROUTES = {
   '/admin/mock-tests':          MockTestsAdminPage,
   '/admin/pragyaan':            PragyaanAdminPage,
   '/admin/icai-directory':      IcaiDirectoryAdminPage,
+  '/admin/student-suggestions':       StudentSuggestionsAdminPage,
+  '/admin/student-suggestion-topics': StudentSuggestionTopicsAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);

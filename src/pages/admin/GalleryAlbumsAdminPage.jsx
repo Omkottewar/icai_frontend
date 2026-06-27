@@ -32,15 +32,34 @@ function GalleryRowShimmer({ count = 5 }) {
 // fit the single-table CRUD shape.
 
 const COMMITTEES = ['', 'GST', 'Direct Tax', 'IT', 'Audit', 'CPE', 'WICASA', 'Branch'];
+// Event-type tag (migration 0062). Orthogonal to committee — lets members
+// filter "show only Sports" / "Press coverage" / etc. on the public page.
+const EVENT_TYPES = ['', 'Technical', 'Cultural', 'Sports', 'Press', 'Social', 'Visit', 'Other'];
 const VISIBILITIES = [
   { value: 'public',  label: 'Public — anyone' },
   { value: 'members', label: 'Members only — needs login' },
   { value: 'private', label: 'Private — admin only' },
 ];
+const LAYOUTS = [
+  { value: 'grid',    label: 'Grid — uniform thumbnails (default, scannable)' },
+  { value: 'masonry', label: 'Masonry — waterfall; featured photos render larger' },
+  { value: 'story',   label: 'Story — single column with captions between photos' },
+];
+// Featured-position options. 0/empty = not featured. 1 = hero tile (big,
+// left-side). 2-4 = side tiles on the right of the hero strip. The public
+// page falls back to chronological order if no album is featured.
+const FEATURED_POSITIONS = [
+  { value: 0, label: 'Not featured' },
+  { value: 1, label: 'Featured — Hero (large left tile)' },
+  { value: 2, label: 'Featured — Side tile #1' },
+  { value: 3, label: 'Featured — Side tile #2' },
+  { value: 4, label: 'Featured — Side tile #3' },
+];
 const EMPTY_ALBUM = {
-  title: '', committee_tag: '', occurred_on: '', description: '',
+  title: '', committee_tag: '', event_type: '', occurred_on: '', description: '',
   cover_file_id: '', cover_url: '',
   visibility: 'public', hidden: false, sort_order: 0,
+  layout: 'grid', featured_position: 0,
 };
 
 async function api(url, opts = {}) {
@@ -98,6 +117,7 @@ export default function GalleryAlbumsAdminPage() {
     setForm({
       title:         row.title || '',
       committee_tag: row.committee_tag || '',
+      event_type:    row.event_type || '',
       occurred_on:   row.occurred_on ? String(row.occurred_on).slice(0, 10) : '',
       description:   row.description || '',
       cover_file_id: row.cover_file_id || '',
@@ -105,6 +125,8 @@ export default function GalleryAlbumsAdminPage() {
       visibility:    row.visibility || 'public',
       hidden:        !!row.hidden,
       sort_order:    row.sort_order ?? 0,
+      layout:        row.layout || 'grid',
+      featured_position: row.is_featured ? (row.featured_position ?? 0) : 0,
     });
     setEditing(row);
   };
@@ -132,7 +154,15 @@ export default function GalleryAlbumsAdminPage() {
     try {
       const isNew = editing === 'new';
       const url = isNew ? '/api/admin/gallery-albums' : `/api/admin/gallery-albums/${editing.id}`;
-      const { cover_url, ...body } = form;
+      const { cover_url, featured_position, ...rest } = form;
+      // Backend expects {is_featured, featured_position}. Position 0 means
+      // "not featured" — collapse to is_featured=false + position=null so
+      // the CHECK constraint stays happy.
+      const body = {
+        ...rest,
+        is_featured: featured_position > 0,
+        featured_position: featured_position > 0 ? featured_position : null,
+      };
       await api(url, { method: isNew ? 'POST' : 'PATCH', body });
       showToast?.('Saved', 'success');
       setEditing(null);
@@ -235,9 +265,15 @@ export default function GalleryAlbumsAdminPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="field-label">Occurred on</label>
-                  <input className="input-base" type="date" value={form.occurred_on} onChange={(e) => update('occurred_on', e.target.value)} />
+                  <label className="field-label">Event type</label>
+                  <select className="input-base" value={form.event_type} onChange={(e) => update('event_type', e.target.value)}>
+                    {EVENT_TYPES.map((t) => <option key={t} value={t}>{t || '— None —'}</option>)}
+                  </select>
                 </div>
+              </div>
+              <div>
+                <label className="field-label">Occurred on</label>
+                <input className="input-base" type="date" value={form.occurred_on} onChange={(e) => update('occurred_on', e.target.value)} />
               </div>
               <div>
                 <label className="field-label">Description (optional)</label>
@@ -276,6 +312,38 @@ export default function GalleryAlbumsAdminPage() {
                   <input type="checkbox" checked={form.hidden} onChange={(e) => update('hidden', e.target.checked)} />
                   Hide entirely (draft)
                 </label>
+              </div>
+
+              {/* ── Photo layout ───────────────────────────────────── */}
+              <div>
+                <label className="field-label">Layout (how photos render inside this album)</label>
+                <select
+                  className="input-base"
+                  value={form.layout}
+                  onChange={(e) => update('layout', e.target.value)}
+                >
+                  {LAYOUTS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
+                </select>
+                <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
+                  Masonry only — mark individual photos as "Featured" in the Photos panel to make them
+                  span a full row.
+                </div>
+              </div>
+
+              {/* ── Featured placement on /gallery hero strip ───────── */}
+              <div>
+                <label className="field-label">Featured placement (top of public /gallery)</label>
+                <select
+                  className="input-base"
+                  value={form.featured_position}
+                  onChange={(e) => update('featured_position', Number(e.target.value))}
+                >
+                  {FEATURED_POSITIONS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+                </select>
+                <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
+                  Only one album per position — if two albums claim Hero, the most recently saved wins
+                  on the public page (we sort by position, then by sort_order).
+                </div>
               </div>
             </div>
 
@@ -406,10 +474,18 @@ function PhotosPanel({ album, onClose, onChange }) {
 
   const editPhoto = async (p, patch) => {
     try {
-      await api(`/api/admin/gallery-albums/${album.id}/photos/${p.id}`, {
-        method: 'PATCH',
-        body: { caption: patch.caption ?? p.caption, sort_order: p.sort_order },
-      });
+      // Build only the fields that changed — the backend PATCH supports
+      // partial updates so the request stays small and a "toggle
+      // featured" doesn't accidentally rewrite the caption.
+      const photoPatch = {};
+      if (patch.caption !== undefined)     photoPatch.caption = patch.caption;
+      if (patch.is_featured !== undefined) photoPatch.is_featured = patch.is_featured;
+      if (Object.keys(photoPatch).length > 0) {
+        await api(`/api/admin/gallery-albums/${album.id}/photos/${p.id}`, {
+          method: 'PATCH',
+          body: photoPatch,
+        });
+      }
       // Alt text belongs to the underlying file row, not the photo row.
       if (patch.alt_text !== undefined && p.file_id) {
         await api(`/api/admin/files/${p.file_id}`, {
@@ -528,6 +604,19 @@ function PhotosPanel({ album, onClose, onChange }) {
                     defaultValue={p.caption || ''}
                     onBlur={(e) => { if (e.target.value !== (p.caption || '')) editPhoto(p, { caption: e.target.value }); }}
                   />
+                  <label style={{
+                    display: 'flex', alignItems: 'center', gap: '.3rem',
+                    fontSize: '.7rem', color: p.is_featured ? 'var(--primary, #1e40af)' : 'var(--muted-foreground)',
+                    fontWeight: p.is_featured ? 600 : 400,
+                    cursor: 'pointer',
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={!!p.is_featured}
+                      onChange={(e) => editPhoto(p, { is_featured: e.target.checked })}
+                    />
+                    Featured {p.is_featured && '★'}
+                  </label>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.7rem' }}>
                     <span className="muted-text">#{p.sort_order ?? 0}</span>
                     <button type="button" className="btn btn-ghost"

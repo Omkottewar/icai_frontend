@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
+import { useSiteContent } from '../hooks/useSiteContent';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import {
   IconUsers, IconCheck, IconCheckCircle, IconClock, IconArrowRight, IconMapPin,
@@ -57,6 +58,7 @@ function overlaps(aStart, aEnd, bStart, bEnd) {
 export default function RoomBookingPage() {
   const route = useRoute();
   const { user } = useAuth();
+  const header = useSiteContent('room_booking_page_header');
 
   const [rooms, setRooms] = useState(null);
   const [roomId, setRoomId] = useState(null);
@@ -175,7 +177,7 @@ export default function RoomBookingPage() {
   if (!user) {
     return (
       <>
-        <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+        <PageHeader title={header.title} subtitle={header.subtitle} />
         <section className="container" style={{ padding: '2.5rem 1rem' }}>
           <div className="card" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Please sign in to book a room</h2>
@@ -195,7 +197,7 @@ export default function RoomBookingPage() {
   if (rooms === null) {
     return (
       <>
-        <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+        <PageHeader title={header.title} subtitle={header.subtitle} />
         <section className="container" style={{ padding: '2.5rem 1rem' }}>
           <ShimmerLines count={8} />
         </section>
@@ -206,7 +208,7 @@ export default function RoomBookingPage() {
   if (rooms.length === 0) {
     return (
       <>
-        <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+        <PageHeader title={header.title} subtitle={header.subtitle} />
         <section className="container" style={{ padding: '2.5rem 1rem' }}>
           <div className="card" style={{ maxWidth: 520, margin: '0 auto', textAlign: 'center' }}>
             <h2 style={{ fontSize: '1.1rem', fontWeight: 700 }}>No rooms available yet</h2>
@@ -222,7 +224,7 @@ export default function RoomBookingPage() {
 
   return (
     <>
-      <PageHeader title="Room Booking" subtitle="Reserve a room at ICAI Bhawan, Nagpur" />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
 
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
         <div className="room-booking-grid">

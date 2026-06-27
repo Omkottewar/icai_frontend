@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { ShimmerLines } from '../../components/ui/Shimmer';
 import { IconX, IconAward } from '../../icons';
 import { dialog } from '../../lib/dialog';
+import FlipMenu from '../../components/ui/FlipMenu';
 
 // ─── /admin/cpe ─────────────────────────────────────────────────────────────
 //
@@ -458,23 +459,30 @@ function UserPicker({ value, onChange }) {
       </div>
     );
   }
+  const inputRef = useRef(null);
   return (
     <div style={{ position: 'relative' }}>
-      <input className="input-base" placeholder="Type 2+ letters of name or email…"
+      <input ref={inputRef} className="input-base" placeholder="Type 2+ letters of name or email…"
         value={q} onChange={(e) => { setQ(e.target.value); setOpen(true); }}
         onFocus={() => setOpen(true)} />
-      {open && results.length > 0 && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'white', border: '1px solid #e5e7eb', borderRadius: 4, marginTop: 2, zIndex: 10, maxHeight: 240, overflowY: 'auto' }}>
-          {results.map((u) => (
-            <button key={u.id} type="button" className="btn btn-ghost"
-              style={{ width: '100%', textAlign: 'left', padding: '.5rem .75rem', borderRadius: 0 }}
-              onClick={() => { onChange(u); setOpen(false); setQ(''); }}>
-              <div style={{ fontWeight: 500 }}>{u.name}</div>
-              <div className="muted-text" style={{ fontSize: '.75rem' }}>{u.email}</div>
-            </button>
-          ))}
-        </div>
-      )}
+      <FlipMenu
+        open={open && results.length > 0}
+        triggerRef={inputRef}
+        onClose={() => setOpen(false)}
+        align="stretch"
+        offset={2}
+        maxHeight={240}
+        style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 4 }}
+      >
+        {results.map((u) => (
+          <button key={u.id} type="button" className="btn btn-ghost"
+            style={{ width: '100%', textAlign: 'left', padding: '.5rem .75rem', borderRadius: 0 }}
+            onMouseDown={() => { onChange(u); setOpen(false); setQ(''); }}>
+            <div style={{ fontWeight: 500 }}>{u.name}</div>
+            <div className="muted-text" style={{ fontSize: '.75rem' }}>{u.email}</div>
+          </button>
+        ))}
+      </FlipMenu>
     </div>
   );
 }

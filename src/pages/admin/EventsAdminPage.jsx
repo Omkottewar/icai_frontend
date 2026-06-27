@@ -9,7 +9,7 @@ import { useRoleFlags } from '../../hooks/useRoleFlags';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { Shimmer, ShimmerFormField, ShimmerLines } from '../../components/ui/Shimmer';
 import { eventLabel, EVENT_STATUS, toneStyle } from '../../lib/eventStatus';
-import { MCM_ROLE_CODES, ROLE_CODE_LABEL } from '../../lib/checklistQuestions';
+import { MCM_ROLE_CODES, ROLE_CODE_LABEL, FILLER_ROLE_CODES, APPROVER_ROLE_CODES } from '../../lib/checklistQuestions';
 import EventTimeline from '../../components/admin/EventTimeline';
 import ComparableEventsPanel from '../../components/admin/ComparableEventsPanel';
 import EventQuickActions from '../../components/admin/EventQuickActions';
@@ -17,6 +17,7 @@ import { dialog } from '../../lib/dialog';
 import { publishEventWithOverride } from '../../lib/eventPublish';
 import Button from '../../components/ui/Button';
 import DateTimePicker from '../../components/admin/DateTimePicker';
+import FlipMenu from '../../components/ui/FlipMenu';
 import { IconPlus, IconCheckCircle } from '../../icons';
 
 // Programme types are a fixed list (no more free-text typos). Stays in sync
@@ -1054,12 +1055,23 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   // member of the managing committee, never a student or generic member.
   useEffect(() => {
     let cancelled = false;
-    const url = `/api/admin/users?status=active&pageSize=100&role_codes=${MCM_ROLE_CODES.join(',')}`;
+    // Fetch the union of FILLER + APPROVER role-holders in one request,
+    // then split client-side. This keeps the network cost the same while
+    // letting each picker show only the right people.
+    const codes = Array.from(new Set([...FILLER_ROLE_CODES, ...APPROVER_ROLE_CODES]));
+    const url = `/api/admin/users?status=active&pageSize=100&role_codes=${codes.join(',')}`;
     adminFetch(url)
       .then((j) => { if (!cancelled) setUsers(j.rows || []); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
+
+  // Split the directory into the two picker pools. A user lands in a
+  // pool if any of their *active* roles intersects the pool's allow-list.
+  // A single person holding both committee_chairman AND branch_treasurer
+  // appears in both — which is intentional and matches reality.
+  const fillerUsers   = users.filter((u) => (u.active_roles ?? []).some((r) => FILLER_ROLE_CODES.includes(r.role_code)));
+  const approverUsers = users.filter((u) => (u.active_roles ?? []).some((r) => APPROVER_ROLE_CODES.includes(r.role_code)));
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -1226,9 +1238,10 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
                   <div className="tp-banner">
                     <strong>{pickedTemplate.name}</strong>
                     <p>
-                      Pick who will <strong>fill</strong> this checklist and who will <strong>review</strong> it. The
-                      committee chairman fills the entire checklist; the branch chairman approves it. You only need to
-                      change these if you want a specific person other than the current chair to act this time.
+                      Pick who will <strong>fill</strong> this checklist and who will <strong>approve</strong> it. By default
+                      the committee chairman (or, for WICASA events, a WICASA member) fills it, and the branch chairman
+                      or treasurer signs off. You only need to override these if you want someone other than the current
+                      defaults to act this time.
                     </p>
                   </div>
 
@@ -1249,11 +1262,11 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
                     <div className="tp-section-info">
                       <strong>Primary filler</strong>
                       <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                        Fills every section. Default: current Committee Chairman.
+                        Fills every section. Committee Chairman or a WICASA member.
                       </span>
                     </div>
                     <UserPicker
-                      users={users}
+                      users={fillerUsers}
                       value={primaryFiller}
                       placeholder="— Auto (Committee Chairman) —"
                       onChange={setPrimaryFiller}
@@ -1261,13 +1274,13 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
                   </div>
                   <div className="tp-section-row">
                     <div className="tp-section-info">
-                      <strong>Reviewer</strong>
+                      <strong>Approver</strong>
                       <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                        Approves once filled. Default: current Branch Chairman.
+                        Signs off once filled. Branch Chairman or Treasurer.
                       </span>
                     </div>
                     <UserPicker
-                      users={users}
+                      users={approverUsers}
                       value={primaryReviewer}
                       placeholder="— Auto (Branch Chairman) —"
                       onChange={setPrimaryReviewer}
@@ -1421,14 +1434,12 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
           .up-trigger:hover { border-color: var(--primary); }
           .up-trigger.is-empty { color: var(--muted-foreground); }
           .up-chev { font-size: .65rem; opacity: .6; margin-left: .3rem; }
+          /* FlipMenu owns position + portal + max-height; we only style. */
           .up-menu {
-            position: absolute; top: calc(100% + .25rem); right: 0;
-            z-index: 6; min-width: 280px;
             background: white; border: 1px solid var(--border);
             border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.12);
             padding: .35rem;
             display: flex; flex-direction: column;
-            max-height: 280px; overflow-y: auto;
           }
           .up-item {
             display: flex; align-items: center; gap: .5rem;
@@ -1481,17 +1492,10 @@ function UserPicker({ users, value, placeholder, onChange }) {
   // dozens of names. Filters client-side over the `users` prop, which is
   // already scoped to MCM-eligible users by the parent.
   const [search, setSearch] = useState('');
-  const wrapRef = useRef(null);
+  const triggerRef = useRef(null);
   const searchRef = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-  // Auto-focus the search input when the menu opens; clear when it closes.
+  // FlipMenu owns click-outside + position. Auto-focus the search input
+  // when the menu opens; clear when it closes.
   useEffect(() => {
     if (open) {
       setSearch('');
@@ -1517,8 +1521,9 @@ function UserPicker({ users, value, placeholder, onChange }) {
   })();
 
   return (
-    <div ref={wrapRef} className="up-wrap">
+    <div className="up-wrap">
       <button
+        ref={triggerRef}
         type="button"
         className={'up-trigger' + (picked ? '' : ' is-empty')}
         onClick={() => setOpen((o) => !o)}
@@ -1529,8 +1534,16 @@ function UserPicker({ users, value, placeholder, onChange }) {
         </span>
         <span className="up-chev">▾</span>
       </button>
-      {open && (
-        <div className="up-menu" role="menu">
+      <FlipMenu
+        open={open}
+        triggerRef={triggerRef}
+        onClose={() => setOpen(false)}
+        align="stretch"
+        minWidth={280}
+        maxHeight={320}
+        className="up-menu"
+      >
+        <div role="menu">
           <div style={{
             position: 'sticky', top: 0, background: 'var(--card)',
             padding: '.4rem .5rem', borderBottom: '1px solid var(--border)',
@@ -1547,8 +1560,6 @@ function UserPicker({ users, value, placeholder, onChange }) {
                 border: '1px solid var(--border)', borderRadius: '.3rem',
                 fontSize: '.8rem', boxSizing: 'border-box',
               }}
-              // Don't close the dropdown on click; stopping propagation
-              // keeps the outside-click handler from firing.
               onClick={(e) => e.stopPropagation()}
             />
           </div>
@@ -1597,7 +1608,7 @@ function UserPicker({ users, value, placeholder, onChange }) {
             </button>
           )}
         </div>
-      )}
+      </FlipMenu>
     </div>
   );
 }

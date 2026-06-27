@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useSiteContent } from '../../hooks/useSiteContent';
 import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import { IconArrowLeft, IconCheckCircle, IconX } from '../../icons';
 import Button from '../../components/ui/Button';
 
 export default function ForgotPage() {
   const { forgotPassword } = useAuth();
+  const header = useSiteContent('auth_forgot');
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -35,9 +37,9 @@ export default function ForgotPage() {
           <a href="#/login" className="row gap-1 muted-text" style={{ fontSize: '.8125rem', marginBottom: '1rem' }}>
             <IconArrowLeft size="sm" /> Back to sign in
           </a>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Reset your password</h1>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{header.title}</h1>
           <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.25rem', marginBottom: '1.5rem' }}>
-            Enter your registered email and we'll send you a reset link.
+            {header.subtitle}
           </p>
           {sent ? (
             <div className="alert alert-success">

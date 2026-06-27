@@ -31,6 +31,9 @@ export const SITE_CONTENT_DEFAULTS = {
     body:     'The official portal of the Nagpur Branch of WIRC of ICAI — supporting over 5,000 members and 8,500+ students through education, regulation and continuous professional development.',
   },
   home_branch_premises: {
+    // Default Unsplash photo — the admin can replace it from
+    // /admin/site-content → Home tab → "Branch premises section".
+    image_url: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=960&h=440&q=80&auto=format&fit=crop',
     body: 'A purpose-built three-storey facility housing the Branch office, a 220-seat seminar hall, a digital library and a dedicated student wing for residential coaching.',
     stats: [
       { k: '80 seats',      v: 'READING ROOM' },
@@ -41,6 +44,11 @@ export const SITE_CONTENT_DEFAULTS = {
   // Each mirrors the current hardcoded copy so behaviour is identical
   // until an admin overrides a field.
   home_hero_text: {
+    // Hero photo + watermark default to null so HomePage falls back to the
+    // bundled assets (heroImage.png / heroLogo.png). Once an admin uploads
+    // through /admin/site-content the DB row wins.
+    bg_image_url:     null,
+    watermark_url:    null,
     badge:            'Branch of WIRC of ICAI',
     title_prefix:     'Nagpur Branch of',
     title_highlight:  'ICAI',
@@ -53,6 +61,23 @@ export const SITE_CONTENT_DEFAULTS = {
     cta_download_label: 'Download Circulars',
     since_label:        'SINCE',
     since_year:         '1962',
+  },
+  home_leadership_carousel: {
+    // Same Unsplash placeholders the page used to ship with — admin can
+    // replace any slide from /admin/site-content. Leave a slot's url blank
+    // to skip that slide entirely.
+    slide_1_url:     'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=720&h=480&q=80&auto=format&fit=crop',
+    slide_1_caption: 'Branch leadership',
+    slide_1_alt:     'Professional gathering of chartered accountants',
+    slide_2_url:     'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=720&h=480&q=80&auto=format&fit=crop',
+    slide_2_caption: 'CPE programmes',
+    slide_2_alt:     'CPE seminar audience',
+    slide_3_url:     'https://images.unsplash.com/photo-1517048676732-d65bc937f952?w=720&h=480&q=80&auto=format&fit=crop',
+    slide_3_caption: 'Member community',
+    slide_3_alt:     'CA professionals collaborating around a meeting table',
+    slide_4_url:     'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=720&h=480&q=80&auto=format&fit=crop',
+    slide_4_caption: 'Student community',
+    slide_4_alt:     'CA students in training session',
   },
   home_services_section: {
     eyebrow: 'SERVICES',
@@ -84,9 +109,30 @@ export const SITE_CONTENT_DEFAULTS = {
     title:               'WICASA — Nagpur Branch',
     body:                "The Nagpur Branch CA Students' Association supports articleship trainees through orientation courses, mock tests, soft-skills training and the annual festival.",
     updates_heading:     'New updates',
+    // Each non-empty line shows as one update pill in the card.
+    updates: [
+      'Mock Test Series for the May 2026 attempt — registration now open',
+      'New ITT & Orientation batch begins 2 June at ICAI Bhawan',
+      'Industrial visit to MIDC Butibori — sign up by 28 May',
+    ].join('\n'),
     suggestions_heading: 'Student suggestions',
     signin_hint:         'Sign in to upvote',
     resources_label:     'STUDENT RESOURCES',
+  },
+  about_page_header: {
+    title:    'About the Branch',
+    subtitle: 'Established 1962 · Branch of WIRC of ICAI',
+  },
+  about_section_headings: {
+    vision_card_title:        'A model branch of ICAI',
+    mission_card_title:       'Service to the profession',
+    history_card_title:       'Six decades of service',
+    committee_heading:        'Managing Committee',
+    committee_empty_msg:      'The roster will appear here once committee members are assigned.',
+    past_chairmen_heading:    'Past Chairmen',
+    past_chairmen_subtitle:   'Members who have led the Nagpur Branch over the decades.',
+    annual_reports_heading:   'Annual Reports',
+    annual_reports_subtitle:  'Year-on-year reports of branch activities, finances and member services.',
   },
   about_vision: {
     body: 'To be a leading branch dedicated to the holistic development of members and students through quality education, networking, and innovative initiatives.',
@@ -96,6 +142,288 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   about_history: {
     body: 'The Nagpur Branch was established in 1962 and has grown into one of the most active branches of WIRC, serving over 5,000 members and 8,500+ students.',
+  },
+  // ── Students page defaults ──────────────────────────────────────────
+  students_page_header: {
+    title:    'For Students',
+    subtitle: 'Everything CA students of Nagpur need — in one place.',
+  },
+  students_icai_banner: {
+    body:         'Registration, exam forms, results and study material are on the **official ICAI portal**.',
+    button_label: 'Visit ICAI Students Portal',
+    button_url:   'https://www.icai.org/students',
+  },
+  students_quick_access: {
+    mock_tests_label:  'Mock tests',
+    articleship_label: 'Articleship Vacancies',
+    events_label:      'Student Events',
+  },
+  students_services: {
+    card_1_title: 'WICASA Events & Mock Tests',
+    card_1_desc:  'Foundation, Inter and Final mock tests, GMCS, ITT, orientation programmes.',
+    card_2_title: 'Articleship Vacancies',
+    card_2_desc:  'Browse openings posted by member firms across Nagpur and Vidarbha.',
+    card_3_title: 'Career Counselling',
+    card_3_desc:  '1-on-1 sessions with practising CAs and alma mater mentors.',
+    card_4_title: 'Study Material & Resources',
+    card_4_desc:  'Past papers, RTPs, MTPs and curated study notes.',
+    card_5_title: 'Scholarships & Awards',
+    card_5_desc:  'Information on merit-cum-need scholarships from CABF and the branch.',
+    card_6_title: 'Mock-Test Discussions',
+    card_6_desc:  'Discuss questions, solutions and strategies with other students for every Foundation / Inter / Final mock test.',
+  },
+  // ── Members page defaults ───────────────────────────────────────────
+  members_page_header: {
+    title:    'For Members',
+    subtitle: 'Services, CPE and resources for Chartered Accountants',
+  },
+  members_icai_banner: {
+    body:         'All member services, UDIN, COP and CPE records are managed at the **official ICAI portal** (ICAI SSP sign-in required).',
+    button_label: 'Visit ICAI Members Portal',
+    button_url:   'https://www.icai.org/members',
+  },
+  members_quick_access: {
+    directory_label: "Members' Directory",
+    jobs_label:      'Job Vacancies',
+  },
+  members_services: {
+    card_1_title: 'COP Renewal · Restoration · Firm Registration',
+    card_1_desc:  'Self-service Certificate of Practice workflows on ICAI eServices.',
+    card_2_title: 'UDIN Generation & Verification',
+    card_2_desc:  'Generate and verify Unique Document Identification Numbers on the ICAI UDIN portal.',
+    card_3_title: 'CPE Hours Tracker',
+    card_3_desc:  'Track structured / unstructured CPE hours against the 120-hours-in-3-years requirement.',
+    card_4_title: 'Newsletter Archive & Article Submission',
+    card_4_desc:  'Read past issues of the Nagpur Branch monthly newsletter — and submit your own article to be featured in an upcoming issue.',
+  },
+  // ── Contact page defaults ───────────────────────────────────────────
+  contact_page_header: {
+    title:    'Contact the Branch',
+    subtitle: 'Raise a grievance, share a suggestion, or send a general query. We aim to respond within 48 hours.',
+  },
+  contact_sections: {
+    info_card_title:      'ICAI Bhawan, Nagpur',
+    track_link_label:     'Track an existing ticket →',
+    form_card_title:      'Send a message',
+    submit_button_label:  'Send message',
+    submit_busy_label:    'Sending…',
+    success_message:      "Thanks — your message has been logged. Reference: **{ticketNo}**. A confirmation has been emailed to {email}.",
+    track_button_label:   'Track this ticket',
+    another_button_label: 'Submit another',
+  },
+  // ── Resources page defaults ─────────────────────────────────────────
+  resources_page_header: {
+    title:    'Resources',
+    subtitle: 'Standards, circulars, newsletters and downloadable presentations.',
+  },
+  resources_categories: {
+    card_1_title: 'Circulars',
+    card_1_desc:  'ICAI announcements, notifications and council decisions.',
+    card_1_url:   'https://www.icai.org/category/announcements',
+    card_2_title: 'Standards (AS / SA)',
+    card_2_desc:  'Accounting Standards, Ind AS and Standards on Auditing.',
+    card_2_url:   'https://resource.cdn.icai.org/',
+    card_3_title: 'e-Journal Archive',
+    card_3_desc:  'Browse The Chartered Accountant journal archives.',
+    card_3_url:   'https://www.icai.org/category/journal-section',
+    card_4_title: 'Web-Media Policy',
+    card_4_desc:  'ICAI guidelines for member online presence.',
+    card_4_url:   'https://www.icai.org/post/social-media-guidelines',
+  },
+  resources_sections: {
+    newsletter_eyebrow:    'Monthly',
+    newsletter_heading:    'Branch Newsletter',
+    newsletter_subtitle:   'The Nagpur Branch monthly newsletter — events recap, articles, member updates.',
+    newsletter_empty_msg:  'No newsletters published yet.',
+    ejournal_eyebrow:      'Branch publication',
+    ejournal_heading:      'e-Journal Archive',
+    ejournal_subtitle:     'Long-form articles authored by the Nagpur Branch — quarterly and special issues.',
+    papers_eyebrow:        'Seminars & Conferences',
+    papers_heading:        'Paper Presentations',
+    papers_subtitle:       'Presentations and papers from past conferences and seminars held at the Nagpur Branch.',
+    papers_search_placeholder: 'Search title, abstract or speaker…',
+    papers_disclaimer:     '**Disclaimer:** The views expressed in these presentations are of the Speaker himself/herself. The Institute of Chartered Accountants of India does not subscribe to his/her views.',
+  },
+  // ── Pragyaan landing defaults ───────────────────────────────────────
+  praygyaan_page_header: {
+    title:    'Pragyaan — AI Assistant',
+    subtitle: 'Your 24×7 grounded guide to ICAI Nagpur Branch services, events, circulars, and resources.',
+  },
+  praygyaan_features: {
+    card_1_title: 'Source-cited answers',
+    card_1_desc:  'Every reply cites the branch document or page it relied on.',
+    card_2_title: 'Smart, scoped search',
+    card_2_desc:  'Searches branch circulars, events, FAQs and resources for you.',
+    card_3_title: 'English · हिन्दी · मराठी',
+    card_3_desc:  'Ask in your language — Pragyaan replies in the same one.',
+    welcome:      "Namaste! I'm **Pragyaan**, the ICAI Nagpur Branch AI assistant. Ask me about CPE events, articleship, UDIN, branch services, circulars, professional standards, and more — I answer from the branch knowledge base and cite my sources.",
+    input_placeholder:           'Ask Pragyaan a question…',
+    input_placeholder_streaming: 'Pragyaan is replying…',
+    send_label:                  'Send',
+    send_label_streaming:        'Replying…',
+    chat_title:                  'Chat with Pragyaan',
+    reply_in_label:              'Reply in',
+    starters_prefix:             'Try:',
+  },
+  // ── Events page defaults ────────────────────────────────────────────
+  events_page_header: {
+    title:                       'Events & CPE',
+    subtitle:                    'Upcoming programmes across all committees',
+    committee_subtitle_template: 'Upcoming events from the {short} committee',
+  },
+  events_audience_tabs: {
+    all_label:      'All Events',
+    members_label:  'For Members',
+    students_label: 'For Students',
+  },
+  events_sections: {
+    events_eyebrow:        'EVENTS',
+    events_title:          'Upcoming programmes and committees',
+    upcoming_eyebrow:      'UPCOMING EVENTS',
+    view_list_label:       'List',
+    view_month_label:      'Month',
+    committees_eyebrow:    'BROWSE BY COMMITTEE',
+    committees_title:      'Committee categories',
+    committees_subtitle:   'Select a committee to open its dedicated page with every upcoming event.',
+    empty_audience_msg:    'No upcoming events for this audience right now.',
+    empty_committee_msg:   'No upcoming events for this committee right now. Check back soon.',
+    all_committees_btn:    'All committees',
+  },
+  events_committee_fallback: {
+    image_url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=600&h=420&q=80&auto=format&fit=crop',
+  },
+  // ── Announcements page defaults ─────────────────────────────────────
+  announcements_page_header: {
+    title:               'Announcements',
+    subtitle:            'Latest updates from ICAI Nagpur Branch — events, circulars, deadlines, and important notices.',
+    empty_state_heading: 'No active announcements right now',
+    empty_state_body:    'Check back soon — branch updates, events, and circulars will appear here.',
+  },
+  // ── Members directory defaults ──────────────────────────────────────
+  members_directory_page_header: {
+    title:               "Members' Directory",
+    subtitle:            'Nagpur Branch — registered members list',
+    confidential_notice: '**Confidential:** This directory is restricted to members under the jurisdiction of the Nagpur Branch. Do not share or reproduce member contact details outside authorised use.',
+    signin_notice_title: 'Sign in to see contact details.',
+    signin_notice_body:  "You're viewing the public roster. Members can sign in to access phone, email and firm information.",
+  },
+  // ── Photo gallery defaults ──────────────────────────────────────────
+  photo_gallery_page_header: {
+    title:    'Photo Gallery',
+    subtitle: 'Event photos from programmes organised by the Nagpur Branch',
+  },
+  // ── Job vacancies defaults ──────────────────────────────────────────
+  job_vacancies_page_header: {
+    job_title:            'Job Vacancies',
+    job_subtitle:         'Member job opportunities in Nagpur / Vidarbha region',
+    articleship_title:    'Articleship Vacancies',
+    articleship_subtitle: 'Articleship openings posted by member firms in Nagpur / Vidarbha',
+    notice:               '**Notice:** These vacancies are posted by member firms and organisations in Nagpur / Vidarbha region. The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.',
+  },
+  // ── Track grievance defaults ────────────────────────────────────────
+  track_grievance_page_header: {
+    title:    'Track your grievance',
+    subtitle: 'Enter your ticket number and the email you submitted with to see the current status.',
+  },
+  // ── My Library defaults ─────────────────────────────────────────────
+  my_library_page_header: {
+    title:    'My Library',
+    subtitle: 'Your saved papers and CPE history.',
+  },
+  // ── Room booking defaults ───────────────────────────────────────────
+  room_booking_page_header: {
+    title:    'Room Booking',
+    subtitle: 'Reserve a room at ICAI Bhawan, Nagpur',
+  },
+  // ── Search defaults ─────────────────────────────────────────────────
+  search_page_header: {
+    title:             'Search',
+    subtitle_idle:     'Search events, services and resources',
+    subtitle_template: 'Results for "{query}"',
+    placeholder:       'Search…',
+    submit_label:      'Search',
+    empty_state:       'No events matched "{query}". Try the events page or browse by committee.',
+  },
+  // ── Mock tests defaults ─────────────────────────────────────────────
+  mock_tests_page_header: {
+    title:               'Mock tests',
+    subtitle:            'WICASA-organised mock papers — register, download practice material, see results.',
+    my_section_heading:  'My mock tests',
+    upcoming_heading:    'Upcoming & open',
+    results_heading:     'Recent results',
+    empty_msg:           'No mock tests scheduled for this level right now.',
+    level_label:         'Level:',
+  },
+  // ── CABF defaults ───────────────────────────────────────────────────
+  benevolent_fund_content: {
+    title:    'CA Benevolent Fund',
+    subtitle: 'Financial relief for members and their families in distress.',
+    about_heading:      'About CABF',
+    about_body:         'The Chartered Accountants Benevolent Fund (CABF) provides financial assistance to members and their dependents in case of distress, illness or untimely demise. The fund is administered by the ICAI Head Office; the Nagpur branch facilitates contributions and disbursement requests.',
+    contribute_heading: 'Contribute',
+    contribute_body:    'Contributions are eligible for deduction under Section 80G. Suggested slabs:',
+    slabs_csv:          '₹501, ₹1,001, ₹5,001, ₹11,001',
+    alert_body:         '**Online contributions open soon.** In the meantime, contribute via the official ICAI CABF portal or contact the Nagpur branch directly.',
+    icai_btn_label:     'ICAI CABF (HQ) ↗',
+    icai_btn_url:       'https://www.icai.org/post/cabf',
+    contact_btn_label:  'Contact Nagpur Branch',
+  },
+  // ── CA 2.0 defaults ─────────────────────────────────────────────────
+  ca2_vision_content: {
+    title:        'CA 2.0 — Life After Office',
+    subtitle:     'A meaningful second innings for senior CAs',
+    intro:        "CA 2.0 is the Nagpur Branch's flagship vision for senior chartered accountants — a community programme that combines wellness, mentorship and hobby circles, ensuring that veterans of the profession continue to live a meaningful, engaged and joyful life after retirement from active practice.",
+    card_1_title: 'Wellness circles',
+    card_1_desc:  'Yoga, walks, health camps and mental wellness sessions.',
+    card_2_title: 'Mentor a junior',
+    card_2_desc:  'Structured 6-month mentor pairing with juniors and students.',
+    card_3_title: 'Hobby clubs',
+    card_3_desc:  'Music, theatre, painting, photography — pick your circle.',
+  },
+  // ── Investor Awareness defaults ─────────────────────────────────────
+  investor_awareness_content: {
+    title:            'Investor Awareness',
+    subtitle:         'Free programmes promoting financial literacy and safe investing.',
+    intro:            'The branch conducts public investor awareness programmes in association with regulators and industry bodies to promote financial literacy, safe investing, fraud awareness and basic personal finance for students, salaried individuals and senior citizens.',
+    sessions_heading: 'Upcoming sessions',
+    sessions_body:
+`- **Financial Planning for Young Professionals** — 12 May · ICAI Bhawan
+- **Beware of Online Investment Frauds** — 19 May · Online
+- **Senior Citizens' Money Health** — 26 May · Chitnavis Centre`,
+  },
+  // ── Career Counselling defaults ─────────────────────────────────────
+  career_counselling_content: {
+    title:    'Career Counselling',
+    subtitle: 'One-to-one sessions with volunteer CAs and alma-mater mentors — launching soon.',
+    benefits_heading:       "What you'll get",
+    benefits_body:
+`- A 30-minute 1:1 with a practising CA
+- Help with articleship, exams and career paths
+- Optional follow-up over email`,
+    bookings_heading:       'Bookings open soon',
+    bookings_body:          "The Nagpur Branch is onboarding its volunteer counsellor panel for this term. Once the roster is in place, you'll be able to pick a counsellor and a time slot directly from this page. We'll announce the launch in the branch newsletter and via the homepage announcement ticker.\n\nNeed career guidance now? Reach out via the contact form and we'll route your request to the right person at the branch.",
+    contact_button_label:   'Open the contact form',
+  },
+  // ── Auth defaults ───────────────────────────────────────────────────
+  auth_login: {
+    title:    'Welcome back',
+    subtitle: 'Sign in to your ICAI Nagpur Branch account.',
+  },
+  auth_signup: {
+    title:    'Create your account',
+    subtitle: 'Join the ICAI Nagpur Branch community.',
+  },
+  auth_forgot: {
+    title:    'Reset your password',
+    subtitle: "We'll email you a link to set a new one.",
+  },
+  // ── Footer defaults ─────────────────────────────────────────────────
+  footer_content: {
+    brand_name:            'ICAI Nagpur Branch',
+    brand_description:     'Branch of WIRC of The Institute of Chartered Accountants of India.',
+    quick_links_heading:   'Quick Links',
+    initiatives_heading:   'Initiatives',
+    icai_portals_heading:  'ICAI Portals',
   },
   // ── Pragyaan FAQ defaults ───────────────────────────────────────────────
   // Backs the starter chips Pragyaan suggests. Bodies are markdown with one

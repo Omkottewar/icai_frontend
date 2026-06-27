@@ -1,22 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useRoute } from '../hooks/useRoute';
+import { useSiteContent } from '../hooks/useSiteContent';
+import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap } from '../icons';
-
-const NOTICE = (
-  <div style={{
-    background: 'oklch(0.36 0.13 255 / 0.06)',
-    border: '1px solid oklch(0.36 0.13 255 / 0.15)',
-    borderRadius: '.5rem',
-    padding: '.875rem 1rem',
-    marginBottom: '2rem',
-    fontSize: '.8125rem',
-    color: 'var(--foreground)',
-  }}>
-    <strong>Notice:</strong> These vacancies are posted by member firms and organisations in Nagpur / Vidarbha region.
-    The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.
-  </div>
-);
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -46,21 +33,34 @@ function usePostings(type) {
 
 export default function JobVacanciesPage() {
   const route = useRoute();
+  const header = useSiteContent('job_vacancies_page_header');
   const isArticleship = route.query.type === 'articleship';
   const postingType = isArticleship ? 'articleship' : 'job';
   const { rows, loading, error } = usePostings(postingType);
   const [enquiryTarget, setEnquiryTarget] = useState(null);
 
+  const notice = (
+    <div style={{
+      background: 'oklch(0.36 0.13 255 / 0.06)',
+      border: '1px solid oklch(0.36 0.13 255 / 0.15)',
+      borderRadius: '.5rem',
+      padding: '.875rem 1rem',
+      marginBottom: '2rem',
+      fontSize: '.8125rem',
+      color: 'var(--foreground)',
+    }}>
+      {renderMarkdown(header.notice)}
+    </div>
+  );
+
   return (
     <>
       <PageHeader
-        title={isArticleship ? 'Articleship Vacancies' : 'Job Vacancies'}
-        subtitle={isArticleship
-          ? 'Articleship openings posted by member firms in Nagpur / Vidarbha'
-          : 'Member job opportunities in Nagpur / Vidarbha region'}
+        title={isArticleship ? header.articleship_title : header.job_title}
+        subtitle={isArticleship ? header.articleship_subtitle : header.job_subtitle}
       />
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
-        {NOTICE}
+        {notice}
 
         <div style={{ marginBottom: '1.5rem' }}>
           <div className="tiny-eyebrow">{isArticleship ? 'For CA Students' : 'For CA Members'}</div>

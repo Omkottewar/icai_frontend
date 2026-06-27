@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
 import { IconBell, IconCheck } from '../../icons';
 import { Shimmer } from '../ui/Shimmer';
+import FlipMenu from '../ui/FlipMenu';
 
 function BellShimmerList() {
   return (
@@ -38,40 +39,12 @@ function relativeTime(iso) {
 export default function NotificationsBell() {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
-  const [panelTop, setPanelTop] = useState(60); // px, used only when fixed-positioned on mobile
-  const wrapRef = useRef(null);
   const triggerRef = useRef(null);
 
   // Hook is enabled only when the user is signed in — anonymous visitors
-  // shouldn't be hitting /api/notifications.
+  // shouldn't be hitting /api/notifications. FlipMenu owns positioning,
+  // click-outside, scroll/resize handling — no manual rect math here.
   const { items, unread, loading, markRead, markAllRead } = useNotifications({ enabled: Boolean(user) });
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  // When opening on a narrow viewport the panel is fixed-positioned (see
-  // CSS below). Anchor its top to the bottom of the bell trigger so it
-  // hugs the sticky header regardless of how tall the header has rendered.
-  useEffect(() => {
-    if (!open) return;
-    const update = () => {
-      const r = triggerRef.current?.getBoundingClientRect();
-      if (r) setPanelTop(Math.max(8, Math.round(r.bottom + 8)));
-    };
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
-    return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
-    };
-  }, [open]);
 
   if (!user) return null;
 
@@ -85,7 +58,7 @@ export default function NotificationsBell() {
   };
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }}>
       <button
         ref={triggerRef}
         type="button"
@@ -99,40 +72,47 @@ export default function NotificationsBell() {
         )}
       </button>
 
-      {open && (
-        <div className="bell-panel" style={{ '--bell-panel-top': `${panelTop}px` }}>
-          <div className="bell-panel-head">
-            <strong style={{ fontSize: '.875rem' }}>Notifications</strong>
-            {unread > 0 && (
-              <button type="button" onClick={markAllRead} className="bell-mark-all">
-                <IconCheck size="sm" /> Mark all read
-              </button>
-            )}
-          </div>
-
-          <div className="bell-list">
-            {loading && items.length === 0 && <BellShimmerList />}
-            {!loading && items.length === 0 && (
-              <div className="bell-empty">You're all caught up.</div>
-            )}
-            {items.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => onItemClick(n)}
-                className={`bell-item ${n.read_at ? 'bell-item-read' : 'bell-item-unread'}`}
-              >
-                <div className="bell-item-title">
-                  {!n.read_at && <span className="bell-item-dot" aria-hidden />}
-                  {n.title}
-                </div>
-                {n.body && <div className="bell-item-body">{n.body}</div>}
-                <div className="bell-item-meta">{relativeTime(n.created_at)}</div>
-              </button>
-            ))}
-          </div>
+      <FlipMenu
+        open={open}
+        triggerRef={triggerRef}
+        onClose={() => setOpen(false)}
+        align="right"
+        offset={8}
+        minWidth={Math.min(352, Math.max(280, typeof window !== 'undefined' ? window.innerWidth - 32 : 352))}
+        maxHeight={448}
+        className="bell-panel"
+      >
+        <div className="bell-panel-head">
+          <strong style={{ fontSize: '.875rem' }}>Notifications</strong>
+          {unread > 0 && (
+            <button type="button" onClick={markAllRead} className="bell-mark-all">
+              <IconCheck size="sm" /> Mark all read
+            </button>
+          )}
         </div>
-      )}
+
+        <div className="bell-list">
+          {loading && items.length === 0 && <BellShimmerList />}
+          {!loading && items.length === 0 && (
+            <div className="bell-empty">You're all caught up.</div>
+          )}
+          {items.map((n) => (
+            <button
+              key={n.id}
+              type="button"
+              onClick={() => onItemClick(n)}
+              className={`bell-item ${n.read_at ? 'bell-item-read' : 'bell-item-unread'}`}
+            >
+              <div className="bell-item-title">
+                {!n.read_at && <span className="bell-item-dot" aria-hidden />}
+                {n.title}
+              </div>
+              {n.body && <div className="bell-item-body">{n.body}</div>}
+              <div className="bell-item-meta">{relativeTime(n.created_at)}</div>
+            </button>
+          ))}
+        </div>
+      </FlipMenu>
 
       <style>{`
         .bell-trigger {
@@ -149,28 +129,14 @@ export default function NotificationsBell() {
           display: inline-flex; align-items: center; justify-content: center;
           line-height: 1; box-shadow: 0 0 0 2px var(--primary, #1e3a8a);
         }
+        /* FlipMenu owns position, top/left, width — we only style the
+           surface. Mobile narrow-screen edge-clamping is handled by the
+           FlipMenu itself (it clamps to the viewport with 8px padding). */
         .bell-panel {
-          position: absolute; top: calc(100% + .5rem); right: 0;
-          width: 22rem; max-width: 92vw; max-height: 28rem;
           background: white; color: var(--foreground, #111);
           border: 1px solid var(--border, rgba(0,0,0,.1));
           border-radius: .5rem; box-shadow: 0 8px 32px rgba(0,0,0,.18);
-          display: flex; flex-direction: column; z-index: 60;
-        }
-        /* On phones the bell isn't at the viewport edge (avatar + hamburger
-           sit to its right), so anchoring the 22rem panel to the bell's
-           right would clip off-screen on the left. Pin it to the viewport
-           instead and let it span almost edge-to-edge. */
-        @media (max-width: 640px) {
-          .bell-panel {
-            position: fixed;
-            top: var(--bell-panel-top, 3.75rem);
-            left: .5rem;
-            right: .5rem;
-            width: auto;
-            max-width: none;
-            max-height: 70vh;
-          }
+          display: flex; flex-direction: column;
         }
         .bell-panel-head {
           display: flex; justify-content: space-between; align-items: center;

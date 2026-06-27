@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useRoute } from '../hooks/useRoute';
+import { useSiteContent } from '../hooks/useSiteContent';
 import { IconCheckCircle, IconX } from '../icons';
 import Button from '../components/ui/Button';
 
@@ -25,6 +26,7 @@ function fmt(d) {
 
 export default function TrackGrievancePage() {
   const { query } = useRoute();
+  const header = useSiteContent('track_grievance_page_header');
   const initial = { ticket_no: query.ticket_no ?? '', email: query.email ?? '' };
   const [form, setForm] = useState(initial);
   const [item, setItem] = useState(null);
@@ -59,7 +61,7 @@ export default function TrackGrievancePage() {
 
   return (
     <>
-      <PageHeader title="Track your grievance" subtitle="Enter your ticket number and the email you submitted with to see the current status." />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: '3rem 1rem', maxWidth: '40rem' }}>
         <form className="card col gap-3" onSubmit={submit}>
           <div>

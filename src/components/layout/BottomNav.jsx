@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   IconHome, IconCalendar, IconSearch, IconUser, IconMenu, IconX,
   IconBookOpen, IconBriefcase, IconHandshake, IconGraduationCap,
-  IconBot, IconArrowRight, IconLogOut, IconBell,
+  IconBot, IconArrowRight, IconLogOut, IconBell, IconMessageSquare,
 } from '../../icons';
 
 // Fixed bottom-of-viewport navigation strip — mobile-only (hidden ≥768 px).
@@ -33,6 +33,7 @@ const SHEET_ITEMS = [
   { to: '/mock-tests',          Icon: IconGraduationCap,   label: 'Mock tests' },
   { to: '/book-room',           Icon: IconCalendar,        label: 'Book a room' },
   { to: '/gallery',             Icon: IconBookOpen,        label: 'Photo gallery' },
+  { to: '/student-suggestions', Icon: IconMessageSquare,   label: 'Student suggestions' },
   { to: '/track-grievance',     Icon: IconHandshake,       label: 'Track grievance' },
   { to: '/contact',             Icon: IconHandshake,       label: 'Contact us' },
   { to: '/my-library',          Icon: IconBookOpen,        label: 'My library', authOnly: true },

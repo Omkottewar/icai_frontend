@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate, useRoute } from '../hooks/useRoute';
+import { useSiteContent } from '../hooks/useSiteContent';
 import {
   IconCalendar, IconClock, IconMapPin, IconAward, IconArrowRight,
   IconCheckCircle, IconDownload, IconGraduationCap, IconBookOpen, IconX,
@@ -50,6 +51,7 @@ async function api(url, opts = {}) {
 export default function MockTestsPage() {
   const { user, showToast } = useAuth();
   const route = useRoute();
+  const header = useSiteContent('mock_tests_page_header');
   const [level, setLevel] = useState('');
   const [rows, setRows]   = useState(null);
   const [my, setMy]       = useState([]);
@@ -119,15 +121,12 @@ export default function MockTestsPage() {
 
   return (
     <>
-      <PageHeader
-        title="Mock tests"
-        subtitle="WICASA-organised mock papers — register, download practice material, see results."
-      />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
 
       <section className="container" style={{ padding: '1.5rem 1rem 3rem' }}>
         {/* Filter row */}
         <div className="row gap-2" style={{ marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <label style={{ fontSize: '.8rem', fontWeight: 600 }}>Level:</label>
+          <label style={{ fontSize: '.8rem', fontWeight: 600 }}>{header.level_label}</label>
           {LEVELS.map((l) => (
             <button
               key={l.value}
@@ -145,7 +144,7 @@ export default function MockTestsPage() {
         {/* My registrations strip — only shown when the user has any */}
         {user && my.length > 0 && (
           <section style={{ marginBottom: '2rem' }}>
-            <h2 className="mt-section-title">My mock tests</h2>
+            <h2 className="mt-section-title">{header.my_section_heading}</h2>
             <div className="mt-mine-grid">
               {my.map((r) => <MyMockTestCard key={r.registration_id} reg={r} onCancel={() => onCancel(r.mock_test.id)} />)}
             </div>
@@ -153,7 +152,7 @@ export default function MockTestsPage() {
         )}
 
         {/* Upcoming + open */}
-        <h2 className="mt-section-title">Upcoming &amp; open</h2>
+        <h2 className="mt-section-title">{header.upcoming_heading}</h2>
         {rows === null ? (
           <div className="mt-grid">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -168,7 +167,7 @@ export default function MockTestsPage() {
         ) : upcoming.length === 0 ? (
           <div className="card" style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
             <IconGraduationCap />
-            <p className="muted-text" style={{ marginTop: '.5rem' }}>No mock tests scheduled for this level right now.</p>
+            <p className="muted-text" style={{ marginTop: '.5rem' }}>{header.empty_msg}</p>
           </div>
         ) : (
           <div className="mt-grid">
@@ -189,7 +188,7 @@ export default function MockTestsPage() {
         {/* Recently completed */}
         {completed.length > 0 && (
           <section style={{ marginTop: '2.5rem' }}>
-            <h2 className="mt-section-title">Recent results</h2>
+            <h2 className="mt-section-title">{header.results_heading}</h2>
             <div className="mt-grid">
               {completed.map((t) => (
                 <MockTestCard

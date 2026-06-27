@@ -33,6 +33,8 @@ function initials(name) {
 }
 
 export default function AboutPage() {
+  const header     = useSiteContent('about_page_header');
+  const sections   = useSiteContent('about_section_headings');
   const vision     = useSiteContent('about_vision');
   const mission    = useSiteContent('about_mission');
   const history    = useSiteContent('about_history');
@@ -62,36 +64,36 @@ export default function AboutPage() {
 
   return (
     <>
-      <PageHeader title="About the Branch" subtitle="Established 1962 · Branch of WIRC of ICAI" />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <div style={{ display: 'grid', gap: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
           <div className="card">
             <div className="tiny-eyebrow">Vision</div>
-            <h3 style={{ marginTop: '.5rem', fontSize: '1.125rem', fontWeight: 600 }}>A model branch of ICAI</h3>
+            <h3 style={{ marginTop: '.5rem', fontSize: '1.125rem', fontWeight: 600 }}>{sections.vision_card_title}</h3>
             <div className="muted-text" style={{ marginTop: '.5rem' }}>
               {renderMarkdown(vision.body)}
             </div>
           </div>
           <div className="card">
             <div className="tiny-eyebrow">Mission</div>
-            <h3 style={{ marginTop: '.5rem', fontSize: '1.125rem', fontWeight: 600 }}>Service to the profession</h3>
+            <h3 style={{ marginTop: '.5rem', fontSize: '1.125rem', fontWeight: 600 }}>{sections.mission_card_title}</h3>
             <div className="muted-text" style={{ marginTop: '.5rem' }}>
               {renderMarkdown(mission.body)}
             </div>
           </div>
           <div className="card">
             <div className="tiny-eyebrow">History</div>
-            <h3 style={{ marginTop: '.5rem', fontSize: '1.125rem', fontWeight: 600 }}>Six decades of service</h3>
+            <h3 style={{ marginTop: '.5rem', fontSize: '1.125rem', fontWeight: 600 }}>{sections.history_card_title}</h3>
             <div className="muted-text" style={{ marginTop: '.5rem' }}>
               {renderMarkdown(history.body)}
             </div>
           </div>
         </div>
 
-        <h2 style={{ marginTop: '3rem', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 700 }}>Managing Committee</h2>
+        <h2 style={{ marginTop: '3rem', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 700 }}>{sections.committee_heading}</h2>
         {roster.length === 0 ? (
           <p className="muted-text" style={{ marginTop: '1rem' }}>
-            The roster will appear here once committee members are assigned.
+            {sections.committee_empty_msg}
           </p>
         ) : (
           <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
@@ -122,10 +124,10 @@ export default function AboutPage() {
             About page doesn't show empty section headers on a fresh install. */}
         {chairmen.length > 0 && (
           <>
-            <h2 style={{ marginTop: '3rem', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 700 }}>Past Chairmen</h2>
-            <p className="muted-text" style={{ marginTop: '.5rem', fontSize: '.875rem', maxWidth: '44rem' }}>
-              Members who have led the Nagpur Branch over the decades.
-            </p>
+            <h2 style={{ marginTop: '3rem', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 700 }}>{sections.past_chairmen_heading}</h2>
+            <div className="muted-text" style={{ marginTop: '.5rem', fontSize: '.875rem', maxWidth: '44rem' }}>
+              {renderMarkdown(sections.past_chairmen_subtitle)}
+            </div>
             <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
               {chairmen.map((c) => (
                 <div key={c.id} className="card" style={{ textAlign: 'center', padding: '1rem' }}>
@@ -153,10 +155,10 @@ export default function AboutPage() {
         {/* Annual Reports — yearly branch report PDFs */}
         {reports.length > 0 && (
           <>
-            <h2 style={{ marginTop: '3rem', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 700 }}>Annual Reports</h2>
-            <p className="muted-text" style={{ marginTop: '.5rem', fontSize: '.875rem', maxWidth: '44rem' }}>
-              Year-on-year reports of branch activities, finances and member services.
-            </p>
+            <h2 style={{ marginTop: '3rem', fontSize: 'clamp(1.25rem, 4vw, 1.5rem)', fontWeight: 700 }}>{sections.annual_reports_heading}</h2>
+            <div className="muted-text" style={{ marginTop: '.5rem', fontSize: '.875rem', maxWidth: '44rem' }}>
+              {renderMarkdown(sections.annual_reports_subtitle)}
+            </div>
             <div style={{ marginTop: '1.5rem', display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
               {reports.map((r) => (
                 <a

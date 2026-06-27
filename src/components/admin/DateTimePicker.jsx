@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconCalendar, IconClock, IconChevronUp, IconChevronDownAlt } from '../../icons';
+import FlipMenu from '../ui/FlipMenu';
 
 // Custom date + time picker.
 //
@@ -29,8 +30,7 @@ export default function DateTimePicker({
     const d = parseValue(value) || new Date();
     return new Date(d.getFullYear(), d.getMonth(), 1);
   });
-  const wrapRef = useRef(null);
-  const popRef = useRef(null);
+  const triggerRef = useRef(null);
 
   // Keep viewMonth in sync if a parent updates `value` (e.g. resetting form).
   useEffect(() => {
@@ -38,22 +38,9 @@ export default function DateTimePicker({
     if (d) setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }, [value]);
 
-  // Close on outside click + Esc.
-  useEffect(() => {
-    if (!open) return;
-    const onMouse = (e) => {
-      if (!wrapRef.current?.contains(e.target) && !popRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onMouse);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onMouse);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
+  // FlipMenu handles click-outside + Escape + portal positioning + auto-flip,
+  // so the calendar popover can no longer be cropped by parent overflow or
+  // viewport edges.
 
   const picked = parseValue(value);
   const label = picked ? formatPretty(picked) : '';
@@ -100,8 +87,9 @@ export default function DateTimePicker({
   };
 
   return (
-    <div className="dtp-wrap" ref={wrapRef}>
+    <div className="dtp-wrap">
       <button
+        ref={triggerRef}
         type="button"
         className={className + ' dtp-trigger' + (picked ? '' : ' is-empty')}
         onClick={() => !disabled && setOpen((o) => !o)}
@@ -128,8 +116,16 @@ export default function DateTimePicker({
         />
       )}
 
-      {open && (
-        <div className="dtp-pop" ref={popRef} role="dialog" aria-label="Choose date and time">
+      <FlipMenu
+        open={open}
+        triggerRef={triggerRef}
+        onClose={() => setOpen(false)}
+        align="left"
+        offset={6}
+        minWidth={320}
+        className="dtp-pop"
+      >
+        <div role="dialog" aria-label="Choose date and time">
           {/* Quick presets */}
           <div className="dtp-presets">
             <button type="button" className="dtp-preset" onClick={() => { const d = new Date(); emit(d); }}>
@@ -226,7 +222,7 @@ export default function DateTimePicker({
             </button>
           </div>
         </div>
-      )}
+      </FlipMenu>
 
       <style>{`
         .dtp-wrap { position: relative; }
@@ -262,9 +258,8 @@ export default function DateTimePicker({
         .dtp-trigger-chev {
           font-size: .7rem; opacity: .55; color: var(--muted-foreground);
         }
+        /* FlipMenu owns position + portal placement; we only style. */
         .dtp-pop {
-          position: absolute; z-index: 50;
-          top: calc(100% + .35rem); left: 0;
           width: 320px; max-width: calc(100vw - 2rem);
           padding: .75rem;
           background: white;

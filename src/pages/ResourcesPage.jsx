@@ -1,11 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { useSiteContent } from '../hooks/useSiteContent';
+import { renderMarkdown } from '../lib/markdown.jsx';
 import {
   IconArrowRight, IconFileText, IconBookOpen, IconDownload, IconAward, IconShield,
   IconCalendar, IconUsers, IconPlus, IconSearch,
 } from '../icons';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
+
+// Structural frames for the top category tiles — icon is built-in; title /
+// description / URL come from the `resources_categories` slot.
+const CATEGORY_ICONS = [IconFileText, IconBookOpen, IconAward, IconShield];
 
 // Renders a cover image with a graceful gradient fallback when the URL is
 // missing OR when the image fails to load (404, mock data, etc.). The
@@ -75,35 +81,6 @@ function PaperShimmerGrid({ count = 6 }) {
   );
 }
 
-// Top-strip category tiles — quick visual nav to canonical ICAI portal
-// pages. Each tile is a real <a href> opening in a new tab so members
-// land on the live ICAI announcement / standard / journal page.
-const CATS = [
-  {
-    Icon: IconFileText,
-    t:    'Circulars',
-    d:    'ICAI announcements, notifications and council decisions.',
-    href: 'https://www.icai.org/category/announcements',
-  },
-  {
-    Icon: IconBookOpen,
-    t:    'Standards (AS / SA)',
-    d:    'Accounting Standards, Ind AS and Standards on Auditing.',
-    href: 'https://resource.cdn.icai.org/',
-  },
-  {
-    Icon: IconAward,
-    t:    'e-Journal Archive',
-    d:    'Browse The Chartered Accountant journal archives.',
-    href: 'https://www.icai.org/category/journal-section',
-  },
-  {
-    Icon: IconShield,
-    t:    'Web-Media Policy',
-    d:    'ICAI guidelines for member online presence.',
-    href: 'https://www.icai.org/post/social-media-guidelines',
-  },
-];
 
 const COMMITTEE_COLORS = {
   GST:          { color: '#16a34a', bg: '#f0fdf4' },
@@ -141,6 +118,9 @@ function writeHashQuery(params) {
 
 export default function ResourcesPage() {
   const { user } = useAuth();
+  const header     = useSiteContent('resources_page_header');
+  const categories = useSiteContent('resources_categories');
+  const sections   = useSiteContent('resources_sections');
   const [newsletters, setNewsletters] = useState(null);
   const [ejournalIssues, setEjournalIssues] = useState(null);
   const [err, setErr] = useState('');
@@ -162,45 +142,52 @@ export default function ResourcesPage() {
 
   return (
     <>
-      <PageHeader title="Resources" subtitle="Standards, circulars, newsletters and downloadable presentations." />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
 
-      {/* Resource categories — quick links to canonical ICAI portal pages */}
+      {/* Resource categories — admin-editable via the resources_categories slot */}
       <section className="container" style={{ padding: '3rem 1rem 2rem' }}>
         <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
-          {CATS.map((s) => (
-            <a
-              key={s.t}
-              href={s.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="card hover-lift"
-              style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column' }}
-            >
-              <div className="icon-tile"><s.Icon size="lg" /></div>
-              <h3 style={{ marginTop: '.75rem', fontWeight: 600 }}>{s.t}</h3>
-              <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>{s.d}</p>
-              <div className="row gap-1" style={{ marginTop: 'auto', paddingTop: '1rem', color: 'var(--primary)', fontSize: '.875rem', fontWeight: 500 }}>
-                Open <IconArrowRight size="sm" />
-              </div>
-            </a>
-          ))}
+          {[1, 2, 3, 4].map((n) => {
+            const Icon = CATEGORY_ICONS[n - 1];
+            const t = categories[`card_${n}_title`];
+            const d = categories[`card_${n}_desc`];
+            const href = categories[`card_${n}_url`];
+            if (!t) return null;
+            return (
+              <a
+                key={n}
+                href={href || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="card hover-lift"
+                style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column' }}
+              >
+                <div className="icon-tile"><Icon size="lg" /></div>
+                <h3 style={{ marginTop: '.75rem', fontWeight: 600 }}>{t}</h3>
+                <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>{d}</p>
+                <div className="row gap-1" style={{ marginTop: 'auto', paddingTop: '1rem', color: 'var(--primary)', fontSize: '.875rem', fontWeight: 500 }}>
+                  Open <IconArrowRight size="sm" />
+                </div>
+              </a>
+            );
+          })}
         </div>
       </section>
 
       {/* Branch Newsletter — dynamic, sorted by issue year/month desc */}
       <section className="container" style={{ padding: '2rem 1rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ marginBottom: '1.5rem' }}>
-          <div className="tiny-eyebrow">Monthly</div>
-          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>Branch Newsletter</h2>
-          <p className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
-            The Nagpur Branch monthly newsletter — events recap, articles, member updates.
-          </p>
+          <div className="tiny-eyebrow">{sections.newsletter_eyebrow}</div>
+          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>{sections.newsletter_heading}</h2>
+          <div className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
+            {renderMarkdown(sections.newsletter_subtitle)}
+          </div>
         </div>
 
         {newsletters === null ? (
           <NewsletterShimmerGrid count={4} />
         ) : newsletters.length === 0 ? (
-          <p className="muted-text" style={{ fontSize: '.875rem' }}>No newsletters published yet.</p>
+          <p className="muted-text" style={{ fontSize: '.875rem' }}>{sections.newsletter_empty_msg}</p>
         ) : (
           <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             {newsletters.map((n) => (
@@ -238,11 +225,11 @@ export default function ResourcesPage() {
       {ejournalIssues && ejournalIssues.length > 0 && (
         <section className="container" style={{ padding: '2rem 1rem', borderTop: '1px solid var(--border)' }}>
           <div style={{ marginBottom: '1.5rem' }}>
-            <div className="tiny-eyebrow">Branch publication</div>
-            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>e-Journal Archive</h2>
-            <p className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
-              Long-form articles authored by the Nagpur Branch — quarterly and special issues.
-            </p>
+            <div className="tiny-eyebrow">{sections.ejournal_eyebrow}</div>
+            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>{sections.ejournal_heading}</h2>
+            <div className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
+              {renderMarkdown(sections.ejournal_subtitle)}
+            </div>
           </div>
 
           <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
@@ -274,7 +261,7 @@ export default function ResourcesPage() {
       )}
 
       {/* Paper Presentations — own section with its own search/filter state */}
-      <PapersSection user={user} initialErr={err} />
+      <PapersSection user={user} initialErr={err} sections={sections} />
     </>
   );
 }
@@ -282,7 +269,7 @@ export default function ResourcesPage() {
 // ─── Paper Presentations section ───────────────────────────────────────────
 // Lives outside the parent so a search keystroke doesn't re-render the four
 // link tiles or the newsletter grid.
-function PapersSection({ user, initialErr }) {
+function PapersSection({ user, initialErr, sections }) {
   // Filter state — seeded from URL hash so a filtered URL is shareable.
   const initialQuery = readHashQuery();
   const [q,        setQ]        = useState(initialQuery.get('q') || '');
@@ -365,11 +352,11 @@ function PapersSection({ user, initialErr }) {
   return (
     <section className="container" style={{ padding: '2rem 1rem 4rem', borderTop: '1px solid var(--border)' }}>
       <div style={{ marginBottom: '1.5rem' }}>
-        <div className="tiny-eyebrow">Seminars & Conferences</div>
-        <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>Paper Presentations</h2>
-        <p className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
-          Presentations and papers from past conferences and seminars held at the Nagpur Branch.
-        </p>
+        <div className="tiny-eyebrow">{sections.papers_eyebrow}</div>
+        <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.3rem, 4.2vw, 1.75rem)', fontWeight: 700, lineHeight: 1.15 }}>{sections.papers_heading}</h2>
+        <div className="muted-text" style={{ marginTop: '.5rem', maxWidth: '44rem', fontSize: '.875rem' }}>
+          {renderMarkdown(sections.papers_subtitle)}
+        </div>
       </div>
 
       {/* ── Filter bar ───────────────────────────────────────────────── */}
@@ -380,7 +367,7 @@ function PapersSection({ user, initialErr }) {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search title, abstract or speaker…"
+            placeholder={sections.papers_search_placeholder || 'Search title, abstract or speaker…'}
             aria-label="Search papers"
           />
         </div>
@@ -420,10 +407,9 @@ function PapersSection({ user, initialErr }) {
         </div>
       )}
 
-      {/* Mandatory disclaimer per Web-Media Policy 5p */}
+      {/* Mandatory disclaimer per Web-Media Policy 5p — admin-editable */}
       <div className="res-disclaimer">
-        <strong>Disclaimer:</strong> The views expressed in these presentations are of the Speaker himself/herself.
-        The Institute of Chartered Accountants of India does not subscribe to his/her views.
+        {renderMarkdown(sections.papers_disclaimer)}
       </div>
 
       {err && <p style={{ color: 'var(--destructive)', fontSize: '.875rem' }}>{err}</p>}

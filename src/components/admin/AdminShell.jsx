@@ -7,6 +7,7 @@ import {
   IconCalendar, IconUsers, IconAward, IconShield, IconBriefcase, IconHeart,
   IconFileText, IconSettings, IconArrowLeft, IconLogOut, IconMenu, IconX,
   IconCheckCircle, IconBookOpen, IconMapPin, IconGraduationCap, IconHandshake,
+  IconMessageSquare,
 } from '../../icons';
 import caIndiaLogo from '../../assets/CA India Logo.png';
 
@@ -59,6 +60,8 @@ const NAV_GROUPS = [
       { to: '/admin/mock-tests',            label: 'Mock tests',    Icon: IconGraduationCap, roles: [ROLE_WICASA] },
       { to: '/admin/mentorship',            label: 'Mentorship',    Icon: IconHandshake,     roles: [ROLE_WICASA] },
       { to: '/admin/articleship-matches',   label: 'Articleship matching', Icon: IconHandshake, roles: [ROLE_WICASA] },
+      { to: '/admin/student-suggestions',         label: 'Suggestions',        Icon: IconMessageSquare, roles: [ROLE_WICASA, ROLE_CHAIRMAN] },
+      { to: '/admin/student-suggestion-topics',   label: 'Suggestion topics',  Icon: IconSettings,      roles: [ROLE_WICASA, ROLE_CHAIRMAN] },
     ],
   },
   {
@@ -99,6 +102,7 @@ const NAV_GROUPS = [
       { to: '/admin/paper-presentations',  label: 'Paper presentations',  Icon: IconFileText, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
       { to: '/admin/newsletters',          label: 'Newsletter',           Icon: IconBookOpen, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/gallery',              label: 'Photo gallery',        Icon: IconFileText, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
+      { to: '/admin/gallery-videos',       label: 'Video gallery',        Icon: IconFileText, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
       { to: '/admin/office-bearers',       label: 'Office bearers',       Icon: IconUsers,    roles: [ROLE_CHAIRMAN] },
       { to: '/admin/annual-reports',       label: 'Annual reports',       Icon: IconFileText, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/site-settings',        label: 'Site settings',        Icon: IconSettings, roles: [] /* admin-only */ },

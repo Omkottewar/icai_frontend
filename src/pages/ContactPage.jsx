@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { IconMapPin, IconMail, IconPhone, IconClock, IconCheckCircle, IconX } from '../icons';
 import { useSiteSettings } from '../hooks/useSiteSettings';
+import { useSiteContent } from '../hooks/useSiteContent';
 import { useRecaptcha } from '../hooks/useRecaptcha';
+import { renderMarkdown } from '../lib/markdown.jsx';
 import Button from '../components/ui/Button';
 
 const AGAINST_TYPES = [
@@ -25,6 +27,8 @@ const EMPTY = {
 
 export default function ContactPage() {
   const { settings } = useSiteSettings();
+  const header   = useSiteContent('contact_page_header');
+  const sections = useSiteContent('contact_sections');
   const { execute: executeRecaptcha, enabled: captchaEnabled } = useRecaptcha();
   const [form, setForm] = useState(EMPTY);
   const [subjects, setSubjects] = useState(FALLBACK_SUBJECTS);
@@ -77,10 +81,10 @@ export default function ContactPage() {
 
   return (
     <>
-      <PageHeader title="Contact the Branch" subtitle="Raise a grievance, share a suggestion, or send a general query. We aim to respond within 48 hours." />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: '3rem 1rem', display: 'grid', gap: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
         <div className="card">
-          <h3 style={{ fontWeight: 600, fontSize: '1.125rem' }}>ICAI Bhawan, Nagpur</h3>
+          <h3 style={{ fontWeight: 600, fontSize: '1.125rem' }}>{sections.info_card_title}</h3>
           <ul className="col gap-3 muted-text" style={{ listStyle: 'none', padding: 0, marginTop: '1rem', fontSize: '.875rem' }}>
             <li className="row gap-2"><IconMapPin size="sm" /> {settings.branch_address}</li>
             <li className="row gap-2"><IconMail size="sm" /> {settings.branch_email}</li>
@@ -88,24 +92,30 @@ export default function ContactPage() {
             <li className="row gap-2"><IconClock size="sm" /> {settings.branch_hours}</li>
           </ul>
           <div style={{ marginTop: '1.25rem' }}>
-            <a className="btn btn-ghost" href="#/track-grievance">Track an existing ticket →</a>
+            <a className="btn btn-ghost" href="#/track-grievance">{sections.track_link_label}</a>
           </div>
         </div>
 
         <div className="card">
-          <h3 style={{ fontWeight: 600, fontSize: '1.125rem' }}>Send a message</h3>
+          <h3 style={{ fontWeight: 600, fontSize: '1.125rem' }}>{sections.form_card_title}</h3>
 
           {ticketNo ? (
             <div className="col gap-3" style={{ marginTop: '1rem' }}>
               <div className="alert alert-success">
-                <IconCheckCircle size="sm" /> Thanks — your message has been logged. Reference:{' '}
-                <strong>{ticketNo}</strong>. A confirmation has been emailed to {submittedEmail}.
+                <IconCheckCircle size="sm" />{' '}
+                {/* Markdown rendered with {ticketNo}/{email} placeholder
+                    substitution so the admin keeps full control over wording. */}
+                {renderMarkdown(
+                  (sections.success_message || '')
+                    .replace(/\{ticketNo\}/g, ticketNo)
+                    .replace(/\{email\}/g, submittedEmail)
+                )}
               </div>
               <div className="row gap-2">
-                <a className="btn btn-primary" href={trackHref}>Track this ticket</a>
+                <a className="btn btn-primary" href={trackHref}>{sections.track_button_label}</a>
                 <button type="button" className="btn btn-ghost"
                   onClick={() => { setTicketNo(''); setForm(EMPTY); }}>
-                  Submit another
+                  {sections.another_button_label}
                 </button>
               </div>
             </div>
@@ -170,7 +180,7 @@ export default function ContactPage() {
 
               <Button className="btn btn-primary" type="submit" loading={busy}
                 style={{ justifyContent: 'center' }}>
-                {busy ? 'Sending…' : 'Send message'}
+                {busy ? sections.submit_busy_label : sections.submit_button_label}
               </Button>
 
               {captchaEnabled && (

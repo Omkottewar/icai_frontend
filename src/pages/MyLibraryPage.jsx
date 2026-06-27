@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
+import { useSiteContent } from '../hooks/useSiteContent';
 import { IconBookOpen, IconAward } from '../icons';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 
@@ -18,6 +19,7 @@ async function api(url) {
 
 export default function MyLibraryPage() {
   const { user, loading } = useAuth();
+  const header = useSiteContent('my_library_page_header');
   const [items, setItems] = useState(null);
   const [cpe, setCpe] = useState(null);
 
@@ -32,7 +34,7 @@ export default function MyLibraryPage() {
 
   return (
     <>
-      <PageHeader title="My Library" subtitle="Your saved papers and CPE history." />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '900px' }}>
         {/* CPE summary tile */}
         {cpe && (

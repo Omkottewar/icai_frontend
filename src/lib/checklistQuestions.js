@@ -246,6 +246,35 @@ export const MCM_ROLE_CODES = [
   'branch_treasurer',
 ];
 
+// ─── Per-picker role scopes ──────────────────────────────────────────────
+// The "Who fills each section?" dialog has two distinct dropdowns. They
+// shouldn't show the same set of people:
+//
+//   FILLER  — the person who actually does the pre-event paperwork.
+//             Real-world: Committee Chairman runs their own committee's
+//             events; for student-wing events (WICASA), members of the
+//             WICASA committee fill it. We narrow to committee chairs +
+//             other committee officers + MCM (which is how WICASA members
+//             show up — they're MCM-tagged on the WICASA committee).
+//
+//   APPROVER — the person who signs off. Real-world: Branch Chairman or
+//              Treasurer — nobody else has approval authority over a
+//              committee's event paperwork.
+//
+// These lists are passed to the existing /api/admin/users endpoint as the
+// `role_codes` filter, and then filtered client-side per picker so we
+// only fetch the user directory once.
+export const FILLER_ROLE_CODES = [
+  'committee_chairman',
+  'committee_convener',
+  'committee_co_convener',
+  'mcm',
+];
+export const APPROVER_ROLE_CODES = [
+  'branch_chairman',
+  'branch_treasurer',
+];
+
 // Lookup: role_code → human label, used by the user picker to show
 // "Akshara Soni · Committee Chairman" next to each name.
 export const ROLE_CODE_LABEL = Object.fromEntries(

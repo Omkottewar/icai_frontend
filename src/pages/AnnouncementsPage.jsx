@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAnnouncements } from '../hooks/useAnnouncements';
+import { useSiteContent } from '../hooks/useSiteContent';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import { IconCalendar, IconArrowRight } from '../icons';
 import { renderMarkdown } from '../lib/markdown.jsx';
@@ -57,14 +58,12 @@ function AnnouncementRow({ index, item }) {
 
 export default function AnnouncementsPage() {
   const { data, loading, error } = useAnnouncements();
+  const header = useSiteContent('announcements_page_header');
   const items = useMemo(() => data?.items ?? [], [data]);
 
   return (
     <>
-      <PageHeader
-        title="Announcements"
-        subtitle="Latest updates from ICAI Nagpur Branch — events, circulars, deadlines, and important notices."
-      />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: 'clamp(1.5rem, 4vw, 2.5rem) 1rem' }}>
         {loading && (
           <ol className="ann-list" aria-hidden="true">
@@ -89,10 +88,10 @@ export default function AnnouncementsPage() {
 
         {!loading && !error && items.length === 0 && (
           <div className="ann-empty">
-            <h2>No active announcements right now</h2>
-            <p className="muted-text">
-              Check back soon — branch updates, events, and circulars will appear here.
-            </p>
+            <h2>{header.empty_state_heading}</h2>
+            <div className="muted-text">
+              {renderMarkdown(header.empty_state_body)}
+            </div>
           </div>
         )}
 

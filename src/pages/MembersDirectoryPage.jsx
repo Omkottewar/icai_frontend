@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { cachedGet } from '../lib/apiCache';
+import { useSiteContent } from '../hooks/useSiteContent';
+import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconSearch, IconArrowRight, IconLock } from '../icons';
 import { ShimmerTableRow } from '../components/ui/Shimmer';
 
@@ -38,6 +40,7 @@ function useDirectoryData(q, statusFilter, page) {
 }
 
 export default function MembersDirectoryPage() {
+  const header = useSiteContent('members_directory_page_header');
   const [query, setQuery]           = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -52,7 +55,7 @@ export default function MembersDirectoryPage() {
 
   return (
     <>
-      <PageHeader title="Members' Directory" subtitle="Nagpur Branch — registered members list" />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
 
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
 
@@ -63,8 +66,7 @@ export default function MembersDirectoryPage() {
             border: '1px solid oklch(0.50 0.16 145 / 0.2)',
             borderRadius: '.5rem', padding: '.875rem 1rem', marginBottom: '1.5rem', fontSize: '.8125rem',
           }}>
-            <strong>Confidential:</strong> This directory is restricted to members under the jurisdiction
-            of the Nagpur Branch. Do not share or reproduce member contact details outside authorised use.
+            {renderMarkdown(header.confidential_notice)}
           </div>
         ) : (
           <div className="row gap-2" style={{
@@ -75,8 +77,8 @@ export default function MembersDirectoryPage() {
           }}>
             <span style={{ color: 'oklch(0.45 0.18 75)', marginTop: 2 }}><IconLock size="sm" /></span>
             <div style={{ flex: 1, minWidth: '14rem' }}>
-              <strong>Sign in to see contact details.</strong>{' '}
-              You're viewing the public roster. Members can sign in to access phone, email and firm information.
+              <strong>{header.signin_notice_title}</strong>{' '}
+              {renderMarkdown(header.signin_notice_body)}
             </div>
             <a href="#/login" className="btn btn-primary" style={{ padding: '.3rem .75rem', fontSize: '.75rem', whiteSpace: 'nowrap' }}>
               Sign in <IconArrowRight size="sm" />

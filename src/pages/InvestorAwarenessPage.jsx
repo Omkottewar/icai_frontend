@@ -1,34 +1,27 @@
 import GenericPage from '../components/ui/GenericPage';
+import { useSiteContent } from '../hooks/useSiteContent';
+import { renderMarkdown } from '../lib/markdown.jsx';
 
+// Page copy + the upcoming-sessions list live in the
+// `investor_awareness_content` slot. The sessions list is rendered as
+// markdown (admin edits a bullet list); the page no longer ships with a
+// hardcoded 3-session array.
 export default function InvestorAwarenessPage() {
+  const c = useSiteContent('investor_awareness_content');
   return (
     <GenericPage
-      title="Investor Awareness"
-      subtitle="Free programmes promoting financial literacy and safe investing."
+      title={c.title}
+      subtitle={c.subtitle}
       body={
         <div className="col gap-5">
-          <p className="muted-text" style={{ lineHeight: 1.6 }}>
-            The branch conducts public investor awareness programmes in association with regulators and industry
-            bodies to promote financial literacy, safe investing, fraud awareness and basic personal finance for
-            students, salaried individuals and senior citizens.
-          </p>
+          <div className="muted-text" style={{ lineHeight: 1.6 }}>
+            {renderMarkdown(c.intro)}
+          </div>
           <div className="card">
-            <h3 style={{ fontWeight: 600 }}>Upcoming sessions</h3>
-            <ul className="col gap-3" style={{ marginTop: '.75rem', padding: 0, listStyle: 'none' }}>
-              {[
-                { t: 'Financial Planning for Young Professionals', d: '12 May · ICAI Bhawan' },
-                { t: 'Beware of Online Investment Frauds', d: '19 May · Online' },
-                { t: "Senior Citizens' Money Health", d: '26 May · Chitnavis Centre' },
-              ].map((s) => (
-                <li key={s.t} className="row" style={{ justifyContent: 'space-between', padding: '.75rem 0', borderBottom: '1px solid var(--border)' }}>
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: '.875rem' }}>{s.t}</div>
-                    <div className="muted-text" style={{ fontSize: '.75rem' }}>{s.d}</div>
-                  </div>
-                  <button className="btn btn-outline" style={{ padding: '.4rem .9rem' }}>Reserve</button>
-                </li>
-              ))}
-            </ul>
+            <h3 style={{ fontWeight: 600 }}>{c.sessions_heading}</h3>
+            <div className="muted-text" style={{ marginTop: '.75rem' }}>
+              {renderMarkdown(c.sessions_body)}
+            </div>
           </div>
         </div>
       }

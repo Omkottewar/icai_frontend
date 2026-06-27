@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Drawer from '../../components/admin/Drawer';
 import FormField from '../../components/admin/FormField';
@@ -10,6 +10,7 @@ import { SITE_CONTENT_DEFAULTS } from '../../hooks/useSiteContent';
 import { renderMarkdown } from '../../lib/markdown.jsx';
 import Button from '../../components/ui/Button';
 import ImageCropper from '../../components/ui/ImageCropper';
+import FlipMenu from '../../components/ui/FlipMenu';
 
 function formatWhen(ts) {
   if (!ts) return '—';
@@ -17,8 +18,10 @@ function formatWhen(ts) {
   return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-// Admin index of all editable site-content slots. Each slot is a card with
-// its current "last edited" stamp; clicking opens the per-slot drawer form.
+// Admin index of all editable site-content slots. Pages are arranged as
+// a tab bar at the top — each tab holds the slot cards for that page so
+// the admin only sees what's relevant. Clicking a slot card opens the
+// per-slot drawer form.
 export default function SiteContentAdminPage() {
   const { showToast } = useAuth();
   const [editingSlug, setEditingSlug] = useState(null);
@@ -31,80 +34,196 @@ export default function SiteContentAdminPage() {
   const { data: committeesData } = useAdminList('/api/admin/committees', {});
   const committees = committeesData?.rows ?? [];
 
-  // Group slots by `page` (Home, About, …) so the admin can navigate the
-  // sections that match what they see on the live site.
+  // Group slots by `page` (Home, About, …) so each tab only shows the
+  // slots the admin would expect to find on that page.
   const slotsByPage = SLOT_SLUGS.reduce((acc, slug) => {
     const def = SITE_SLOTS[slug];
     (acc[def.page] ||= []).push(slug);
     return acc;
   }, {});
 
+  // The "Events" page tab is special — it has no static slots (its
+  // contents are dynamic per-committee), so we add it manually to the tab
+  // list whenever committees exist.
+  const pages = Object.keys(slotsByPage);
+  if (committees.length > 0 && !pages.includes('Events')) pages.push('Events');
+
+  const [activePage, setActivePage] = useState(pages[0] || 'Home');
+
+  // If the active page disappears from the data (e.g. a fresh install
+  // where committees haven't loaded yet), snap back to the first page so
+  // we don't render an empty tab body.
+  useEffect(() => {
+    if (!pages.includes(activePage) && pages[0]) setActivePage(pages[0]);
+  }, [pages, activePage]);
+
   const committeeRow = rowsBySlug.get('about_committee_members');
+
+  const pageSlugs = slotsByPage[activePage] || [];
 
   return (
     <AdminLayout
       title="Site content"
-      subtitle="Editable text and images on the public site"
+      subtitle="Edit every text and image on the public site. Pick a page tab below."
     >
-      {Object.entries(slotsByPage).map(([page, slugs]) => (
-        <section key={page} style={{ marginBottom: '2rem' }}>
-          <div className="tiny-eyebrow" style={{ marginBottom: '.75rem' }}>{page} page</div>
-          <div style={{ display: 'grid', gap: '.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-            {slugs.map((slug) => {
-              const def = SITE_SLOTS[slug];
-              const row = rowsBySlug.get(slug);
-              return (
-                <button
-                  key={slug}
-                  type="button"
-                  className="card"
-                  onClick={() => setEditingSlug(slug)}
-                  style={{
-                    textAlign: 'left', cursor: 'pointer',
-                    border: '1px solid var(--border)', background: 'var(--card)',
-                    padding: '1rem', width: '100%',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>{def.label}</div>
-                  <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
-                    {def.fields.length} field{def.fields.length !== 1 ? 's' : ''} · last edited {formatWhen(row?.updated_at)}
-                  </div>
-                  {!row && (
-                    <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
-                      Using default content
-                    </div>
-                  )}
-                </button>
-              );
-            })}
+      {/* Tab bar — one tab per public page that has editable content. */}
+      <div role="tablist" aria-label="Page" className="site-content-tabs">
+        {pages.map((page) => {
+          const isActive = page === activePage;
+          // Slot count badge so the admin can see at a glance which page
+          // has the most editable surface.
+          const slotCount = (slotsByPage[page] || []).length
+            + (page === 'About' ? 1 : 0)              // committee-members card
+            + (page === 'Events' ? committees.length : 0);
+          return (
+            <button
+              key={page}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActivePage(page)}
+              className={'site-content-tab' + (isActive ? ' is-active' : '')}
+            >
+              {page}
+              <span className="site-content-tab-count">{slotCount}</span>
+            </button>
+          );
+        })}
+      </div>
 
-            {page === 'About' && (
-              <button
-                type="button"
-                className="card"
-                onClick={() => setEditingCommittee(true)}
-                style={{
-                  textAlign: 'left', cursor: 'pointer',
-                  border: '1px solid var(--border)', background: 'var(--card)',
-                  padding: '1rem', width: '100%',
-                }}
-              >
-                <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>Committee Members</div>
-                <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
-                  {committeeRow
-                    ? `${(committeeRow.data?.members ?? []).length} member${(committeeRow.data?.members ?? []).length !== 1 ? 's' : ''} · last edited ${formatWhen(committeeRow.updated_at)}`
-                    : 'Managing committee roster for the About page'}
+      <style>{`
+        .site-content-tabs {
+          display: flex;
+          gap: .25rem;
+          flex-wrap: wrap;
+          padding: .25rem;
+          background: var(--muted, #f1f5f9);
+          border-radius: .6rem;
+          margin-bottom: 1.5rem;
+        }
+        .site-content-tab {
+          display: inline-flex;
+          align-items: center;
+          gap: .5rem;
+          padding: .55rem 1rem;
+          border: none;
+          background: transparent;
+          color: var(--muted-foreground);
+          font-weight: 600;
+          font-size: .875rem;
+          border-radius: .45rem;
+          cursor: pointer;
+          transition: background .15s ease, color .15s ease;
+        }
+        .site-content-tab:hover { color: var(--foreground); }
+        .site-content-tab.is-active {
+          background: var(--card, #fff);
+          color: var(--primary);
+          box-shadow: 0 1px 2px rgba(0,0,0,.06);
+        }
+        .site-content-tab-count {
+          font-size: .7rem;
+          font-weight: 700;
+          padding: .1rem .45rem;
+          border-radius: 999px;
+          background: var(--muted, #f1f5f9);
+          color: var(--muted-foreground);
+        }
+        .site-content-tab.is-active .site-content-tab-count {
+          background: oklch(0.93 0.06 255);
+          color: var(--primary);
+        }
+      `}</style>
+
+      {/* Body for the currently-selected page tab. */}
+      <div style={{ display: 'grid', gap: '.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+        {pageSlugs.map((slug) => {
+          const def = SITE_SLOTS[slug];
+          const row = rowsBySlug.get(slug);
+          return (
+            <button
+              key={slug}
+              type="button"
+              className="card"
+              onClick={() => setEditingSlug(slug)}
+              style={{
+                textAlign: 'left', cursor: 'pointer',
+                border: '1px solid var(--border)', background: 'var(--card)',
+                padding: '1rem', width: '100%',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>{def.label}</div>
+              <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+                {def.fields.length} field{def.fields.length !== 1 ? 's' : ''} · last edited {formatWhen(row?.updated_at)}
+              </div>
+              {!row && (
+                <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+                  Using default content
                 </div>
-                {!committeeRow && (
-                  <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
-                    Not configured
-                  </div>
-                )}
-              </button>
+              )}
+            </button>
+          );
+        })}
+
+        {activePage === 'About' && (
+          <button
+            type="button"
+            className="card"
+            onClick={() => setEditingCommittee(true)}
+            style={{
+              textAlign: 'left', cursor: 'pointer',
+              border: '1px solid var(--border)', background: 'var(--card)',
+              padding: '1rem', width: '100%',
+            }}
+          >
+            <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>Committee Members</div>
+            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+              {committeeRow
+                ? `${(committeeRow.data?.members ?? []).length} member${(committeeRow.data?.members ?? []).length !== 1 ? 's' : ''} · last edited ${formatWhen(committeeRow.updated_at)}`
+                : 'Managing committee roster for the About page'}
+            </div>
+            {!committeeRow && (
+              <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+                Not configured
+              </div>
             )}
+          </button>
+        )}
+
+        {activePage === 'Events' && committees.map((c) => {
+          const slug = `event_committee_${c.code.toLowerCase()}`;
+          const row = rowsBySlug.get(slug);
+          return (
+            <button
+              key={c.id}
+              type="button"
+              className="card"
+              onClick={() => setEditingCommitteeContent(c.code)}
+              style={{
+                textAlign: 'left', cursor: 'pointer',
+                border: '1px solid var(--border)', background: 'var(--card)',
+                padding: '1rem', width: '100%',
+              }}
+            >
+              <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>{c.name}</div>
+              <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+                Chairman photo & message · last edited {formatWhen(row?.updated_at)}
+              </div>
+              {!row && (
+                <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
+                  Not configured
+                </div>
+              )}
+            </button>
+          );
+        })}
+
+        {pageSlugs.length === 0 && activePage !== 'About' && activePage !== 'Events' && (
+          <div className="muted-text" style={{ fontSize: '.85rem', fontStyle: 'italic' }}>
+            No editable content on this page yet.
           </div>
-        </section>
-      ))}
+        )}
+      </div>
 
       {editingSlug && (
         <SlotDrawer
@@ -114,42 +233,6 @@ export default function SiteContentAdminPage() {
           onSaved={() => { refresh(); invalidate('/api/site/content'); }}
           showToast={showToast}
         />
-      )}
-
-      {/* Events — per-committee chairman content */}
-      {committees.length > 0 && (
-        <section style={{ marginBottom: '2rem' }}>
-          <div className="tiny-eyebrow" style={{ marginBottom: '.75rem' }}>Events page</div>
-          <div style={{ display: 'grid', gap: '.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-            {committees.map((c) => {
-              const slug = `event_committee_${c.code.toLowerCase()}`;
-              const row = rowsBySlug.get(slug);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="card"
-                  onClick={() => setEditingCommitteeContent(c.code)}
-                  style={{
-                    textAlign: 'left', cursor: 'pointer',
-                    border: '1px solid var(--border)', background: 'var(--card)',
-                    padding: '1rem', width: '100%',
-                  }}
-                >
-                  <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>{c.name}</div>
-                  <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
-                    Chairman photo & message · last edited {formatWhen(row?.updated_at)}
-                  </div>
-                  {!row && (
-                    <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
-                      Not configured
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </section>
       )}
 
       {editingCommittee && (
@@ -384,6 +467,8 @@ function ImageField({ field, value, onChange, showToast }) {
           file={pendingFile}
           onConfirm={uploadCropped}
           onCancel={() => setPendingFile(null)}
+          minWidth={field.minWidth || 0}
+          minHeight={field.minHeight || 0}
         />
       )}
     </FormField>
@@ -704,47 +789,15 @@ function CommitteeMemberRow({ index, member, isFirst, isLast, onChange, onSelect
               </button>
             </div>
           ) : (
-            <div style={{ position: 'relative' }}>
-              <input
-                className="input-base"
-                placeholder="Search user by name or email…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onFocus={() => results.length && setOpen(true)}
-                onBlur={() => setTimeout(() => setOpen(false), 150)}
-              />
-              {searching && (
-                <span style={{
-                  position: 'absolute', right: '.65rem', top: '50%', transform: 'translateY(-50%)',
-                  fontSize: '.72rem', color: 'var(--muted-foreground)', pointerEvents: 'none',
-                }}>
-                  Searching…
-                </span>
-              )}
-              {open && results.length > 0 && (
-                <div style={{
-                  position: 'absolute', zIndex: 50, top: 'calc(100% + 4px)', left: 0, right: 0,
-                  background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '.375rem',
-                  boxShadow: '0 4px 12px rgba(0,0,0,.12)', maxHeight: 220, overflowY: 'auto',
-                }}>
-                  {results.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onMouseDown={() => selectUser(u)}
-                      style={{
-                        display: 'block', width: '100%', textAlign: 'left',
-                        padding: '.5rem .75rem', background: 'transparent', border: 'none',
-                        cursor: 'pointer', fontSize: '.875rem',
-                      }}
-                    >
-                      <div style={{ fontWeight: 500 }}>{u.name}</div>
-                      <div className="muted-text" style={{ fontSize: '.75rem' }}>{u.email}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <UserSearchDropdown
+              query={query}
+              setQuery={setQuery}
+              open={open}
+              setOpen={setOpen}
+              results={results}
+              searching={searching}
+              selectUser={selectUser}
+            />
           )}
           {roleError && (
             <div style={{ fontSize: '.75rem', color: 'var(--destructive)', marginTop: '-.25rem' }}>
@@ -966,5 +1019,63 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
         </div>
       </div>
     </Drawer>
+  );
+}
+
+// ─── User search dropdown — wraps the input + FlipMenu autocomplete. ────
+// Extracted so the input has a stable ref the portal can anchor against.
+// Used inside the Committee Members drawer to pick a user by name / email.
+function UserSearchDropdown({ query, setQuery, open, setOpen, results, searching, selectUser }) {
+  const inputRef = useRef(null);
+  return (
+    <div style={{ position: 'relative' }}>
+      <input
+        ref={inputRef}
+        className="input-base"
+        placeholder="Search user by name or email…"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => results.length && setOpen(true)}
+        // 150ms delay lets a mouseDown on a result fire before the input
+        // blurs and closes the menu.
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {searching && (
+        <span style={{
+          position: 'absolute', right: '.65rem', top: '50%', transform: 'translateY(-50%)',
+          fontSize: '.72rem', color: 'var(--muted-foreground)', pointerEvents: 'none',
+        }}>
+          Searching…
+        </span>
+      )}
+      <FlipMenu
+        open={open && results.length > 0}
+        triggerRef={inputRef}
+        onClose={() => setOpen(false)}
+        align="stretch"
+        offset={4}
+        maxHeight={240}
+        style={{
+          background: 'var(--card)', border: '1px solid var(--border)', borderRadius: '.375rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,.12)',
+        }}
+      >
+        {results.map((u) => (
+          <button
+            key={u.id}
+            type="button"
+            onMouseDown={() => selectUser(u)}
+            style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              padding: '.5rem .75rem', background: 'transparent', border: 'none',
+              cursor: 'pointer', fontSize: '.875rem',
+            }}
+          >
+            <div style={{ fontWeight: 500 }}>{u.name}</div>
+            <div className="muted-text" style={{ fontSize: '.75rem' }}>{u.email}</div>
+          </button>
+        ))}
+      </FlipMenu>
+    </div>
   );
 }

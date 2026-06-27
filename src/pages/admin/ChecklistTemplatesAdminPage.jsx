@@ -15,6 +15,7 @@ import { IconPlus, IconCopy, IconTrash, IconCheckCircle, IconEdit, IconEye } fro
 import { Shimmer, ShimmerLines, ShimmerDrawerBody } from '../../components/ui/Shimmer';
 import { dialog } from '../../lib/dialog';
 import Button from '../../components/ui/Button';
+import FlipMenu from '../../components/ui/FlipMenu';
 
 function fmt(d) {
   if (!d) return '—';
@@ -1165,21 +1166,10 @@ function SectionCard({
   // The collapse chevron is for managing long templates with 8+ sections.
   // The pre-section group (no heading) is never collapsible.
   const [collapsed, setCollapsed] = useState(false);
-  // Settings popover (⋯ menu). Used to live alongside a role picker
-  // ("Who reviews this section?"); per F21 the role picker is gone —
-  // filler + approver are decided exclusively at event-checklist creation.
+  // Settings popover (⋯ menu). FlipMenu handles click-outside + portal
+  // positioning + auto-flip-up when near the viewport bottom.
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsRef = useRef(null);
-  useEffect(() => {
-    if (!settingsOpen) return;
-    const close = (e) => {
-      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
-        setSettingsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [settingsOpen]);
+  const settingsTriggerRef = useRef(null);
 
   return (
     <div className="sc-card">
@@ -1214,8 +1204,9 @@ function SectionCard({
           {collapsed && (
             <span className="sc-count">{items.length} question{items.length === 1 ? '' : 's'}</span>
           )}
-          <div ref={settingsRef} className="sc-settings-wrap">
+          <div className="sc-settings-wrap">
             <button
+              ref={settingsTriggerRef}
               type="button"
               className="sc-settings-trigger"
               onClick={() => setSettingsOpen((o) => !o)}
@@ -1225,17 +1216,22 @@ function SectionCard({
             >
               ⋯
             </button>
-            {settingsOpen && (
-              <div className="sc-settings-menu">
-                <button
-                  type="button"
-                  className="sc-settings-remove"
-                  onClick={() => { setSettingsOpen(false); onRemoveSection(); }}
-                >
-                  Remove section
-                </button>
-              </div>
-            )}
+            <FlipMenu
+              open={settingsOpen}
+              triggerRef={settingsTriggerRef}
+              onClose={() => setSettingsOpen(false)}
+              align="right"
+              minWidth={224}
+              className="sc-settings-menu"
+            >
+              <button
+                type="button"
+                className="sc-settings-remove"
+                onClick={() => { setSettingsOpen(false); onRemoveSection(); }}
+              >
+                Remove section
+              </button>
+            </FlipMenu>
           </div>
         </div>
       )}
@@ -1377,9 +1373,8 @@ function SectionCard({
         .sc-settings-trigger:hover {
           background: white; border-color: var(--border); color: var(--foreground);
         }
+        /* FlipMenu owns position + portal; we only style the surface. */
         .sc-settings-menu {
-          position: absolute; top: calc(100% + .25rem); right: 0;
-          z-index: 6; min-width: 14rem;
           background: white; border: 1px solid var(--border);
           border-radius: .5rem; box-shadow: 0 6px 22px rgba(0,0,0,.1);
           padding: .65rem;

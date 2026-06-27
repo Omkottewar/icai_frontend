@@ -30,15 +30,10 @@ function EventRowsShimmer({ count = 4 }) {
   );
 }
 
-// Single hero fallback when a committee row carries no admin-supplied image.
-// Replace with a `committees.hero_image_url` column if admins should pick.
-const FALLBACK_COMMITTEE_IMG = 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=600&h=420&q=80&auto=format&fit=crop';
-
-const AUDIENCE_TABS = [
-  { key: 'All',      label: 'All Events' },
-  { key: 'Members',  label: 'For Members' },
-  { key: 'Students', label: 'For Students' },
-];
+// Audience tab keys are structural (they have to match the `audience` value
+// on events). The actual labels are admin-editable via the
+// `events_audience_tabs` slot.
+const AUDIENCE_KEYS = ['All', 'Members', 'Students'];
 
 function CommitteeChairmanSection({ code }) {
   const content = useSiteContent(`event_committee_${code.toLowerCase()}`);
@@ -96,10 +91,21 @@ function toCardInfo(committee) {
 
 export default function EventsPage() {
   const route = useRoute();
+  const header        = useSiteContent('events_page_header');
+  const tabs          = useSiteContent('events_audience_tabs');
+  const sections      = useSiteContent('events_sections');
+  const committeeImg  = useSiteContent('events_committee_fallback');
+
+  const AUDIENCE_TABS = useMemo(() => ([
+    { key: 'All',      label: tabs.all_label },
+    { key: 'Members',  label: tabs.members_label },
+    { key: 'Students', label: tabs.students_label },
+  ]), [tabs]);
+
   const selectedCommittee = route.query.committee || null;
   // Seed audience from ?audience= so deep-links from the public Students /
   // Members pages land pre-filtered. Falls back to 'All' for stray values.
-  const initialAudience = AUDIENCE_TABS.find((t) => t.key === route.query.audience)?.key || 'All';
+  const initialAudience = AUDIENCE_KEYS.includes(route.query.audience) ? route.query.audience : 'All';
   const [audience, setAudience] = useState(initialAudience);
   const [view, setView] = useState('list'); // 'list' | 'month'
 
@@ -124,7 +130,10 @@ export default function EventsPage() {
 
     return (
       <>
-        <PageHeader title={info.fullName} subtitle={`Upcoming events from the ${info.short} committee`} />
+        <PageHeader
+          title={info.fullName}
+          subtitle={(header.committee_subtitle_template || '').replace(/\{short\}/g, info.short)}
+        />
 
         <section className="container" style={{ padding: '2rem 1rem' }}>
           <button
@@ -132,14 +141,14 @@ export default function EventsPage() {
             className="btn btn-outline"
             style={{ padding: '.4rem .9rem', marginBottom: '1.5rem' }}
           >
-            <IconArrowLeft size="sm" /> All committees
+            <IconArrowLeft size="sm" /> {sections.all_committees_btn}
           </button>
 
-          {/* Committee details panel */}
+          {/* Committee details panel — fallback image admin-editable via events_committee_fallback */}
           <div className="committee-panel" style={{ '--cat-accent': info.color }}>
             <img
               className="committee-panel-img"
-              src={FALLBACK_COMMITTEE_IMG}
+              src={committeeImg.image_url}
               alt={info.fullName}
               loading="lazy"
             />
@@ -164,7 +173,7 @@ export default function EventsPage() {
             <div>{events.map((e) => <EventRow key={e.id ?? e.title} event={e} detailed />)}</div>
           ) : (
             <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
-              <p className="muted-text">No upcoming events for this committee right now. Check back soon.</p>
+              <p className="muted-text">{sections.empty_committee_msg}</p>
             </div>
           )}
         </section>
@@ -175,7 +184,7 @@ export default function EventsPage() {
   // ── Default events landing view ─────────────────────────────────────────
   return (
     <>
-      <PageHeader title="Events & CPE" subtitle="Upcoming programmes across all committees" />
+      <PageHeader title={header.title} subtitle={header.subtitle} />
 
       {/* Audience tab bar */}
       <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--card)', position: 'sticky', top: 64, zIndex: 10 }}>
@@ -216,18 +225,18 @@ export default function EventsPage() {
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
         <div className="row" style={{ marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           <div>
-            <div className="tiny-eyebrow">EVENTS</div>
-            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.375rem, 4.5vw, 1.875rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>Upcoming programmes and committees</h2>
+            <div className="tiny-eyebrow">{sections.events_eyebrow}</div>
+            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.375rem, 4.5vw, 1.875rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>{sections.events_title}</h2>
           </div>
           <div className="muted-text" style={{ fontSize: '.8125rem' }}>{audienceFiltered.length} programme{audienceFiltered.length !== 1 ? 's' : ''} scheduled</div>
         </div>
 
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem' }}>
-          <div className="tiny-eyebrow">UPCOMING EVENTS</div>
+          <div className="tiny-eyebrow">{sections.upcoming_eyebrow}</div>
           <div role="tablist" aria-label="View as" className="row" style={{ background: 'var(--muted)', borderRadius: '.4rem', padding: '.2rem' }}>
             {[
-              { key: 'list',  label: 'List' },
-              { key: 'month', label: 'Month' },
+              { key: 'list',  label: sections.view_list_label },
+              { key: 'month', label: sections.view_month_label },
             ].map((v) => {
               const active = view === v.key;
               return (
@@ -264,18 +273,18 @@ export default function EventsPage() {
         ) : audienceFiltered.length > 0 ? (
           <div>{audienceFiltered.map((e) => <EventRow key={e.id ?? e.title} event={e} detailed />)}</div>
         ) : (
-          <p className="muted-text">No upcoming events for this audience right now.</p>
+          <p className="muted-text">{sections.empty_audience_msg}</p>
         )}
       </section>
 
       {/* Committee categories */}
       <section className="container" style={{ padding: '0 1rem 4rem', borderTop: '1px solid var(--border)', marginTop: '1rem', paddingTop: '3rem' }}>
         <div style={{ marginBottom: '1.5rem' }}>
-          <div className="tiny-eyebrow">BROWSE BY COMMITTEE</div>
-          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.375rem, 4.5vw, 1.875rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>Committee categories</h2>
-          <p className="muted-text" style={{ marginTop: '.5rem', maxWidth: '40rem' }}>
-            Select a committee to open its dedicated page with every upcoming event.
-          </p>
+          <div className="tiny-eyebrow">{sections.committees_eyebrow}</div>
+          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.375rem, 4.5vw, 1.875rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>{sections.committees_title}</h2>
+          <div className="muted-text" style={{ marginTop: '.5rem', maxWidth: '40rem' }}>
+            {renderMarkdown(sections.committees_subtitle)}
+          </div>
         </div>
 
         {committees.length === 0 ? (
