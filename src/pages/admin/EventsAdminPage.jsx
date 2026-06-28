@@ -312,12 +312,12 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
   const onUpload = async (file) => {
     if (!file) return;
     // Per-type size cap mirrors the backend (admin/files.ts): images 6 MB,
-    // videos 30 MB. Catching it client-side avoids a slow base64 + upload
+    // videos 100 MB. Catching it client-side avoids a slow base64 + upload
     // round-trip just to be rejected.
     const isVideo = (file.type || '').startsWith('video/');
-    const cap = isVideo ? 30 * 1024 * 1024 : 6 * 1024 * 1024;
+    const cap = isVideo ? 100 * 1024 * 1024 : 6 * 1024 * 1024;
     if (file.size > cap) {
-      showToast?.(`File too large (max ${isVideo ? 30 : 6} MB)`, 'error');
+      showToast?.(`File too large (max ${isVideo ? 100 : 6} MB)`, 'error');
       return;
     }
     setUploading(true);
@@ -463,7 +463,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
       if (!form.committee_id)  return 'Please pick a committee.';
       if (!form.starts_at)     return 'Please pick a start date and time.';
       if (!form.ends_at)       return 'Please pick an end date and time.';
-      if (form.mode !== 'online'    && !form.venue?.trim())      return 'In-person events need a venue.';
+      if (form.mode !== 'online'    && !form.venue?.trim())      return 'Offline events need a venue.';
       if (form.mode !== 'in_person' && !form.online_url?.trim()) return 'Online / hybrid events need a joining URL.';
     }
     return null;
@@ -572,7 +572,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
               </FormField>
               <FormField label="Mode" required>
                 <select className="input-base" value={form.mode} onChange={(e) => set('mode', e.target.value)}>
-                  <option value="in_person">In person</option>
+                  <option value="in_person">Offline</option>
                   <option value="online">Online</option>
                   <option value="hybrid">Hybrid</option>
                 </select>
@@ -742,7 +742,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
               )}
             </div>
             <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
-              Images (JPEG / PNG / WebP / GIF) up to 6 MB · Videos (MP4 / WebM / MOV) up to 30 MB.
+              Images (JPEG / PNG / WebP / GIF) up to 6 MB · Videos (MP4 / WebM / MOV) up to 100 MB. For longer recordings, use the Video Gallery (YouTube/Vimeo embed).
             </div>
           </Section>
 
