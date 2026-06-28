@@ -71,18 +71,69 @@ export function usePushSubscription({ enabled = true } = {}) {
     }
     setState((s) => ({ ...s, loading: true, error: null }));
     try {
-      // 1. Get the active service worker. `navigator.serviceWorker.ready`
-      //    hangs forever if no SW has been registered for the scope — most
-      //    commonly because the dev server isn't serving sw.js. Race it
-      //    against a 5-second timeout so the user gets an actionable error
-      //    instead of "Asking…" spinning forever.
-      const reg = await Promise.race([
+      // 1. Get a stable, active service worker. Three things matter here:
+      //
+      //   (a) navigator.serviceWorker.ready can hang forever if no SW has
+      //       been registered for the scope (dev server not serving sw.js).
+      //       Race it against a 5-second timeout for a useful error.
+      //
+      //   (b) On mobile (and after every frontend deploy) there's a race:
+      //       the OLD service worker is about to be replaced by a NEW one
+      //       via skipWaiting() + clients.claim(). If we capture the OLD
+      //       registration via .ready and then call subscribe() on it after
+      //       the swap has happened, the browser throws
+      //       "Subscription failed - no active Service Worker" because the
+      //       captured registration is now `redundant`.
+      //
+      //   (c) The fix: after .ready resolves, also wait for a controller to
+      //       exist (or a controllerchange to finish), then re-fetch the
+      //       current registration via getRegistration() so we hand
+      //       pushManager.subscribe() a worker the browser still considers
+      //       authoritative.
+      await Promise.race([
         navigator.serviceWorker.ready,
         new Promise((_, reject) => setTimeout(
           () => reject(new Error('Service worker did not activate within 5 seconds. In dev, make sure VitePWA devOptions.enabled is true and refresh the page.')),
           5000,
         )),
       ]);
+
+      // Wait for a controller to claim this page. On a freshly installed SW,
+      // .ready resolves before the SW is the page's controller; subscribe()
+      // requires an active controller-bound worker. controllerchange fires
+      // when the new SW takes over via clients.claim().
+      if (!navigator.serviceWorker.controller) {
+        await new Promise((resolve) => {
+          const onChange = () => {
+            navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+            resolve();
+          };
+          navigator.serviceWorker.addEventListener('controllerchange', onChange);
+          // Fallback so we never hang forever — if controllerchange never
+          // fires, just proceed and let subscribe() surface its own error.
+          setTimeout(() => {
+            navigator.serviceWorker.removeEventListener('controllerchange', onChange);
+            resolve();
+          }, 2500);
+        });
+      }
+
+      // Always re-fetch the registration right before subscribe(). The
+      // previous reference may be stale (`redundant`) after the activation
+      // race resolved.
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        // Extremely rare — getRegistration returns null when the SW was
+        // unregistered out from under us. Falling back to .ready picks up
+        // whichever new SW is registering now.
+        reg = await navigator.serviceWorker.ready;
+      }
+      if (!reg.active) {
+        throw new Error(
+          'Service worker is still installing. Please reload the page and try again. ' +
+          '(If this keeps happening, fully close the tab, clear site data for icainagpur.in, then reopen.)'
+        );
+      }
 
       // 2. Ask the user. permission can only be requested from a user gesture
       //    — this hook expects to be called from a click handler.
@@ -111,12 +162,41 @@ export function usePushSubscription({ enabled = true } = {}) {
 
       // 4. Subscribe through the browser's PushManager. userVisibleOnly is
       //    mandatory on Chromium browsers — silent pushes are not allowed.
-      let sub = await reg.pushManager.getSubscription();
+      //
+      // If a stale cached subscription exists (e.g. registered under a
+      // previous VAPID key), we unsubscribe it first so the fresh subscribe
+      // doesn't conflict. Without this, Chrome can throw
+      // "InvalidStateError: applicationServerKey of subscribe() call does
+      // not match the original" or, in rarer cases, "push service error".
+      const existing = await reg.pushManager.getSubscription();
+      let sub = existing;
+      if (existing) {
+        // Cheap heuristic: if the cached sub's applicationServerKey matches
+        // our current VAPID key, keep it. Otherwise, drop and re-subscribe.
+        const cachedKey = existing.options?.applicationServerKey;
+        const expected  = urlBase64ToUint8Array(key);
+        const matches   = cachedKey && cachedKey.byteLength === expected.byteLength
+          && new Uint8Array(cachedKey).every((b, i) => b === expected[i]);
+        if (!matches) {
+          try { await existing.unsubscribe(); } catch { /* swallow */ }
+          sub = null;
+        }
+      }
       if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(key),
-        });
+        try {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(key),
+          });
+        } catch (subErr) {
+          // Surface the actual DOMException name so the UI shows something
+          // diagnosable instead of just the generic outer error message.
+          // Common names: AbortError, InvalidStateError, NotAllowedError,
+          // NotSupportedError, InvalidAccessError.
+          const name = subErr?.name || 'Error';
+          const msg  = subErr?.message || String(subErr);
+          throw new Error(`Subscribe failed (${name}): ${msg}`);
+        }
       }
 
       // 5. Hand the subscription to our backend so it can target this device.
