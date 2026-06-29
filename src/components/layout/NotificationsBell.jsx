@@ -51,8 +51,18 @@ export default function NotificationsBell() {
   const onItemClick = (n) => {
     if (!n.read_at) markRead(n.id);
     if (n.link_url) {
-      if (n.link_url.startsWith('http')) window.open(n.link_url, '_blank');
-      else window.location.hash = n.link_url.replace(/^#/, '');
+      if (n.link_url.startsWith('http')) {
+        window.open(n.link_url, '_blank');
+      } else {
+        // Stored URLs from notify() callers are in one of three shapes:
+        //   '/#/dashboard'          (hash-routed, common)
+        //   '#/dashboard'           (hash-routed, no leading slash)
+        //   '/dashboard'            (plain path → treat as hash route)
+        // window.location.hash adds its own '#', so we must strip any
+        // leading '/' and '#' from the stored value before assigning,
+        // otherwise we end up with '/#/#/dashboard' (the double-hash 404).
+        window.location.hash = n.link_url.replace(/^\/?#?\/?/, '/');
+      }
     }
     setOpen(false);
   };

@@ -450,7 +450,7 @@ function BuilderDrawer({ id, onClose }) {
   const { showToast } = useAuth();
   const isNew = !id;
   const [loading, setLoading] = useState(!isNew);
-  const [meta, setMeta] = useState({ name: '', description: '', category: '', fill_role: '', review_role: '' });
+  const [meta, setMeta] = useState({ name: '', description: '', category: '', fill_role: '', review_role: '', approver_role_codes: [] });
   const [questions, setQuestions] = useState([]);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
@@ -472,6 +472,7 @@ function BuilderDrawer({ id, onClose }) {
           category: j.template.category || '',
           fill_role: j.template.fill_role || '',
           review_role: j.template.review_role || '',
+          approver_role_codes: Array.isArray(j.template.approver_role_codes) ? j.template.approver_role_codes : [],
         });
         setQuestions((j.questions || []).map((q) => ({
           _draftId: `q_${q.id}`,
@@ -802,6 +803,16 @@ function TemplateMetaForm({ meta, setMeta }) {
           onChange={(e) => setMeta((m) => ({ ...m, description: e.target.value }))} />
       </Field>
 
+      <Field label="Multi-stage approvers (optional)">
+        <ApproverPicker
+          value={meta.approver_role_codes || []}
+          onChange={(next) => setMeta((m) => ({ ...m, approver_role_codes: next }))}
+        />
+        <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
+          Leave blank for the default single-reviewer flow. Tick one or more to require every selected role to approve before the checklist is published.
+        </div>
+      </Field>
+
       <style>{`
         .meta {
           display: flex; flex-direction: column; gap: .625rem;
@@ -814,6 +825,55 @@ function TemplateMetaForm({ meta, setMeta }) {
         }
         .meta-input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
       `}</style>
+    </div>
+  );
+}
+
+// Multi-select chip picker for the approver_role_codes field. When the
+// admin picks zero roles, the parent template stays on the single-reviewer
+// flow. When 1+ roles are picked, every released event-bound instance from
+// this template auto-creates one approval stage per role.
+const APPROVER_ROLES = [
+  { code: 'branch_chairman',      label: 'Branch Chairman' },
+  { code: 'branch_vice_chairman', label: 'Vice-Chairman' },
+  { code: 'branch_secretary',     label: 'Branch Secretary' },
+  { code: 'branch_treasurer',     label: 'Treasurer' },
+];
+
+function ApproverPicker({ value, onChange }) {
+  const set = new Set(value || []);
+  function toggle(code) {
+    const next = new Set(set);
+    if (next.has(code)) next.delete(code); else next.add(code);
+    // Preserve display order from APPROVER_ROLES so the stage list on the
+    // member-facing panel always shows Chairman → VC → Secretary → Treasurer
+    // regardless of the order the admin clicked them in.
+    onChange(APPROVER_ROLES.filter((r) => next.has(r.code)).map((r) => r.code));
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.4rem' }}>
+      {APPROVER_ROLES.map((r) => {
+        const on = set.has(r.code);
+        return (
+          <button
+            key={r.code}
+            type="button"
+            onClick={() => toggle(r.code)}
+            style={{
+              padding: '.3rem .65rem',
+              fontSize: '.78rem',
+              fontWeight: on ? 700 : 500,
+              borderRadius: 999,
+              border: '1px solid ' + (on ? 'transparent' : 'var(--border)'),
+              background: on ? 'var(--primary, #3622FF)' : 'var(--card)',
+              color: on ? 'white' : 'var(--foreground)',
+              cursor: 'pointer',
+            }}
+          >
+            {on ? '✓ ' : '+ '}{r.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
