@@ -164,7 +164,7 @@ export const SITE_CONTENT_DEFAULTS = {
     card_2_title: 'Articleship Vacancies',
     card_2_desc:  'Browse openings posted by member firms across Nagpur and Vidarbha.',
     card_3_title: 'Career Counselling',
-    card_3_desc:  '1-on-1 sessions with practising CAs and alma mater mentors.',
+    card_3_desc:  'sessions with practising CAs and alma mater mentors.',
     card_4_title: 'Study Material & Resources',
     card_4_desc:  'Past papers, RTPs, MTPs and curated study notes.',
     card_5_title: 'Scholarships & Awards',

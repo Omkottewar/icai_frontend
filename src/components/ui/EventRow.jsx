@@ -1,6 +1,7 @@
 ﻿import { useState } from 'react';
-import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle, IconMessageSquare, IconCalendar } from '../../icons';
+import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle, IconMessageSquare, IconCalendar, IconEye } from '../../icons';
 import EventRegisterModal from '../events/EventRegisterModal';
+import EventDetailsModal from '../events/EventDetailsModal';
 import EventChat from '../events/EventChat';
 import { useMyRegistrations } from '../../hooks/useMyRegistrations';
 import { googleCalendarEventUrl } from '../../lib/googleCalendar';
@@ -32,16 +33,18 @@ function eventImg(title) {
   return EVENT_IMAGES[hash(title) % EVENT_IMAGES.length];
 }
 
-function speakerImg(name) {
-  // pravatar.cc: 1..70 professional-looking placeholder portraits, deterministic per name
-  const id = (hash(name) % 70) + 1;
-  return `https://i.pravatar.cc/96?img=${id}`;
+// Banner uploads can be image OR video — detect from the URL extension so
+// we render the right element instead of a broken <img>.
+function isVideoUrl(url) {
+  if (typeof url !== 'string') return false;
+  return /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(url);
 }
 
 export default function EventRow({ event: e, href = '/events', detailed = false }) {
   const [open, setOpen] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const mode = getMode(e.venue);
   const { eventIds, refresh: refreshMyRegistrations } = useMyRegistrations();
   const isRegistered = e.id && eventIds.has(e.id);
@@ -115,12 +118,25 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
         <div className="event-acc-panel-inner">
           {detailed ? (
             <div className="event-acc-detail">
-              <img
-                className="event-acc-img"
-                src={eventImg(e.title)}
-                alt={e.title}
-                loading="lazy"
-              />
+              {isVideoUrl(e.bannerUrl) ? (
+                <video
+                  className="event-acc-img"
+                  src={e.bannerUrl}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  onClick={(ev) => ev.stopPropagation()}
+                  style={{ background: '#000' }}
+                />
+              ) : (
+                <img
+                  className="event-acc-img"
+                  src={e.bannerUrl || eventImg(e.title)}
+                  alt={e.title}
+                  loading="lazy"
+                  onError={(ev) => { ev.currentTarget.src = eventImg(e.title); }}
+                />
+              )}
               <div className="event-acc-detail-body">
                 <div className="tiny-eyebrow">What to expect</div>
                 <ul className="event-acc-highlights">
@@ -139,21 +155,37 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
                 </div>
 
                 <div className="event-acc-footer">
-                  {e.speaker && (
+                  {(e.speakerName || e.speakerPhotoUrl) && (
                     <div className="event-acc-speaker">
-                      <img
-                        src={speakerImg(e.speaker)}
-                        alt={e.speaker}
-                        loading="lazy"
-                      />
+                      {e.speakerPhotoUrl ? (
+                        <img src={e.speakerPhotoUrl} alt={e.speakerName || 'Speaker'} loading="lazy" />
+                      ) : (
+                        <div style={{
+                          width: 40, height: 40, borderRadius: '50%',
+                          background: 'var(--muted)', display: 'inline-flex',
+                          alignItems: 'center', justifyContent: 'center',
+                          fontWeight: 600, color: 'var(--muted-foreground)',
+                        }}>
+                          {(e.speakerName || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <div>
-                        <div className="event-acc-speaker-name">{e.speaker}</div>
+                        <div className="event-acc-speaker-name">{e.speakerName || 'Speaker TBA'}</div>
                         <div className="event-acc-speaker-role">Speaker</div>
                       </div>
                     </div>
                   )}
                   <div className="event-acc-actions">
                     {e.cpe > 0 && <span className="badge badge-accent">{e.cpe} CPE hrs</span>}
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ padding: '.45rem 1.1rem' }}
+                      onClick={(ev) => { ev.stopPropagation(); setShowDetails(true); }}
+                      aria-label={`View full details for ${e.title}`}
+                    >
+                      <IconEye size="sm" /> View full details
+                    </button>
                     {/* Add to Google Calendar — opens calendar.google.com
                         with the event prefilled in a new tab. Avoids the
                         .ics download path (which triggers a Microsoft Store
@@ -237,6 +269,15 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
       )}
       {showChat && (
         <EventChat event={e} onClose={() => setShowChat(false)} />
+      )}
+      {showDetails && (
+        <EventDetailsModal
+          event={e}
+          isRegistered={isRegistered}
+          onClose={() => setShowDetails(false)}
+          onRegister={() => setShowRegister(true)}
+          onOpenChat={() => setShowChat(true)}
+        />
       )}
 
       <style>{`

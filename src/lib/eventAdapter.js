@@ -28,5 +28,8 @@ export function apiEventToCardEvent(row) {
     ends_at: row.ends_at,
     description: row.description || '',
     online_url: row.online_url || '',
+    speakerName: row.speaker_name || '',
+    speakerBio: row.speaker_bio || '',
+    speakerPhotoUrl: row.speaker_photo_url || '',
   };
 }

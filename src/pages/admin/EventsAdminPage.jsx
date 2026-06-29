@@ -54,6 +54,10 @@ const EMPTY_FORM = {
   recurrence_rrule: '',
   banner_id: '',
   banner_url: '',
+  speaker_name: '',
+  speaker_bio: '',
+  speaker_photo_id: '',
+  speaker_photo_url: '',
   // Recurrence (used on CREATE only — series expansion runs server-side
   // after the seed event is created via /repeat). Editing an existing
   // series happens through the dedicated "Series" view, not this form.
@@ -200,7 +204,7 @@ export default function EventsAdminPage() {
         lookups={lookups}
         canManage={canManageEvents}
         onClose={() => { setEditingId(null); if (route.query.edit || route.query.new) navigate('/admin/events'); }}
-        onSaved={() => { refresh(); }}
+        onSaved={refresh}
         showToast={showToast}
       />
 
@@ -300,6 +304,10 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
           recurrence_rrule: row.recurrence_rrule || '',
           banner_id: row.banner_id || '',
           banner_url: row.banner_url || '',
+          speaker_name: row.speaker_name || '',
+          speaker_bio: row.speaker_bio || '',
+          speaker_photo_id: row.speaker_photo_id || '',
+          speaker_photo_url: row.speaker_photo_url || '',
           status: row.status,
         });
       })
@@ -342,6 +350,41 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
     }
   };
 
+  // Speaker photo upload — images only. Reuses the same files endpoint as
+  // the banner upload; a separate bucket ('speakers') keeps the two
+  // logically separated for storage cleanup / retention rules.
+  const onSpeakerPhotoUpload = async (file) => {
+    if (!file) return;
+    if (!(file.type || '').startsWith('image/')) {
+      showToast?.('Speaker photo must be an image', 'error');
+      return;
+    }
+    if (file.size > 4 * 1024 * 1024) {
+      showToast?.('Speaker photo too large (max 4 MB)', 'error');
+      return;
+    }
+    setUploading(true);
+    try {
+      const b64 = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result).replace(/^data:[^;]+;base64,/, ''));
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+      const r = await adminFetch('/api/admin/files', {
+        method: 'POST',
+        body: { name: file.name, mime_type: file.type, bucket: 'speakers', data_base64: b64 },
+      });
+      set('speaker_photo_id', r.id);
+      set('speaker_photo_url', r.url);
+      showToast?.('Speaker photo uploaded', 'success');
+    } catch (e) {
+      showToast?.(e.message || 'Upload failed', 'error');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const onSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -368,6 +411,9 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
         highlights: form.highlights ? form.highlights.split('\n').map((s) => s.trim()).filter(Boolean) : null,
         banner_id: form.banner_id || null,
         recurrence_rrule: form.recurrence_rrule || null,
+        speaker_name: form.speaker_name || null,
+        speaker_bio: form.speaker_bio || null,
+        speaker_photo_id: form.speaker_photo_id || null,
       };
       if (isNew) {
         const row = await adminFetch('/api/admin/events', { method: 'POST', body: payload });
@@ -395,13 +441,17 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
         } else {
           showToast?.('Event created', 'success');
         }
-        onSaved?.();
+        // Await the parent's refresh so the list reflects the new event
+        // before the drawer closes — otherwise the drawer disappears
+        // while the list is mid-revalidate and the user sees stale data
+        // until the next tick.
+        await onSaved?.();
         onClose?.();
         return row;
       } else {
         await adminFetch(`/api/admin/events/${id}`, { method: 'PATCH', body: payload });
         showToast?.('Event updated', 'success');
-        onSaved?.();
+        await onSaved?.();
       }
     } catch (e2) {
       setError(e2.message);
@@ -417,7 +467,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
       successMessage: 'Event published — visible on the public site',
     });
     if (result.ok) {
-      onSaved?.();
+      await onSaved?.();
       onClose?.();
     }
   };
@@ -434,7 +484,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
     try {
       await adminFetch(`/api/admin/events/${id}/cancel`, { method: 'POST' });
       showToast?.('Event cancelled', 'success');
-      onSaved?.();
+      await onSaved?.();
       onClose?.();
     } catch (e) { showToast?.(e.message, 'error'); }
   };
@@ -450,7 +500,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
     try {
       await adminFetch(`/api/admin/events/${id}`, { method: 'DELETE' });
       showToast?.('Event deleted', 'success');
-      onSaved?.();
+      await onSaved?.();
       onClose?.();
     } catch (e) { showToast?.(e.message, 'error'); }
   };
@@ -751,6 +801,71 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
               <textarea className="input-base" rows={4} value={form.highlights} onChange={(e) => set('highlights', e.target.value)} placeholder="Live Q&A with industry experts&#10;Certificate of participation" />
             </FormField>
           </Section>
+
+          {/* Speaker — surfaces in the public event-details modal as a
+              photo + name + bio block. All three fields are optional; if
+              none are set, the speaker section is hidden on the public
+              side. */}
+          <Section title="Speaker">
+            <div className="row gap-3" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}>
+              {form.speaker_photo_url && (
+                <img
+                  src={form.speaker_photo_url}
+                  alt="speaker"
+                  style={{
+                    width: 96, height: 96, borderRadius: '50%',
+                    objectFit: 'cover', border: '1px solid var(--border)',
+                  }}
+                />
+              )}
+              <div className="row gap-2" style={{ flexWrap: 'wrap', alignItems: 'center' }}>
+                <label className="btn btn-outline" style={{ padding: '.5rem 1rem', cursor: uploading ? 'wait' : 'pointer' }}>
+                  {uploading ? 'Uploading…' : (form.speaker_photo_url ? 'Replace photo' : 'Upload speaker photo')}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    disabled={uploading}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) onSpeakerPhotoUpload(f); e.target.value = ''; }}
+                  />
+                </label>
+                {form.speaker_photo_url && (
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => { set('speaker_photo_id', ''); set('speaker_photo_url', ''); }}
+                    style={{ padding: '.5rem 1rem' }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.4rem', marginBottom: '.85rem' }}>
+              JPEG / PNG / WebP up to 4 MB. Square images render best (shown as a circular avatar).
+            </div>
+
+            <FormField label="Speaker name" hint="e.g. CA Rajesh Sharma">
+              <input
+                className="input-base"
+                type="text"
+                value={form.speaker_name}
+                onChange={(e) => set('speaker_name', e.target.value)}
+                placeholder="Full name"
+                maxLength={120}
+              />
+            </FormField>
+
+            <FormField label="Speaker bio" hint="A short bio shown alongside the name. Markdown supported.">
+              <textarea
+                className="input-base"
+                rows={4}
+                value={form.speaker_bio}
+                onChange={(e) => set('speaker_bio', e.target.value)}
+                placeholder="Partner at ABC & Co., 20+ years experience in indirect taxation. Frequent ICAI speaker on GST."
+              />
+            </FormField>
+          </Section>
           </>)}
 
           {stepIdx === 3 && (
@@ -869,6 +984,7 @@ function WizardReview({ form, lookups, onJumpToStep }) {
     { label: 'Capacity',      value: form.capacity || 'Unlimited',         step: 1 },
     { label: 'Banner',        value: form.banner_url ? 'Uploaded' : 'No banner',  step: 2 },
     { label: 'Highlights',    value: form.highlights ? `${form.highlights.split('\n').filter(Boolean).length} points` : 'None', step: 2 },
+    { label: 'Speaker',       value: form.speaker_name || '—',                    step: 2 },
   ];
 
   return (

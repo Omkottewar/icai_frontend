@@ -1459,10 +1459,26 @@ a:focus-visible,
   position: fixed; inset: 0;
   background: oklch(0.18 0.05 250 / 0.5);
   backdrop-filter: blur(4px);
-  z-index: 90;
+  z-index: 1200;
   display: flex; align-items: center; justify-content: center;
   padding: 1rem;
   animation: fadeIn .15s ease;
+  /* Stops wheel/touch scroll from bubbling out of the backdrop onto the
+     underlying page when the user reaches the end of the modal content. */
+  overscroll-behavior: contain;
+}
+/* The direct child of .modal-backdrop is the dialog itself, which is the
+   actual scroll container (overflow-y: auto). The same overscroll guard
+   has to live on the scroll container, otherwise the chain still leaks
+   when wheel events originate inside the dialog body. */
+.modal-backdrop > * {
+  overscroll-behavior: contain;
+}
+/* Lock the page underneath while any modal is open. Uses :has() so every
+   modal across the app benefits without each one needing its own body
+   scroll-lock effect. */
+body:has(.modal-backdrop) {
+  overflow: hidden;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 

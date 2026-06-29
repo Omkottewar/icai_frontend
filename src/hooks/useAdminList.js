@@ -35,9 +35,26 @@ export function useAdminList(endpoint, params, enabled = true, ttl) {
     return () => { cancelled = true; };
   }, [endpoint, key, enabled, tick, ttl]);
 
-  const refresh = useCallback(() => {
-    revalidate(endpoint, JSON.parse(key), ttl).catch(() => {});
-    setTick((t) => t + 1);
+  // Awaits the network round-trip and writes the result straight into
+  // local state. Previously this fired revalidate() without awaiting and
+  // relied on a tick bump to re-trigger the useEffect — that worked
+  // *most* of the time but raced with consumers that closed a drawer
+  // immediately after calling refresh(), so the list re-render landed
+  // before the new row was in the cache. Returning the promise lets
+  // callers `await refresh()` and be certain the new data is visible.
+  const refresh = useCallback(async () => {
+    try {
+      const fresh = await revalidate(endpoint, JSON.parse(key), ttl);
+      setData(fresh);
+      setError(null);
+    } catch (e) {
+      setError(e);
+    } finally {
+      setLoading(false);
+      // Bump tick too — covers the corner case where a consumer depends
+      // on a separate effect keyed off it.
+      setTick((t) => t + 1);
+    }
   }, [endpoint, key, ttl]);
 
   return { data, loading, error, refresh };

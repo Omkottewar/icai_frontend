@@ -393,7 +393,7 @@ export default function PrayGyaanWidget() {
         }}
       >
         {open ? (
-          <IconX />
+          <IconX size="sm" />
         ) : (
           <img
             src={garudImg}
