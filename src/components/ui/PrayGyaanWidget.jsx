@@ -398,7 +398,17 @@ export default function PrayGyaanWidget() {
           <img
             src={garudImg}
             alt="Garud"
-            style={{ width: '130%', height: '130%', objectFit: 'contain', display: 'block' }}
+            className="pg-fab-bird"
+            style={{
+              width: '130%', height: '130%', objectFit: 'contain', display: 'block',
+              // drop-shadow follows the bird's alpha channel — gives the
+              // silhouette visible separation from light / patterned
+              // backgrounds without adding a circle, frame or fill behind
+              // it. Two-layer shadow: tight dark halo for definition +
+              // wider soft shadow for ambient depth.
+              filter: 'drop-shadow(0 1px 2px rgba(15, 23, 42, 0.55)) drop-shadow(0 4px 14px rgba(15, 23, 42, 0.28))',
+              WebkitFilter: 'drop-shadow(0 1px 2px rgba(15, 23, 42, 0.55)) drop-shadow(0 4px 14px rgba(15, 23, 42, 0.28))',
+            }}
           />
         )}
       </button>
@@ -427,6 +437,54 @@ export default function PrayGyaanWidget() {
           0%, 60%, 100% { transform: translateY(0); }
           30%           { transform: translateY(-4px); }
         }
+
+        /* ─── Pragyaan FAB animations ─────────────────────────────────────
+           Two layered animations on the floating bird:
+             1. pgFabFly   — one-shot "wave hello" sweep on first render so
+                              the entry doesn't feel like a hard pop-in
+             2. pgFabFloat — perpetual gentle bob + micro-tilt + occasional
+                              wing flap, all baked into one keyframe so they
+                              never fight each other on the transform property
+           Both animations are paused on hover (the parent button has its
+           own scale-up transform), and disabled when the user has
+           prefers-reduced-motion set. */
+
+        .pg-fab-bird {
+          animation:
+            pgFabFly 1.2s ease-out 0s 1 both,
+            pgFabFloat 4s ease-in-out 1.3s infinite;
+          transform-origin: 60% 55%;
+          will-change: transform;
+        }
+        /* Pause perpetual motion on hover so it doesn't fight with the
+           parent button's hover scale-up. Entry is already done by then. */
+        #icai-pragyaan-fab:hover .pg-fab-bird {
+          animation-play-state: paused, paused;
+        }
+
+        @keyframes pgFabFly {
+          0%   { opacity: 0; transform: translate(40px, -20px) rotate(-12deg) scale(0.5); }
+          50%  { opacity: 1; transform: translate(-6px, -4px)  rotate(6deg)   scale(1.06); }
+          75%  {              transform: translate(2px, 2px)   rotate(-3deg)  scale(0.98); }
+          100% { opacity: 1; transform: translate(0, 0)        rotate(0deg)   scale(1); }
+        }
+        @keyframes pgFabFloat {
+          /* Most of the cycle is a gentle bob (rotate + translateY).
+             At 88-94% we sneak in a quick wing flap (scaleX) — same
+             property so no animation collision. */
+          0%   { transform: translateY(0)    rotate(-1.5deg) scaleX(1); }
+          50%  { transform: translateY(-5px) rotate(1.5deg)  scaleX(1); }
+          88%  { transform: translateY(-1px) rotate(0deg)    scaleX(0.94); }
+          92%  { transform: translateY(-2px) rotate(0deg)    scaleX(1.05); }
+          96%  { transform: translateY(-1px) rotate(0deg)    scaleX(0.97); }
+          100% { transform: translateY(0)    rotate(-1.5deg) scaleX(1); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .pg-fab-bird {
+            animation: none !important;
+          }
+        }
       `}</style>
     </>
   );
@@ -452,36 +510,66 @@ function TypingDots() {
 // paint; auto-hides after 15 s; dismissable via the × button.
 //
 // Key versioning: bumping the suffix invalidates any prior dismissals so
-// every tester sees the bubble again on next reload. Bump it when you
-// substantively change the copy or position.
-const GREET_DISMISSED_KEY = 'pg-greet-dismissed-v3';
+// Greeting cycle: bubble shows briefly, fades, then re-appears periodically.
+// No sessionStorage persistence — the bird is supposed to feel alive and
+// invite engagement, not be dismissed once and forgotten for the whole
+// session. Manual close (X) skips the current bubble but the next cycle
+// will still fire after INTERVAL_MS.
+const FIRST_DELAY_MS = 1200;     // initial pop-in after page load
+const HOLD_MS        = 7000;     // how long each bubble stays before auto-fade
+const FADE_MS        = 250;      // matches the pgGreetOut keyframe duration
+const INTERVAL_MS    = 45000;    // gap between bubble appearances (≈45 sec)
+
 function PragyaanGreeting() {
   const [visible, setVisible] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const timerRef = useRef(null);
 
-  useEffect(() => {
-    if (typeof sessionStorage === 'undefined') {
-      // SSR / no-storage env — still show.
-      const t = setTimeout(() => setVisible(true), 1200);
-      return () => clearTimeout(t);
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
-    if (sessionStorage.getItem(GREET_DISMISSED_KEY)) return;
-    // Wait for the page to settle before popping in.
-    const showTimer = setTimeout(() => setVisible(true), 1200);
-    return () => clearTimeout(showTimer);
   }, []);
 
-  useEffect(() => {
-    if (!visible) return;
-    const t = setTimeout(() => dismiss(), 15000);
-    return () => clearTimeout(t);
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Run one show-hold-fade-wait round, then schedule itself again.
+  // Cleared on unmount (parent unmounts this whenever the chat opens).
+  const scheduleShow = useCallback((delay) => {
+    clearTimer();
+    timerRef.current = setTimeout(() => {
+      setLeaving(false);
+      setVisible(true);
+      // Hold the bubble in view
+      timerRef.current = setTimeout(() => {
+        // Trigger fade-out animation
+        setLeaving(true);
+        timerRef.current = setTimeout(() => {
+          // Animation done — hide and schedule the next appearance
+          setVisible(false);
+          setLeaving(false);
+          scheduleShow(INTERVAL_MS);
+        }, FADE_MS);
+      }, HOLD_MS);
+    }, delay);
+  }, [clearTimer]);
 
-  function dismiss() {
+  useEffect(() => {
+    scheduleShow(FIRST_DELAY_MS);
+    return clearTimer;
+  }, [scheduleShow, clearTimer]);
+
+  const dismiss = useCallback(() => {
+    // User clicked X — fade the current bubble immediately, then queue
+    // the next cycle. We deliberately don't persist a "never show again"
+    // flag; the bird is supposed to keep checking in periodically.
+    clearTimer();
     setLeaving(true);
-    try { sessionStorage.setItem(GREET_DISMISSED_KEY, '1'); } catch { /* incognito */ }
-    setTimeout(() => setVisible(false), 250);   // matches pgGreetOut keyframe
-  }
+    timerRef.current = setTimeout(() => {
+      setVisible(false);
+      setLeaving(false);
+      scheduleShow(INTERVAL_MS);
+    }, FADE_MS);
+  }, [clearTimer, scheduleShow]);
 
   if (!visible) return null;
 

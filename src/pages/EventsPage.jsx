@@ -110,15 +110,25 @@ export default function EventsPage() {
   const [view, setView] = useState('list'); // 'list' | 'month'
 
   const { data: eventsData, loading: eventsLoading } = usePublicEvents();
+  // Past events are fetched alongside upcoming — same hook, different
+  // cache key. Cached for 60s like the upcoming list.
+  const { data: pastEventsData, loading: pastEventsLoading } = usePublicEvents({ past: true });
   const { data: committeesData } = usePublicCommittees();
 
   const allEvents = useMemo(
     () => (eventsData?.rows ?? []).map(apiEventToCardEvent),
     [eventsData],
   );
+  const pastEvents = useMemo(
+    () => (pastEventsData?.rows ?? []).map(apiEventToCardEvent),
+    [pastEventsData],
+  );
   const committees = committeesData?.rows ?? [];
 
   const audienceFiltered = allEvents.filter((e) =>
+    audience === 'All' || e.audience === audience || e.audience === 'All'
+  );
+  const pastAudienceFiltered = pastEvents.filter((e) =>
     audience === 'All' || e.audience === audience || e.audience === 'All'
   );
 
@@ -186,8 +196,24 @@ export default function EventsPage() {
     <>
       <PageHeader title={header.title} subtitle={header.subtitle} />
 
-      {/* Audience tab bar */}
-      <div style={{ borderBottom: '1px solid var(--border)', background: 'var(--card)', position: 'sticky', top: 64, zIndex: 10 }}>
+      {/* Audience tab bar — sticky under the global Header. Three things
+          this style block guarantees:
+            1. `background: #fff` (explicit, not a CSS var) so the bar is
+               never accidentally transparent against any theme override
+            2. zIndex high enough (50) to stack above CategoryCards which
+               can create their own stacking context via hover transforms
+            3. minHeight + boxShadow so the bar always fully covers any
+               row scrolling behind it AND is visually lifted off the page
+          The `top: 64` matches the global Header height. */}
+      <div style={{
+        background: '#ffffff',
+        borderBottom: '1px solid var(--border)',
+        position: 'sticky',
+        top: 64,
+        zIndex: 50,
+        minHeight: '3.5rem',
+        boxShadow: '0 1px 0 var(--border), 0 2px 6px rgba(15, 23, 42, 0.04)',
+      }}>
         <div className="container row gap-1" style={{ padding: '0 1rem' }}>
           {AUDIENCE_TABS.map((t) => {
             const isActive = audience === t.key;
@@ -276,6 +302,50 @@ export default function EventsPage() {
           <p className="muted-text">{sections.empty_audience_msg}</p>
         )}
       </section>
+
+      {/* Past events archive — visible underneath the upcoming list. Same
+          audience filter applies. Loads via ?past=1 hook above; hidden
+          entirely while loading on first render so the page doesn't show
+          a "Past events: 0" flash. */}
+      {(pastEventsLoading || pastAudienceFiltered.length > 0) && (
+        <section className="container" style={{ padding: '0 1rem 2.5rem' }}>
+          <div className="row" style={{ marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div>
+              <div className="tiny-eyebrow" style={{ color: 'var(--muted-foreground)' }}>Past programmes</div>
+              <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.5vw, 1.5rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>
+                Recently concluded
+              </h2>
+            </div>
+            <div className="muted-text" style={{ fontSize: '.8125rem' }}>
+              {pastAudienceFiltered.length} past event{pastAudienceFiltered.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+
+          {pastEventsLoading ? (
+            <EventRowsShimmer count={3} />
+          ) : (
+            <div className="past-events-list">
+              {pastAudienceFiltered.slice(0, 12).map((e) => (
+                <EventRow key={e.id ?? e.title} event={e} detailed />
+              ))}
+            </div>
+          )}
+
+          {!pastEventsLoading && pastAudienceFiltered.length > 12 && (
+            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem', textAlign: 'center' }}>
+              Showing the 12 most recent. Older events live in the <a href="#/gallery">photo gallery</a>.
+            </div>
+          )}
+
+          <style>{`
+            /* Mute past events visually so they read as archive — same row
+               layout as upcoming, just slightly desaturated. Hover restores
+               full colour so individual cards stay actionable. */
+            .past-events-list { opacity: .78; transition: opacity .15s; }
+            .past-events-list:hover { opacity: 1; }
+          `}</style>
+        </section>
+      )}
 
       {/* Committee categories */}
       <section className="container" style={{ padding: '0 1rem 4rem', borderTop: '1px solid var(--border)', marginTop: '1rem', paddingTop: '3rem' }}>

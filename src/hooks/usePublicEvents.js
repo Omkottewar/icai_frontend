@@ -3,6 +3,12 @@ import { cachedGet } from '../lib/apiCache';
 
 // Public GET /api/events. Cached for 60s — public events update infrequently
 // and the home + events pages can share the same cached payload.
+//
+// params:
+//   audience  — 'members' | 'students' | 'all'  (filter; default = all)
+//   committee — committee code                    (filter; default = none)
+//   past      — true → return past events instead of upcoming. Past events
+//               sort newest-first; upcoming sort soonest-first.
 export function usePublicEvents(params = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -11,6 +17,7 @@ export function usePublicEvents(params = {}) {
   const key = JSON.stringify({
     audience: params.audience || '',
     committee: params.committee || '',
+    past: params.past ? '1' : '',
   });
 
   useEffect(() => {
