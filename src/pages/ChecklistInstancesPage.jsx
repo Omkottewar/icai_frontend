@@ -6,6 +6,7 @@ import QuestionRenderer from '../components/checklists/QuestionRenderer';
 import QuestionEditor from '../components/checklists/QuestionEditor';
 import { hasAnswer, ROLE_OPTIONS, QUESTION_TYPES, newQuestion, MCM_ROLE_CODES, ROLE_CODE_LABEL } from '../lib/checklistQuestions';
 import { IconX, IconPlus } from '../icons';
+import Button from '../components/ui/Button';
 import { CHECKLIST_STATUS, toneStyle } from '../lib/eventStatus';
 import { useRoleFlags } from '../hooks/useRoleFlags';
 import { dialog } from '../lib/dialog';
@@ -756,6 +757,20 @@ function InstanceDrawer({ id, onClose }) {
           }
           .acc-prog.complete { color: #15803d; }
           .acc-body { padding: .25rem 1rem 1rem; }
+
+          /* Multi-stage approval action buttons — compact variant of .btn
+             so three buttons fit neatly inside one stage row without
+             overflowing on mobile. Inherits .btn-primary / .btn-danger /
+             .btn-outline-danger / .btn-success colours from index.css. */
+          .stage-actions {
+            display: flex; gap: .35rem; flex-wrap: wrap;
+            justify-content: flex-end;
+          }
+          .stage-btn {
+            padding: .3rem .65rem !important;
+            font-size: .72rem !important;
+            gap: .3rem !important;
+          }
         `}</style>
       </div>
 
@@ -777,20 +792,20 @@ function InstanceDrawer({ id, onClose }) {
 
       <footer style={{ position: 'sticky', bottom: 0, background: 'var(--card)', borderTop: '1px solid var(--border)', padding: '.75rem 0', marginTop: '1.5rem', display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
         {releaseable && (
-          <button className="btn-primary" onClick={release} disabled={busy}>
+          <Button className="btn btn-primary" onClick={release} disabled={busy}>
             Release to filler →
-          </button>
+          </Button>
         )}
         {editable && (
           <>
-            <button onClick={saveProgress} disabled={busy}>Save progress</button>
-            <button className="btn-primary" onClick={submit} disabled={busy || missing > 0}>Submit for review</button>
+            <Button className="btn btn-outline" onClick={saveProgress} disabled={busy}>Save progress</Button>
+            <Button className="btn btn-primary" onClick={submit} disabled={busy || missing > 0}>Submit for review</Button>
           </>
         )}
         {reviewable && !isMultiStage && (
           <>
-            <button onClick={reject} disabled={busy} style={{ color: 'var(--destructive)' }}>Reject</button>
-            <button className="btn-primary" onClick={approve} disabled={busy}>Approve</button>
+            <Button className="btn btn-outline-danger" onClick={reject} disabled={busy}>Reject</Button>
+            <Button className="btn btn-primary" onClick={approve} disabled={busy}>Approve</Button>
           </>
         )}
       </footer>
@@ -1246,40 +1261,25 @@ function ApprovalStagesPanel({ stages, instanceStatus, onApprove, onReject, onRe
                 fontSize: '.7rem', fontWeight: 600,
               }}>{label.text}</span>
               {showActions ? (
-                <div style={{ display: 'flex', gap: '.25rem', flexWrap: 'wrap' }}>
+                <div className="stage-actions">
                   {/* Terminal reject — destructive, kept furthest left so it's
                       visually separate from the routine Send back / Approve. */}
-                  <button
-                    type="button"
+                  <Button
+                    className="btn btn-danger stage-btn"
                     disabled={busy}
                     onClick={() => onRejectFinal?.(s.stage_code)}
                     title="Cancel the linked event permanently"
-                    style={{
-                      padding: '.25rem .55rem', fontSize: '.7rem', fontWeight: 600,
-                      background: '#991b1b', border: 0,
-                      color: 'white', borderRadius: '.25rem', cursor: 'pointer',
-                    }}
-                  >Reject completely</button>
-                  <button
-                    type="button"
+                  >Reject completely</Button>
+                  <Button
+                    className="btn btn-outline-danger stage-btn"
                     disabled={busy}
                     onClick={() => onReject(s.stage_code)}
-                    style={{
-                      padding: '.25rem .55rem', fontSize: '.7rem', fontWeight: 600,
-                      background: 'transparent', border: '1px solid #fecaca',
-                      color: '#b91c1c', borderRadius: '.25rem', cursor: 'pointer',
-                    }}
-                  >Send back</button>
-                  <button
-                    type="button"
+                  >Send back</Button>
+                  <Button
+                    className="btn btn-success stage-btn"
                     disabled={busy}
                     onClick={() => onApprove(s.stage_code)}
-                    style={{
-                      padding: '.25rem .55rem', fontSize: '.7rem', fontWeight: 700,
-                      background: '#16a34a', border: 0,
-                      color: 'white', borderRadius: '.25rem', cursor: 'pointer',
-                    }}
-                  >Approve</button>
+                  >Approve</Button>
                 </div>
               ) : s.status === 'pending' && instanceStatus === 'awaiting_review' ? (
                 <span style={{ fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>

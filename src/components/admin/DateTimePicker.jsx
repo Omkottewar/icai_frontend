@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { IconCalendar, IconClock, IconChevronUp, IconChevronDownAlt } from '../../icons';
+import { IconCalendar, IconClock } from '../../icons';
 import FlipMenu from '../ui/FlipMenu';
+import TimeStepper from './TimeStepper';
 
 // Custom date + time picker.
 //
@@ -19,10 +20,15 @@ export default function DateTimePicker({
   required = false,
   disabled = false,
   className = 'input-base',
-  placeholder = 'Pick date & time',
+  placeholder,
   minDate,           // 'YYYY-MM-DD' — optional lower bound for picking
   maxDate,           // 'YYYY-MM-DD' — optional upper bound for picking
+  // 'datetime' (default) — emits 'YYYY-MM-DDTHH:MM', shows calendar + time row
+  // 'date'              — emits 'YYYY-MM-DD',         shows calendar only
+  mode = 'datetime',
 }) {
+  const isDateOnly = mode === 'date';
+  const effectivePlaceholder = placeholder ?? (isDateOnly ? 'Pick a date' : 'Pick date & time');
   const [open, setOpen] = useState(false);
   // Anchor month shown in the calendar — independent of `value` so users
   // can flip through months without committing.
@@ -43,9 +49,9 @@ export default function DateTimePicker({
   // viewport edges.
 
   const picked = parseValue(value);
-  const label = picked ? formatPretty(picked) : '';
+  const label = picked ? (isDateOnly ? formatPrettyDate(picked) : formatPretty(picked)) : '';
 
-  const emit = (d) => onChange(formatWire(d));
+  const emit = (d) => onChange(isDateOnly ? formatWireDate(d) : formatWire(d));
 
   const setDateKeepTime = (newDate) => {
     const base = picked || defaultTime();
@@ -99,7 +105,7 @@ export default function DateTimePicker({
       >
         <IconCalendar size="sm" />
         <span className="dtp-trigger-text">
-          {label || placeholder}
+          {label || effectivePlaceholder}
         </span>
         <span className="dtp-trigger-chev" aria-hidden>▾</span>
       </button>
@@ -126,16 +132,18 @@ export default function DateTimePicker({
         className="dtp-pop"
       >
         <div role="dialog" aria-label="Choose date and time">
-          {/* Quick presets */}
+          {/* Quick presets — fewer when there's no time to nudge */}
           <div className="dtp-presets">
-            <button type="button" className="dtp-preset" onClick={() => { const d = new Date(); emit(d); }}>
-              Now
+            <button type="button" className="dtp-preset" onClick={() => { emit(new Date()); }}>
+              {isDateOnly ? 'Today' : 'Now'}
             </button>
-            <button type="button" className="dtp-preset" onClick={() => {
-              const base = picked || new Date();
-              const d = new Date(base.getTime() + 60 * 60 * 1000);
-              emit(d);
-            }}>+1 hour</button>
+            {!isDateOnly && (
+              <button type="button" className="dtp-preset" onClick={() => {
+                const base = picked || new Date();
+                const d = new Date(base.getTime() + 60 * 60 * 1000);
+                emit(d);
+              }}>+1 hour</button>
+            )}
             <button type="button" className="dtp-preset" onClick={() => {
               const base = picked || new Date();
               const d = new Date(base.getTime() + 24 * 60 * 60 * 1000);
@@ -198,16 +206,18 @@ export default function DateTimePicker({
             })}
           </div>
 
-          {/* Time row */}
-          <div className="dtp-time">
-            <IconClock size="sm" />
-            <TimeStepper
-              hour={picked ? picked.getHours() : 9}
-              minute={picked ? picked.getMinutes() : 0}
-              onHour={setHour}
-              onMinute={setMinute}
-            />
-          </div>
+          {/* Time row — hidden in date-only mode */}
+          {!isDateOnly && (
+            <div className="dtp-time">
+              <IconClock size="sm" />
+              <TimeStepper
+                hour={picked ? picked.getHours() : 9}
+                minute={picked ? picked.getMinutes() : 0}
+                onHour={setHour}
+                onMinute={setMinute}
+              />
+            </div>
+          )}
 
           {/* Footer actions */}
           <div className="dtp-foot">
@@ -399,146 +409,6 @@ export default function DateTimePicker({
   );
 }
 
-// ─── Time stepper (12h with AM/PM toggle) ───────────────────────────────
-function TimeStepper({ hour, minute, onHour, onMinute }) {
-  // Convert 24h hour to 12h display.
-  const isPM = hour >= 12;
-  const display12 = ((hour % 12) || 12);
-
-  const setH12 = (h12) => {
-    const h24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
-    onHour(h24);
-  };
-  const togglePM = () => {
-    onHour(isPM ? hour - 12 : hour + 12);
-  };
-  const bumpMinute = (delta) => {
-    const next = (minute + delta + 60) % 60;
-    onMinute(next);
-  };
-  const bumpHour12 = (delta) => {
-    let next = display12 + delta;
-    if (next < 1) next = 12;
-    if (next > 12) next = 1;
-    setH12(next);
-  };
-
-  return (
-    <div className="ts-wrap">
-      <div className="ts-field">
-        <button type="button" className="ts-up" onClick={() => bumpHour12(1)} aria-label="Hour up">
-          <IconChevronUp size="xs" />
-        </button>
-        <input
-          type="number"
-          min="1" max="12"
-          value={display12}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n) && n >= 1 && n <= 12) setH12(n);
-          }}
-          aria-label="Hour"
-        />
-        <button type="button" className="ts-down" onClick={() => bumpHour12(-1)} aria-label="Hour down">
-          <IconChevronDownAlt size="xs" />
-        </button>
-      </div>
-      <span className="ts-colon">:</span>
-      <div className="ts-field">
-        <button type="button" className="ts-up" onClick={() => bumpMinute(5)} aria-label="Minute up">
-          <IconChevronUp size="xs" />
-        </button>
-        <input
-          type="number"
-          min="0" max="59"
-          value={String(minute).padStart(2, '0')}
-          onChange={(e) => {
-            const n = Number(e.target.value);
-            if (Number.isFinite(n) && n >= 0 && n <= 59) onMinute(n);
-          }}
-          aria-label="Minute"
-        />
-        <button type="button" className="ts-down" onClick={() => bumpMinute(-5)} aria-label="Minute down">
-          <IconChevronDownAlt size="xs" />
-        </button>
-      </div>
-      <button
-        type="button"
-        className={'ts-ampm' + (isPM ? ' is-pm' : '')}
-        onClick={togglePM}
-        aria-label="Toggle AM/PM"
-      >
-        {isPM ? 'PM' : 'AM'}
-      </button>
-      <style>{`
-        .ts-wrap {
-          display: flex; align-items: center; gap: .35rem;
-          flex: 1;
-        }
-        .ts-field {
-          position: relative;
-          display: flex; flex-direction: column; align-items: center;
-        }
-        .ts-field input {
-          width: 2.4rem; height: 2rem;
-          padding: 0;
-          text-align: center;
-          font: inherit; font-size: .95rem; font-weight: 700;
-          color: var(--foreground);
-          background: var(--background, #f8fafc);
-          border: 1px solid var(--border);
-          border-radius: .35rem;
-          -moz-appearance: textfield;
-        }
-        .ts-field input::-webkit-outer-spin-button,
-        .ts-field input::-webkit-inner-spin-button {
-          -webkit-appearance: none; margin: 0;
-        }
-        .ts-field input:focus { outline: 2px solid var(--primary); outline-offset: -1px; }
-        .ts-up, .ts-down {
-          position: absolute;
-          width: 1.4rem; height: .9rem;
-          padding: 0;
-          background: transparent; border: 0; cursor: pointer;
-          color: var(--muted-foreground);
-          display: flex; align-items: center; justify-content: center;
-          opacity: 0; transition: opacity .12s;
-        }
-        .ts-field:hover .ts-up, .ts-field:hover .ts-down,
-        .ts-field:focus-within .ts-up, .ts-field:focus-within .ts-down {
-          opacity: 1;
-        }
-        .ts-up { top: -1.05rem; }
-        .ts-down { bottom: -1.05rem; }
-        .ts-up:hover, .ts-down:hover { color: var(--primary, #1e40af); }
-        .ts-colon {
-          font-size: 1rem; font-weight: 700;
-          color: var(--muted-foreground);
-          padding-bottom: .15rem;
-        }
-        .ts-ampm {
-          padding: .3rem .65rem;
-          background: var(--background, #f8fafc);
-          border: 1px solid var(--border);
-          border-radius: .35rem;
-          font: inherit; font-size: .8rem; font-weight: 700;
-          color: var(--muted-foreground);
-          cursor: pointer;
-          margin-left: .25rem;
-        }
-        .ts-ampm.is-pm {
-          background: var(--primary, #1e40af);
-          color: white;
-          border-color: var(--primary, #1e40af);
-        }
-        .ts-ampm:hover:not(.is-pm) {
-          color: var(--foreground);
-        }
-      `}</style>
-    </div>
-  );
-}
-
 // ─── Pure helpers ────────────────────────────────────────────────────────
 
 function parseValue(v) {
@@ -556,6 +426,18 @@ function formatWire(d) {
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Date-only wire format — what `<input type="date">` would have emitted.
+function formatWireDate(d) {
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatPrettyDate(d) {
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function formatPretty(d) {

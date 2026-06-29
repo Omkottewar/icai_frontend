@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import { IconStar } from '../../icons';
 import { Shimmer } from '../ui/Shimmer';
+import DateTimePicker from '../admin/DateTimePicker';
+import TimeRangePicker from '../admin/TimeRangePicker';
 
 // Renders one question of any type. Two modes:
 //   mode="fill"     — interactive input, calls onChange(value)
@@ -155,33 +157,29 @@ function Field({ question, cfg, value, onChange, readonly, tasks, onTaskAction }
     }
     case 'date':
       return (
-        <input
-          type="date"
+        <DateTimePicker
+          mode="date"
           value={value ?? ''}
-          onChange={(e) => set(e.target.value || null)}
+          onChange={(v) => set(v || null)}
         />
       );
     case 'datetime':
       return (
-        <input
-          type="datetime-local"
+        <DateTimePicker
           value={value ?? ''}
-          onChange={(e) => set(e.target.value || null)}
+          onChange={(v) => set(v || null)}
         />
       );
-    case 'time_range': {
-      // Stored as { start: 'HH:MM', end: 'HH:MM' } in 24h. Renders two
-      // time pickers side by side with an em-dash separator.
-      const v = (value && typeof value === 'object') ? value : { start: '', end: '' };
-      const update = (patch) => set({ start: v.start || '', end: v.end || '', ...patch });
+    case 'time_range':
+      // Stored as { start: 'HH:MM', end: 'HH:MM' } in 24h. The custom
+      // TimeRangePicker matches the look of the DateTimePicker so the
+      // checklist filling form has one consistent time UI everywhere.
       return (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-          <input type="time" value={v.start || ''} onChange={(e) => update({ start: e.target.value })} style={{ width: 130 }} />
-          <span style={{ color: 'var(--muted-foreground)' }}>—</span>
-          <input type="time" value={v.end || ''} onChange={(e) => update({ end: e.target.value })} style={{ width: 130 }} />
-        </div>
+        <TimeRangePicker
+          value={value}
+          onChange={(v) => set(v)}
+        />
       );
-    }
     case 'radio':
       return (
         <div>

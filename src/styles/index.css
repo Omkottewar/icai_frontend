@@ -102,6 +102,27 @@ input, select, textarea { font-family: inherit; }
 .btn-ghost-light { background: rgba(255,255,255,.1); color: white; border-color: rgba(255,255,255,.3); backdrop-filter: blur(8px); }
 .btn-ghost-light:hover { background: rgba(255,255,255,.2); }
 
+/* Outlined destructive — pairs with .btn-primary for confirm/reject UI.
+   Same base padding as .btn so they line up visually. */
+.btn-outline-danger {
+  background: var(--card);
+  color: var(--destructive, #b91c1c);
+  border-color: color-mix(in srgb, var(--destructive, #b91c1c) 35%, transparent);
+}
+.btn-outline-danger:hover {
+  background: color-mix(in srgb, var(--destructive, #b91c1c) 8%, var(--card));
+  border-color: var(--destructive, #b91c1c);
+}
+
+/* Solid success — the green "Approve" pair partner for multi-stage and
+   any explicit-affirmation actions. */
+.btn-success {
+  background: #16a34a;
+  color: white;
+  border-color: #16a34a;
+}
+.btn-success:hover { background: #15803d; }
+
 /* ── Loading state for any .btn ─────────────────────────────────────────
    Two activation paths:
      1. The <Button> component sets data-loading + .btn-loading

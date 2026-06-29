@@ -404,6 +404,21 @@ export default function PrayGyaanWidget() {
       </button>
 
       <style>{`
+        /* Hide the floating FAB when any modal / drawer / cropper / dialog
+           overlay is open. Without this, the bird renders on top of action
+           buttons inside drawers (e.g. checklist "Submit for review",
+           cropper "Crop & upload") — bad UX. The :has() selector is
+           supported in all evergreen browsers (Chrome 105+, Safari 15.4+,
+           Firefox 121+). */
+        body:has(.admin-drawer-root) #icai-pragyaan-fab,
+        body:has(.dialog-overlay)    #icai-pragyaan-fab,
+        body:has(.modal-backdrop)    #icai-pragyaan-fab,
+        body:has(.admin-drawer-root) .pg-greet,
+        body:has(.dialog-overlay)    .pg-greet,
+        body:has(.modal-backdrop)    .pg-greet {
+          display: none !important;
+        }
+
         @keyframes widgetSlideUp {
           from { opacity: 0; transform: translateY(12px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0)  scale(1); }
