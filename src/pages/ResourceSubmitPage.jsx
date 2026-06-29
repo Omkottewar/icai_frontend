@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
@@ -92,7 +92,7 @@ export default function ResourceSubmitPage() {
     <>
       <PageHeader title="Submit a paper" subtitle="Share your work with the branch. Admin reviews before publishing." />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '720px' }}>
-        <a href="#/resources">← Back to Resources</a>
+        <a href="/resources">← Back to Resources</a>
 
         <form onSubmit={submit} className="sub-form">
           <Field label="Paper title" required>
@@ -178,7 +178,7 @@ export default function ResourceSubmitPage() {
                     </p>
                   )}
                   {p.status === 'published' && (
-                    <a href={`#/resources/papers/${p.slug}`} style={{ fontSize: '.8rem' }}>View live →</a>
+                    <a href={`/resources/papers/${p.slug}`} style={{ fontSize: '.8rem' }}>View live →</a>
                   )}
                 </div>
               ))}

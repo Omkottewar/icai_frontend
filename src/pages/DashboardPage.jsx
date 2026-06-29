@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import { useRoleFlags } from '../hooks/useRoleFlags';
@@ -128,8 +128,8 @@ export default function DashboardPage() {
         </div>
         <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
           <PendingInstancesBadge />
-          <a href="#/events" className="btn btn-outline">Browse events</a>
-          <a href="#/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
+          <a href="/events" className="btn btn-outline">Browse events</a>
+          <a href="/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
         </div>
       </div>
 
@@ -142,7 +142,7 @@ export default function DashboardPage() {
       )}
 
       {isOfficeBearer && officeBearerCard && (
-        <a href="#/admin" className="admin-cta-card" title={officeBearerCard.desc}>
+        <a href="/admin" className="admin-cta-card" title={officeBearerCard.desc}>
           <div className="admin-cta-icon"><IconShield /></div>
           <div className="admin-cta-body">
             <div className="admin-cta-title">{officeBearerCard.title}</div>
@@ -246,11 +246,11 @@ export default function DashboardPage() {
           <div className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>My upcoming events</h2>
-              <a href="#/events" style={{ color: 'var(--primary)', fontSize: '.875rem', fontWeight: 600 }}>Find more →</a>
+              <a href="/events" style={{ color: 'var(--primary)', fontSize: '.875rem', fontWeight: 600 }}>Find more →</a>
             </div>
             {upcomingEvents.length === 0 ? (
               <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.75rem' }}>
-                No upcoming events. <a href="#/events" style={{ color: 'var(--primary)' }}>Browse what's on →</a>
+                No upcoming events. <a href="/events" style={{ color: 'var(--primary)' }}>Browse what's on →</a>
               </p>
             ) : (
               <ul className="col" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
@@ -292,7 +292,7 @@ export default function DashboardPage() {
               ]).map((a) => {
                 const linkProps = a.external
                   ? { href: a.to, target: '_blank', rel: 'noopener noreferrer' }
-                  : { href: '#' + a.to };
+                  : { href: a.to };
                 return (
                   <a key={a.t} {...linkProps} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
                     <a.Icon size="sm" /> {a.t}{a.external && <span aria-hidden style={{ opacity: .6 }}>↗</span>}
@@ -418,11 +418,11 @@ function StudentTabbedBody({ data, user, logout }) {
           <div className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>My upcoming events</h2>
-              <a href="#/events" style={{ color: 'var(--primary)', fontSize: '.875rem', fontWeight: 600 }}>Find more →</a>
+              <a href="/events" style={{ color: 'var(--primary)', fontSize: '.875rem', fontWeight: 600 }}>Find more →</a>
             </div>
             {upcomingEvents.length === 0 ? (
               <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.75rem' }}>
-                No upcoming events. <a href="#/events" style={{ color: 'var(--primary)' }}>Browse what's on →</a>
+                No upcoming events. <a href="/events" style={{ color: 'var(--primary)' }}>Browse what's on →</a>
               </p>
             ) : (
               <ul className="col" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
@@ -462,7 +462,7 @@ function StudentTabbedBody({ data, user, logout }) {
                 { Icon: IconUsers,     t: 'Book a mentor (soon)',  to: '/career-counselling' },
                 { Icon: IconBookOpen,  t: 'Study material',        to: '/resources' },
               ].map((a) => (
-                <a key={a.t} href={'#' + a.to} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
+                <a key={a.t} href={a.to} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
                   <a.Icon size="sm" /> {a.t}
                   <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
                 </a>
@@ -519,7 +519,7 @@ function BranchInsightsCard() {
   return (
     <>
       <InsightsStyles />
-      <a href="#/branch-insights" className="bic-card">
+      <a href="/branch-insights" className="bic-card">
         <div className="bic-glow" aria-hidden="true" />
         <div className="bic-head">
           <div className="bic-head-left">
@@ -665,7 +665,7 @@ function BicMiniKpi({ label, value, sub, accent = 'primary', highlight }) {
 // member dashboard and the legacy student/other layout. labels = { title, desc }.
 function OfficeBearerCTA({ labels }) {
   return (
-    <a href="#/admin" className="admin-cta-card">
+    <a href="/admin" className="admin-cta-card">
       <div className="admin-cta-icon"><IconShield /></div>
       <div className="admin-cta-body">
         <div className="admin-cta-eyebrow">Your workspace</div>
@@ -715,7 +715,7 @@ function PendingInstancesBadge() {
   }, []);
   if (!count) return null;
   return (
-    <a href="#/my-checklists" className="btn btn-outline" style={{ position: 'relative' }}>
+    <a href="/my-checklists" className="btn btn-outline" style={{ position: 'relative' }}>
       My checklists
       <span style={{
         marginLeft: '.4rem',

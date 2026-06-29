@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+﻿import { useEffect, useRef, useState, useCallback } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { useRoute, navigate } from '../hooks/useRoute';
@@ -251,7 +251,7 @@ export default function PaperReaderPage() {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p style={{ color: 'var(--destructive)' }}>{err}</p>
-        <a href={`#/resources/papers/${slug}`}>← Back to paper</a>
+        <a href={`/resources/papers/${slug}`}>← Back to paper</a>
       </section>
     );
   }

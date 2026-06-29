@@ -1,4 +1,4 @@
-import AdminLayout from '../../components/admin/AdminLayout';
+﻿import AdminLayout from '../../components/admin/AdminLayout';
 import { IconSparkles } from '../../icons';
 
 export default function ComingSoonPage({ title = 'Coming soon', description }) {
@@ -15,7 +15,7 @@ export default function ComingSoonPage({ title = 'Coming soon', description }) {
         <p className="muted-text" style={{ maxWidth: '32rem' }}>
           {description ?? 'The data model is already in place — this admin view will land in a follow-up release. For now, use Events to drive the public site.'}
         </p>
-        <a href="#/admin/events" className="btn btn-primary" style={{ marginTop: '.5rem', padding: '.5rem 1rem' }}>
+        <a href="/admin/events" className="btn btn-primary" style={{ marginTop: '.5rem', padding: '.5rem 1rem' }}>
           Go to Events
         </a>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/layout/PageHeader';
@@ -258,7 +258,7 @@ function AttemptLive({ attemptId }) {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p style={{ color: 'var(--destructive)' }}>{err}</p>
-        <a href="#/mock-tests">← Back to mock tests</a>
+        <a href="/mock-tests">← Back to mock tests</a>
       </section>
     );
   }
@@ -277,7 +277,7 @@ function AttemptLive({ attemptId }) {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p>This test has no questions yet. Please contact the branch.</p>
-        <a href="#/mock-tests">← Back to mock tests</a>
+        <a href="/mock-tests">← Back to mock tests</a>
       </section>
     );
   }
@@ -341,10 +341,10 @@ function AttemptLive({ attemptId }) {
         )}
 
         <p className="muted-text" style={{ marginTop: '1.5rem', fontSize: '.85rem' }}>
-          Your final result will appear on the <a href="#/mock-tests">My Mock Tests</a> page once the branch publishes it.
+          Your final result will appear on the <a href="/mock-tests">My Mock Tests</a> page once the branch publishes it.
         </p>
         <div style={{ marginTop: '1.5rem' }}>
-          <a href="#/mock-tests" className="btn btn-primary" style={{ padding: '.5rem 1.1rem' }}>
+          <a href="/mock-tests" className="btn btn-primary" style={{ padding: '.5rem 1.1rem' }}>
             Back to Mock Tests
           </a>
         </div>

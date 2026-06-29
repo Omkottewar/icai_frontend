@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import DataTable from '../../components/admin/DataTable';
 import Drawer from '../../components/admin/Drawer';
@@ -579,7 +579,7 @@ function OpenAssignmentsSection({ userId, showToast }) {
                   Assigned as <strong>{d.role}</strong> · status <strong>{d.status}</strong>
                 </div>
               </div>
-              <a href={`#/my-checklists?id=${d.instance_id}`} className="btn btn-ghost" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }}>
+              <a href={`/my-checklists?id=${d.instance_id}`} className="btn btn-ghost" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }}>
                 View
               </a>
             </li>
@@ -594,7 +594,7 @@ function OpenAssignmentsSection({ userId, showToast }) {
                   Section assignee · {s.section_count} section{s.section_count === 1 ? '' : 's'} · status <strong>{s.status}</strong>
                 </div>
               </div>
-              <a href={`#/my-checklists?id=${s.instance_id}`} className="btn btn-ghost" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }}>
+              <a href={`/my-checklists?id=${s.instance_id}`} className="btn btn-ghost" style={{ padding: '.25rem .5rem', fontSize: '.72rem' }}>
                 View
               </a>
             </li>

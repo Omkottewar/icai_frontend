@@ -5,7 +5,7 @@ export default function Link({ to, children, className = '', onClick, activeClas
   const active = route.path === to || (to !== '/' && route.path.startsWith(to));
   return (
     <a
-      href={'#' + to}
+      href={to}
       className={className + (active && activeClassName ? ' ' + activeClassName : '')}
       onClick={(e) => { onClick && onClick(e); }}
     >

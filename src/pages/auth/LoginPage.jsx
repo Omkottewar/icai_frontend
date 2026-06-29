@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
 import { useSiteContent } from '../../hooks/useSiteContent';
@@ -50,8 +50,8 @@ export default function LoginPage() {
           </div>
 
           <div className="auth-tabs">
-            <a href="#/login" className="auth-tab active" style={{ textAlign: 'center' }}>Sign in</a>
-            <a href="#/signup" className="auth-tab" style={{ textAlign: 'center' }}>Create account</a>
+            <a href="/login" className="auth-tab active" style={{ textAlign: 'center' }}>Sign in</a>
+            <a href="/signup" className="auth-tab" style={{ textAlign: 'center' }}>Create account</a>
           </div>
 
           {err && (
@@ -83,7 +83,7 @@ export default function LoginPage() {
             <div>
               <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <label className="field-label" style={{ marginBottom: 0 }}>Password</label>
-                <a href="#/forgot" style={{ fontSize: '.8125rem', color: 'var(--primary)', fontWeight: 600 }}>
+                <a href="/forgot" style={{ fontSize: '.8125rem', color: 'var(--primary)', fontWeight: 600 }}>
                   Forgot password?
                 </a>
               </div>

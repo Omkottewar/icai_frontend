@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
@@ -67,7 +67,7 @@ export default function MyLibraryPage() {
             <IconBookOpen />
             <strong>You haven't saved anything yet.</strong>
             <p className="muted-text">Tap "Save to library" on any paper to add it here.</p>
-            <a href="#/resources" className="btn btn-primary" style={{ marginTop: '.75rem' }}>Browse resources →</a>
+            <a href="/resources" className="btn btn-primary" style={{ marginTop: '.75rem' }}>Browse resources →</a>
           </div>
         )}
         {items && items.length > 0 && (
@@ -83,7 +83,7 @@ export default function MyLibraryPage() {
             <ul className="ml-cpe-list">
               {cpe.items.map((c) => (
                 <li key={c.attempt_id}>
-                  <a href={`#/resources/papers/${c.paper_slug}`}>
+                  <a href={`/resources/papers/${c.paper_slug}`}>
                     <strong>{c.paper_title}</strong>
                     <span className="muted-text"> · {c.minutes} min · {new Date(c.completed_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
                   </a>
@@ -121,8 +121,8 @@ export default function MyLibraryPage() {
 
 function SavedCard({ item }) {
   const href = item.resource_type === 'paper'
-    ? `#/resources/papers/${item.slug}`
-    : `#/resources/journal/${item.slug}`;
+    ? `/resources/papers/${item.slug}`
+    : `/resources/journal/${item.slug}`;
   return (
     <a href={href} className="ml-card">
       {item.cover_url

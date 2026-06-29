@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { cachedGet } from '../lib/apiCache';
 import { useSiteContent } from '../hooks/useSiteContent';
@@ -80,7 +80,7 @@ export default function MembersDirectoryPage() {
               <strong>{header.signin_notice_title}</strong>{' '}
               {renderMarkdown(header.signin_notice_body)}
             </div>
-            <a href="#/login" className="btn btn-primary" style={{ padding: '.3rem .75rem', fontSize: '.75rem', whiteSpace: 'nowrap' }}>
+            <a href="/login" className="btn btn-primary" style={{ padding: '.3rem .75rem', fontSize: '.75rem', whiteSpace: 'nowrap' }}>
               Sign in <IconArrowRight size="sm" />
             </a>
           </div>

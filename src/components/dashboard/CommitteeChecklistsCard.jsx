@@ -1,4 +1,4 @@
-import { useChecklistInstanceList } from '../../hooks/useChecklist';
+﻿import { useChecklistInstanceList } from '../../hooks/useChecklist';
 import { navigate } from '../../hooks/useRoute';
 import { IconArrowRight } from '../../icons';
 import InsightsStyles from './insights/insightsStyles';
@@ -34,7 +34,7 @@ export default function CommitteeChecklistsCard() {
         emptyText="No checklists waiting for your input."
         actions={
           pending.length > 3 ? (
-            <a href="#/my-checklists" className="iframe-btn">See all →</a>
+            <a href="/my-checklists" className="iframe-btn">See all →</a>
           ) : null
         }
         padding="1rem"

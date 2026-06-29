@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { IconChevronDown, IconClock, IconMapPin, IconArrowRight, IconCheck, IconCheckCircle, IconMessageSquare, IconCalendar } from '../../icons';
 import EventRegisterModal from '../events/EventRegisterModal';
 import EventChat from '../events/EventChat';
@@ -38,7 +38,7 @@ function speakerImg(name) {
   return `https://i.pravatar.cc/96?img=${id}`;
 }
 
-export default function EventRow({ event: e, href = '#/events', detailed = false }) {
+export default function EventRow({ event: e, href = '/events', detailed = false }) {
   const [open, setOpen] = useState(false);
   const [showRegister, setShowRegister] = useState(false);
   const [showChat, setShowChat] = useState(false);

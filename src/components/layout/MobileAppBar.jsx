@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
 import caIndiaLogo from '../../assets/CA India Logo.png';
@@ -66,7 +66,7 @@ export default function MobileAppBar() {
 
   return (
     <header className={'mobile-appbar' + (elevated ? ' is-scrolled' : '')} aria-label="App header">
-      <a href="#/" className="mobile-appbar-brand" aria-label="Home">
+      <a href="/" className="mobile-appbar-brand" aria-label="Home">
         <span className="mobile-appbar-logo">
           <img src={caIndiaLogo} alt="" />
         </span>
@@ -75,11 +75,11 @@ export default function MobileAppBar() {
       <div className="mobile-appbar-actions">
         <NotificationsBell />
         {user ? (
-          <a href="#/dashboard" className="mobile-appbar-avatar" aria-label="Open dashboard">
+          <a href="/dashboard" className="mobile-appbar-avatar" aria-label="Open dashboard">
             {initials}
           </a>
         ) : (
-          <a href="#/login" className="mobile-appbar-signin">Sign in</a>
+          <a href="/login" className="mobile-appbar-signin">Sign in</a>
         )}
       </div>
     </header>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 
 // DPDP Act 2023 / GDPR-aligned cookie banner.
 //
@@ -102,7 +102,7 @@ export default function CookieConsentBanner() {
         We use cookies to keep this site secure, remember your preferences and understand how the
         portal is used. Essential cookies are always on; analytics cookies are set only with your
         consent. You can accept all, reject non-essential, or manage your choices anytime. See our{' '}
-        <a href="#/privacy" style={{ textDecoration: 'underline' }}>Privacy Policy</a>.
+        <a href="/privacy" style={{ textDecoration: 'underline' }}>Privacy Policy</a>.
       </p>
       <div
         style={{

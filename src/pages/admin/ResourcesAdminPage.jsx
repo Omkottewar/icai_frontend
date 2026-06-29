@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
@@ -149,7 +149,7 @@ function ModerationQueue() {
             </td>
             <td>{new Date(p.submitted_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</td>
             <td style={{ textAlign: 'right' }}>
-              <a href={`#/resources/papers/${p.slug}`} className="ra-icon-btn" title="Preview" target="_blank" rel="noopener noreferrer">👁</a>
+              <a href={`/resources/papers/${p.slug}`} className="ra-icon-btn" title="Preview" target="_blank" rel="noopener noreferrer">👁</a>
               <button className="ra-icon-btn" title="Approve" disabled={busy === p.id} onClick={() => act(p.id, 'approve')} style={{ color: '#16a34a' }}><IconCheck /></button>
               <button className="ra-icon-btn" title="Reject with note" disabled={busy === p.id} onClick={() => reject(p)} style={{ color: '#dc2626' }}><IconX /></button>
             </td>
@@ -211,13 +211,13 @@ function PapersTab() {
               {items.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <a href={`#/resources/papers/${p.slug}`} target="_blank" rel="noopener noreferrer"><strong>{p.title}</strong></a>
+                    <a href={`/resources/papers/${p.slug}`} target="_blank" rel="noopener noreferrer"><strong>{p.title}</strong></a>
                   </td>
                   <td>{p.speaker_name}</td>
                   <td><span className={'ra-pill ra-pill-' + p.status}>{p.status.replace('_', ' ')}</span></td>
                   <td>{p.view_count}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <a href={`#/admin/resources/papers/${p.id}/quiz`} className="ra-icon-btn" title="Quiz">📝</a>
+                    <a href={`/admin/resources/papers/${p.id}/quiz`} className="ra-icon-btn" title="Quiz">📝</a>
                     <button className="ra-icon-btn" title="Delete" onClick={() => remove(p.id)} style={{ color: '#dc2626' }}><IconTrash /></button>
                   </td>
                 </tr>

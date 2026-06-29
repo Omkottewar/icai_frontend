@@ -16,7 +16,7 @@ import {
 //   • Mine — the signed-in user's own submissions across statuses, so they
 //     can see which are still pending or got rejected (and why).
 //
-// The route lives at #/student-suggestions and is reachable from the
+// The route lives at /student-suggestions and is reachable from the
 // "See all →" link on the WICASA card and the more-sheet in the mobile
 // bottom nav.
 

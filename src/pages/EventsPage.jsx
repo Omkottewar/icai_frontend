@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import EventRow from '../components/ui/EventRow';
 import CategoryCard from '../components/ui/CategoryCard';
@@ -196,21 +196,16 @@ export default function EventsPage() {
     <>
       <PageHeader title={header.title} subtitle={header.subtitle} />
 
-      {/* Audience tab bar — sticky under the global Header. Three things
-          this style block guarantees:
-            1. `background: #fff` (explicit, not a CSS var) so the bar is
-               never accidentally transparent against any theme override
-            2. zIndex high enough (50) to stack above CategoryCards which
-               can create their own stacking context via hover transforms
-            3. minHeight + boxShadow so the bar always fully covers any
-               row scrolling behind it AND is visually lifted off the page
-          The `top: 64` matches the global Header height. */}
+      {/* Audience tab bar — normal in-flow section header at the top of
+          the events listing. We deliberately do NOT use `position: sticky`
+          here: the surrounding <div className="page-enter"> in AppShell
+          acts as the sticky containing block, which means the bar gets
+          "released" by its parent's bottom edge well before the user
+          reaches the end of the page — appearing mid-page rather than
+          docked to the top. A normal in-flow bar avoids that bug. */}
       <div style={{
         background: '#ffffff',
         borderBottom: '1px solid var(--border)',
-        position: 'sticky',
-        top: 64,
-        zIndex: 50,
         minHeight: '3.5rem',
         boxShadow: '0 1px 0 var(--border), 0 2px 6px rgba(15, 23, 42, 0.04)',
       }}>
@@ -303,49 +298,53 @@ export default function EventsPage() {
         )}
       </section>
 
-      {/* Past events archive — visible underneath the upcoming list. Same
-          audience filter applies. Loads via ?past=1 hook above; hidden
-          entirely while loading on first render so the page doesn't show
-          a "Past events: 0" flash. */}
-      {(pastEventsLoading || pastAudienceFiltered.length > 0) && (
-        <section className="container" style={{ padding: '0 1rem 2.5rem' }}>
-          <div className="row" style={{ marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div>
-              <div className="tiny-eyebrow" style={{ color: 'var(--muted-foreground)' }}>Past programmes</div>
-              <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.5vw, 1.5rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>
-                Recently concluded
-              </h2>
-            </div>
-            <div className="muted-text" style={{ fontSize: '.8125rem' }}>
-              {pastAudienceFiltered.length} past event{pastAudienceFiltered.length !== 1 ? 's' : ''}
-            </div>
+      {/* Past events archive — always rendered so the section is visible
+          (and debuggable) even when the API returns no past events.
+          Shows a shimmer while loading, then either the rows or a
+          friendly empty state. */}
+      <section className="container" style={{ padding: '0 1rem 2.5rem' }}>
+        <div className="row" style={{ marginBottom: '.75rem', flexWrap: 'wrap', gap: '.5rem', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <div>
+            <div className="tiny-eyebrow" style={{ color: 'var(--muted-foreground)' }}>Past programmes</div>
+            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.125rem, 3.5vw, 1.5rem)', fontWeight: 700, lineHeight: 1.15, letterSpacing: '-.01em' }}>
+              Recently concluded
+            </h2>
           </div>
+          <div className="muted-text" style={{ fontSize: '.8125rem' }}>
+            {pastAudienceFiltered.length} past event{pastAudienceFiltered.length !== 1 ? 's' : ''}
+          </div>
+        </div>
 
-          {pastEventsLoading ? (
-            <EventRowsShimmer count={3} />
-          ) : (
-            <div className="past-events-list">
-              {pastAudienceFiltered.slice(0, 12).map((e) => (
-                <EventRow key={e.id ?? e.title} event={e} detailed />
-              ))}
-            </div>
-          )}
+        {pastEventsLoading ? (
+          <EventRowsShimmer count={3} />
+        ) : pastAudienceFiltered.length > 0 ? (
+          <div className="past-events-list">
+            {pastAudienceFiltered.slice(0, 12).map((e) => (
+              <EventRow key={e.id ?? e.title} event={e} detailed />
+            ))}
+          </div>
+        ) : (
+          <div className="card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+            <p className="muted-text" style={{ margin: 0 }}>
+              No past events yet — concluded programmes will appear here.
+            </p>
+          </div>
+        )}
 
-          {!pastEventsLoading && pastAudienceFiltered.length > 12 && (
-            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem', textAlign: 'center' }}>
-              Showing the 12 most recent. Older events live in the <a href="#/gallery">photo gallery</a>.
-            </div>
-          )}
+        {!pastEventsLoading && pastAudienceFiltered.length > 12 && (
+          <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem', textAlign: 'center' }}>
+            Showing the 12 most recent. Older events live in the <a href="/gallery">photo gallery</a>.
+          </div>
+        )}
 
-          <style>{`
-            /* Mute past events visually so they read as archive — same row
-               layout as upcoming, just slightly desaturated. Hover restores
-               full colour so individual cards stay actionable. */
-            .past-events-list { opacity: .78; transition: opacity .15s; }
-            .past-events-list:hover { opacity: 1; }
-          `}</style>
-        </section>
-      )}
+        <style>{`
+          /* Mute past events visually so they read as archive — same row
+             layout as upcoming, just slightly desaturated. Hover restores
+             full colour so individual cards stay actionable. */
+          .past-events-list { opacity: .78; transition: opacity .15s; }
+          .past-events-list:hover { opacity: 1; }
+        `}</style>
+      </section>
 
       {/* Committee categories */}
       <section className="container" style={{ padding: '0 1rem 4rem', borderTop: '1px solid var(--border)', marginTop: '1rem', paddingTop: '3rem' }}>

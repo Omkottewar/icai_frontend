@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { Shimmer } from '../../components/ui/Shimmer';
@@ -104,7 +104,7 @@ export default function StudentSuggestionsAdminPage() {
   };
 
   const headerActions = useMemo(() => (
-    <a href="#/admin/student-suggestion-topics" className="btn btn-outline" style={{ fontSize: '.8125rem' }}>
+    <a href="/admin/student-suggestion-topics" className="btn btn-outline" style={{ fontSize: '.8125rem' }}>
       Manage topics
     </a>
   ), []);

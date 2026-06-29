@@ -1,10 +1,10 @@
-import { IconAward, IconCheckCircle } from '../../icons';
+﻿import { IconAward, IconCheckCircle } from '../../icons';
 
 export default function AuthSidePanel({ mode }) {
   return (
     <div className="auth-side">
       <div style={{ position: 'relative', zIndex: 1 }}>
-        <a href="#/" className="row gap-3" style={{ color: 'white' }}>
+        <a href="/" className="row gap-3" style={{ color: 'white' }}>
           <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '.5rem', background: 'rgba(255,255,255,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,.25)' }}>CA</div>
           <div>
             <div style={{ fontSize: '.875rem', fontWeight: 700 }}>ICAI Nagpur Branch</div>

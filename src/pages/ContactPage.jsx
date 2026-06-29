@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { IconMapPin, IconMail, IconPhone, IconClock, IconCheckCircle, IconX } from '../icons';
 import { useSiteSettings } from '../hooks/useSiteSettings';
@@ -76,8 +76,8 @@ export default function ContactPage() {
   };
 
   const trackHref = ticketNo
-    ? `#/track-grievance?ticket_no=${encodeURIComponent(ticketNo)}&email=${encodeURIComponent(submittedEmail)}`
-    : '#/track-grievance';
+    ? `/track-grievance?ticket_no=${encodeURIComponent(ticketNo)}&email=${encodeURIComponent(submittedEmail)}`
+    : '/track-grievance';
 
   return (
     <>
@@ -92,7 +92,7 @@ export default function ContactPage() {
             <li className="row gap-2"><IconClock size="sm" /> {settings.branch_hours}</li>
           </ul>
           <div style={{ marginTop: '1.25rem' }}>
-            <a className="btn btn-ghost" href="#/track-grievance">{sections.track_link_label}</a>
+            <a className="btn btn-ghost" href="/track-grievance">{sections.track_link_label}</a>
           </div>
         </div>
 

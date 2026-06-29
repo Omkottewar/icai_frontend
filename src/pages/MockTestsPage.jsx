@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate, useRoute } from '../hooks/useRoute';
@@ -312,7 +312,7 @@ function MockTestCard({ test, myReg, openExpanded, canTake, onRegister, onCancel
             <span className="mt-pill mt-pill-success"><IconCheckCircle size="sm" /> Registered</span>
             {test.supports_online && (
               <a
-                href={`#/mock-tests/${test.id}/attempt`}
+                href={`/mock-tests/${test.id}/attempt`}
                 className="btn btn-primary"
                 style={{ padding: '.35rem .8rem', fontSize: '.82rem' }}
               >
@@ -553,7 +553,7 @@ function MockTestDiscussion({ testId, onCountChange }) {
         </form>
       ) : (
         <p className="muted-text" style={{ fontSize: '.78rem', marginTop: '.5rem' }}>
-          <a href="#/login">Sign in</a> to join the discussion.
+          <a href="/login">Sign in</a> to join the discussion.
         </p>
       )}
 

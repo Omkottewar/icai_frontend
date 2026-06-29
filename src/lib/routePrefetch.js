@@ -1,4 +1,4 @@
-// Hover/focus link prefetching.
+﻿// Hover/focus link prefetching.
 //
 // Goal: when the user's cursor enters a nav link (or it gets keyboard focus,
 // or a touch begins), kick off the dynamic `import()` for that route's chunk.
@@ -14,7 +14,7 @@
 //
 // Why delegated listening: instead of wrapping every <a> in a custom
 // component, we attach one mouseover/focusin/touchstart handler to the
-// document and read the closest <a href="#/..."> at the event target. This
+// document and read the closest <a href="/..."> at the event target. This
 // covers nav links, dashboard CTAs, footer links, dropdown items, anchors
 // inside markdown content — anything that uses the hashbang convention.
 
@@ -145,20 +145,35 @@ export function prefetchRoute(path) {
   }
 }
 
-// Convert "#/foo/bar?x=1" → "/foo/bar". Returns null for non-hash hrefs.
-function pathFromHashHref(href) {
+// Convert an <a href> into a pathname we can look up in ROUTE_LOADERS.
+// Handles both the new clean-URL shape ("/foo/bar?x=1") and the legacy
+// hash shape ("#/foo/bar?x=1") so links from older emails/notifications
+// still prefetch. Returns null for external / non-routable hrefs.
+function pathFromHref(href) {
   if (!href) return null;
-  const idx = href.indexOf('#/');
-  if (idx === -1) return null;
-  const rest = href.slice(idx + 1);     // starts with "/"
-  const qIdx = rest.indexOf('?');
-  return qIdx === -1 ? rest : rest.slice(0, qIdx);
+  // Legacy hash form — peel off the "#" prefix to expose "/foo/bar".
+  const hashIdx = href.indexOf('#/');
+  if (hashIdx !== -1) {
+    const rest = href.slice(hashIdx + 1);
+    const qIdx = rest.indexOf('?');
+    return qIdx === -1 ? rest : rest.slice(0, qIdx);
+  }
+  // External / scheme-prefixed — skip.
+  if (/^([a-z]+:)?\/\//i.test(href) || /^(mailto|tel|sms):/i.test(href)) return null;
+  if (!href.startsWith('/')) return null;
+  // Same-origin clean URL.
+  const qIdx = href.indexOf('?');
+  const hIdx = href.indexOf('#');
+  let end = href.length;
+  if (qIdx !== -1) end = Math.min(end, qIdx);
+  if (hIdx !== -1) end = Math.min(end, hIdx);
+  return href.slice(0, end);
 }
 
 // ─── Delegated event installer ──────────────────────────────────────────
 //
 // One listener on the document instead of per-link wiring — covers every
-// <a href="#/..."> anywhere in the tree, including those added dynamically
+// <a href="/..."> anywhere in the tree, including those added dynamically
 // (header dropdown, drawer detail panels, markdown content).
 //
 // Capture phase + passive: we only want to read the href; we never call
@@ -174,7 +189,7 @@ export function installLinkPrefetchListener() {
     // link bubble events through their text node, not the anchor itself.
     for (let hop = 0; el && hop < 4; hop += 1, el = el.parentElement) {
       if (el.tagName === 'A') {
-        const path = pathFromHashHref(el.getAttribute('href'));
+        const path = pathFromHref(el.getAttribute('href'));
         if (path) prefetchRoute(path);
         return;
       }

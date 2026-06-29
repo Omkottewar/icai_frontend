@@ -1,4 +1,4 @@
-import PageHeader from '../components/layout/PageHeader';
+﻿import PageHeader from '../components/layout/PageHeader';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconCheckCircle, IconArrowRight, IconUsers, IconBriefcase, IconShield, IconAward, IconBookOpen } from '../icons';
@@ -10,8 +10,8 @@ import { IconCheckCircle, IconArrowRight, IconUsers, IconBriefcase, IconShield, 
 const CARD_FRAMES = [
   { Icon: IconShield,       href: 'https://eservices.icai.org/', external: true,                                 },
   { Icon: IconCheckCircle,  href: 'https://udin.icai.org/',      external: true,                                 },
-  { Icon: IconAward,        href: '#/dashboard',                 note: 'Sign in to see your live tracker · official records on ICAI CPE portal' },
-  { Icon: IconBookOpen,     href: '#/resources',                 note: 'Submit an article → /resources/submit' },
+  { Icon: IconAward,        href: '/dashboard',                 note: 'Sign in to see your live tracker · official records on ICAI CPE portal' },
+  { Icon: IconBookOpen,     href: '/resources',                 note: 'Submit an article → /resources/submit' },
 ];
 
 export default function MembersPage() {
@@ -47,10 +47,10 @@ export default function MembersPage() {
 
         {/* Quick access row */}
         <div className="row gap-3" style={{ marginBottom: '2.5rem', flexWrap: 'wrap' }}>
-          <a href="#/members-directory" className="btn btn-outline" style={{ gap: '.5rem' }}>
+          <a href="/members-directory" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconUsers size="sm" /> {quickAccess.directory_label}
           </a>
-          <a href="#/job-vacancies" className="btn btn-outline" style={{ gap: '.5rem' }}>
+          <a href="/job-vacancies" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconBriefcase size="sm" /> {quickAccess.jobs_label}
           </a>
         </div>

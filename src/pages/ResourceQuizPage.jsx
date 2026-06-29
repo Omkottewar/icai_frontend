@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
@@ -74,7 +74,7 @@ export default function ResourceQuizPage() {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p style={{ color: 'var(--destructive)' }}>{err}</p>
-        <a href={`#/resources/papers/${slug}`}>← Back to paper</a>
+        <a href={`/resources/papers/${slug}`}>← Back to paper</a>
       </section>
     );
   }
@@ -104,7 +104,7 @@ export default function ResourceQuizPage() {
           <span style={{ fontSize: '3rem' }}>⏳</span>
           <h2>Come back in {hoursLeft} hour{hoursLeft === 1 ? '' : 's'}</h2>
           <p className="muted-text">You can retake this quiz after the cooldown period. The break helps you review and re-read.</p>
-          <a href={`#/resources/papers/${slug}`} className="btn btn-outline" style={{ marginTop: '1rem' }}>← Back to paper</a>
+          <a href={`/resources/papers/${slug}`} className="btn btn-outline" style={{ marginTop: '1rem' }}>← Back to paper</a>
         </div>
         <style>{COOLDOWN_STYLES}</style>
       </section>
@@ -115,7 +115,7 @@ export default function ResourceQuizPage() {
     <>
       <PageHeader title="CPE Quiz" subtitle={`Pass ${data.quiz.pass_threshold} of ${data.quiz.question_count} to earn ${data.quiz.cpe_credit_minutes} min unstructured CPE.`} />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '720px' }}>
-        <a href={`#/resources/papers/${slug}`} className="quiz-back">← Back to paper</a>
+        <a href={`/resources/papers/${slug}`} className="quiz-back">← Back to paper</a>
 
         <form onSubmit={submit} className="quiz-form">
           {data.questions.map((q, qIdx) => (
@@ -169,8 +169,8 @@ function ResultView({ result, slug, quizMinutes, alreadyPassed }) {
           </p>
         )}
         <div className="quiz-result-actions">
-          <a href={`#/resources/papers/${slug}`} className="btn btn-outline">Back to paper</a>
-          <a href="#/my-library" className="btn btn-primary">View My Library →</a>
+          <a href={`/resources/papers/${slug}`} className="btn btn-outline">Back to paper</a>
+          <a href="/my-library" className="btn btn-primary">View My Library →</a>
         </div>
       </div>
       <style>{RESULT_STYLES}</style>

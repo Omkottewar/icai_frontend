@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -92,7 +92,7 @@ export default function BottomNav() {
           return (
             <a
               key={to}
-              href={'#' + to}
+              href={to}
               className={'bottom-nav-tab' + (active ? ' is-active' : '')}
               aria-current={active ? 'page' : undefined}
             >
@@ -135,7 +135,7 @@ function BottomSheet({ onClose, authed, onLogout }) {
 
         <div className="bottom-sheet-grid">
           {items.map(({ to, Icon, label }) => (
-            <a key={to} href={'#' + to} className="bottom-sheet-item" onClick={onClose}>
+            <a key={to} href={to} className="bottom-sheet-item" onClick={onClose}>
               <span className="bottom-sheet-item-icon" aria-hidden="true"><Icon /></span>
               <span className="bottom-sheet-item-label">{label}</span>
             </a>
@@ -150,10 +150,10 @@ function BottomSheet({ onClose, authed, onLogout }) {
             </button>
           ) : (
             <div className="col gap-2">
-              <a href="#/login" className="btn btn-primary" onClick={onClose} style={{ justifyContent: 'center' }}>
+              <a href="/login" className="btn btn-primary" onClick={onClose} style={{ justifyContent: 'center' }}>
                 Sign in <IconArrowRight size="sm" />
               </a>
-              <a href="#/signup" className="btn btn-outline" onClick={onClose} style={{ justifyContent: 'center' }}>
+              <a href="/signup" className="btn btn-outline" onClick={onClose} style={{ justifyContent: 'center' }}>
                 Create account
               </a>
             </div>

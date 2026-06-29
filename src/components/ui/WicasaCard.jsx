@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { navigate } from '../../hooks/useRoute';
 import { useSiteContent } from '../../hooks/useSiteContent';
@@ -153,12 +153,12 @@ export default function WicasaCard() {
         >
           <IconPlus size="sm" /> Submit a suggestion
         </button>
-        <a href="#/student-suggestions" className="btn btn-ghost" style={{ padding: '.4rem .85rem', fontSize: '.8rem' }}>
+        <a href="/student-suggestions" className="btn btn-ghost" style={{ padding: '.4rem .85rem', fontSize: '.8rem' }}>
           See all →
         </a>
       </div>
 
-      <a href="#/students" className="wicasa-resources" style={{ marginTop: '1rem' }}>
+      <a href="/students" className="wicasa-resources" style={{ marginTop: '1rem' }}>
         {t.resources_label} <IconArrowRight size="sm" />
       </a>
 

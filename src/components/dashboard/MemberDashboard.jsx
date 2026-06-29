@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import NotificationSettingsCard from './NotificationSettingsCard';
 import MemberProfileDrawer from './MemberProfileDrawer';
 import {
@@ -326,8 +326,8 @@ function MembershipIdentityCard({ user, profile, pendingBadge, onEdit }) {
       </div>
       <div className="md-identity-actions">
         {pendingBadge}
-        <a href="#/events" className="btn btn-outline">Browse events</a>
-        <a href="#/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
+        <a href="/events" className="btn btn-outline">Browse events</a>
+        <a href="/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
       </div>
     </div>
   );
@@ -369,7 +369,7 @@ function CPEDeadlineAlert({ cpe }) {
           {gap} hour{gap === 1 ? '' : 's'} of CPE left for {cpe.fy_label}.
         </strong>
         <span className="muted-text"> {daysLeft} day{daysLeft === 1 ? '' : 's'} to close. </span>
-        <a href="#/events" style={{ color: 'inherit', fontWeight: 700, textDecoration: 'underline' }}>
+        <a href="/events" style={{ color: 'inherit', fontWeight: 700, textDecoration: 'underline' }}>
           Find a CPE event →
         </a>
       </div>
@@ -535,13 +535,13 @@ function UpcomingEventsCard({ rows, onCancelled }) {
     <div className="card md-card">
       <div className="md-card-head">
         <h2 className="md-card-title">My upcoming events</h2>
-        <a href="#/events" className="md-card-action">Find more →</a>
+        <a href="/events" className="md-card-action">Find more →</a>
       </div>
       {rows.length === 0 ? (
         <div className="md-empty">
           <IconCalendar size="lg" />
           <p>No events on your calendar yet.</p>
-          <a href="#/events" className="md-empty-cta">Browse what's on →</a>
+          <a href="/events" className="md-empty-cta">Browse what's on →</a>
         </div>
       ) : (
         <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
@@ -655,7 +655,7 @@ function MyRoomBookingsCard() {
     <div className="card md-card">
       <div className="md-card-head">
         <h2 className="md-card-title">My room bookings</h2>
-        <a href="#/book-room" className="md-card-action">Book a room →</a>
+        <a href="/book-room" className="md-card-action">Book a room →</a>
       </div>
       <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
         {upcoming.map((b) => (
@@ -766,12 +766,12 @@ function SuggestedEventsCard({ rows }) {
             Upcoming, with seats open — pulled from the events you haven't joined yet.
           </p>
         </div>
-        <a href="#/events" className="md-card-action">All events →</a>
+        <a href="/events" className="md-card-action">All events →</a>
       </div>
       <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
         {rows.map((e) => (
           <li key={e.id} className="md-row md-row-link">
-            <a href={`#/events?slug=${e.slug}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', textDecoration: 'none', color: 'inherit' }}>
+            <a href={`/events?slug=${e.slug}`} style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%', textDecoration: 'none', color: 'inherit' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="md-row-title">{e.title}</div>
                 <div className="md-row-meta">
@@ -819,18 +819,18 @@ function SavedLibraryCard({ items, total }) {
             {total > 0 ? `${total} saved item${total === 1 ? '' : 's'} · most-recent first` : 'Save papers and journals you want to revisit.'}
           </p>
         </div>
-        <a href="#/my-library" className="md-card-action">Open library →</a>
+        <a href="/my-library" className="md-card-action">Open library →</a>
       </div>
       {items.length === 0 ? (
         <div className="md-empty">
           <IconBookOpen size="lg" />
           <p>Nothing saved yet.</p>
-          <a href="#/resources" className="md-empty-cta">Browse resources →</a>
+          <a href="/resources" className="md-empty-cta">Browse resources →</a>
         </div>
       ) : (
         <div className="md-library-grid">
           {items.map((b) => (
-            <a key={b.bookmark_id} href={`#/resources/${b.resource_type === 'ejournal' ? 'journal' : 'papers'}/${b.slug}`} className="md-library-tile">
+            <a key={b.bookmark_id} href={`/resources/${b.resource_type === 'ejournal' ? 'journal' : 'papers'}/${b.slug}`} className="md-library-tile">
               <LibraryCover src={b.cover_url} />
               <div className="md-library-tile-body">
                 <div className="md-library-tile-type">
@@ -857,9 +857,9 @@ function MemberServicesGrid() {
     { Icon: IconShield,    title: 'Generate UDIN',          desc: 'Issue UDIN for signed documents on the official portal.', href: ICAI_LINKS.udin,        external: true, needsIcaiLogin: true },
     { Icon: IconAward,     title: 'Track CPE certificates', desc: 'Download structured/unstructured CPE certificates.',     href: ICAI_LINKS.cpePortal,   external: true, needsIcaiLogin: true },
     { Icon: IconBriefcase, title: 'COP services',           desc: 'COP renewal, restoration, surrender, firm registration.', href: ICAI_LINKS.copServices, external: true, needsIcaiLogin: true },
-    { Icon: IconUsers,     title: 'Members directory',      desc: 'Find a Nagpur member by name, MRN or area.',              href: '#/members-directory' },
-    { Icon: IconBriefcase, title: 'Job vacancies',          desc: 'Senior positions and openings posted by member firms.',   href: '#/job-vacancies' },
-    { Icon: IconHandshake, title: 'Contribute to CABF',     desc: 'Support members and families in distress.',              href: '#/benevolent-fund' },
+    { Icon: IconUsers,     title: 'Members directory',      desc: 'Find a Nagpur member by name, MRN or area.',              href: '/members-directory' },
+    { Icon: IconBriefcase, title: 'Job vacancies',          desc: 'Senior positions and openings posted by member firms.',   href: '/job-vacancies' },
+    { Icon: IconHandshake, title: 'Contribute to CABF',     desc: 'Support members and families in distress.',              href: '/benevolent-fund' },
   ];
 
   return (
@@ -1062,8 +1062,8 @@ function GrievanceTile() {
           Grievances against members, firms or the branch. 48-hour SLA.
         </p>
         <div className="row gap-2" style={{ flexWrap: 'wrap' }}>
-          <a href="#/contact" className="btn btn-primary" style={{ padding: '.35rem .7rem', fontSize: '.78rem' }}>New grievance</a>
-          <a href="#/track-grievance" className="btn btn-outline" style={{ padding: '.35rem .7rem', fontSize: '.78rem' }}>Track ticket</a>
+          <a href="/contact" className="btn btn-primary" style={{ padding: '.35rem .7rem', fontSize: '.78rem' }}>New grievance</a>
+          <a href="/track-grievance" className="btn btn-outline" style={{ padding: '.35rem .7rem', fontSize: '.78rem' }}>Track ticket</a>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { navigate } from '../../hooks/useRoute';
 import { IconBriefcase, IconArrowRight } from '../../icons';
@@ -41,10 +41,10 @@ export default function EmployerDashboardPage() {
       <div className="card" style={{ padding: '1.25rem' }}>
         <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '.5rem' }}>Quick actions</h2>
         <div style={{ display: 'grid', gap: '.5rem' }}>
-          <a href="#/employer/postings" className="btn btn-outline" style={{ justifyContent: 'space-between' }}>
+          <a href="/employer/postings" className="btn btn-outline" style={{ justifyContent: 'space-between' }}>
             Manage postings <IconArrowRight size="sm" />
           </a>
-          <a href="#/employer/profile" className="btn btn-outline" style={{ justifyContent: 'space-between' }}>
+          <a href="/employer/profile" className="btn btn-outline" style={{ justifyContent: 'space-between' }}>
             Edit company details <IconArrowRight size="sm" />
           </a>
         </div>

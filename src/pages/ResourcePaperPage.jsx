@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
@@ -85,12 +85,12 @@ export default function ResourcePaperPage() {
   };
 
   const shareWhatsApp = () => {
-    const text = `${paper.title} — by ${paper.speaker_name}\n${window.location.origin}/#/resources/papers/${paper.slug}`;
+    const text = `${paper.title} — by ${paper.speaker_name}\n${window.location.origin}/resources/papers/${paper.slug}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const copyLink = async () => {
-    const url = `${window.location.origin}/#/resources/papers/${paper.slug}`;
+    const url = `${window.location.origin}/resources/papers/${paper.slug}`;
     try {
       await navigator.clipboard.writeText(url);
       // tiny toast — keep self-contained
@@ -106,7 +106,7 @@ export default function ResourcePaperPage() {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p style={{ color: 'var(--destructive)' }}>{err}</p>
-        <a href="#/resources">← Back to Resources</a>
+        <a href="/resources">← Back to Resources</a>
       </section>
     );
   }
@@ -125,7 +125,7 @@ export default function ResourcePaperPage() {
 
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '900px' }}>
         <div className="pp-back">
-          <a href="#/resources">← All resources</a>
+          <a href="/resources">← All resources</a>
         </div>
 
         {/* Topics + view count strip */}
@@ -133,7 +133,7 @@ export default function ResourcePaperPage() {
           {paper.topics.map((t) => (
             <a
               key={t.code}
-              href={`#/resources?topic=${t.code}`}
+              href={`/resources?topic=${t.code}`}
               className="pp-topic-pill"
               onClick={(e) => { e.preventDefault(); navigate(`/resources?topic=${t.code}`); }}
             >{t.name}</a>
@@ -145,7 +145,7 @@ export default function ResourcePaperPage() {
 
         {/* Author byline */}
         <div className="pp-author">
-          <a href={`#/resources/speakers/${speakerSlug}`} className="pp-author-link">
+          <a href={`/resources/speakers/${speakerSlug}`} className="pp-author-link">
             <span className="pp-author-avatar">
               {paper.speaker_name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
             </span>
@@ -157,7 +157,7 @@ export default function ResourcePaperPage() {
           <div className="pp-meta">
             {dateLabel && <span><IconCalendar size="sm" /> {dateLabel}</span>}
             {paper.event && (
-              <a href={`#/events/${paper.event.slug}`}>
+              <a href={`/events/${paper.event.slug}`}>
                 <IconUsers size="sm" /> {paper.event.title}
               </a>
             )}
@@ -176,7 +176,7 @@ export default function ResourcePaperPage() {
         {/* Action bar — read in app, download, bookmark, share */}
         <div className="pp-actions">
           {paper.pdf_url && (
-            <a href={`#/resources/papers/${paper.slug}/read`} className="btn btn-primary">
+            <a href={`/resources/papers/${paper.slug}/read`} className="btn btn-primary">
               <IconBookOpen size="sm" /> <span>Read in app</span>
             </a>
           )}
@@ -250,7 +250,7 @@ function QuizCTA({ quiz, slug }) {
     );
   }
   return (
-    <a href={`#/resources/papers/${slug}/quiz`} className="pp-quiz-cta pp-quiz-open">
+    <a href={`/resources/papers/${slug}/quiz`} className="pp-quiz-cta pp-quiz-open">
       <span style={{ fontSize: '1.75rem' }}>🎓</span>
       <div style={{ flex: 1 }}>
         <strong>Take the quiz · earn {quiz.quiz.cpe_credit_minutes} min CPE</strong>
@@ -345,7 +345,7 @@ function CommentsThread({ paper, user }) {
         </form>
       ) : (
         <div className="pp-comments-signin">
-          <a href="#/login">Sign in</a> to post questions or comments.
+          <a href="/login">Sign in</a> to post questions or comments.
         </div>
       )}
 

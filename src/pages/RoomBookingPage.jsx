@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
@@ -215,7 +215,7 @@ export default function RoomBookingPage() {
             <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.5rem' }}>
               The branch hasn't published any bookable rooms. Check back soon or contact the office.
             </p>
-            <a href="#/contact" className="btn btn-outline" style={{ marginTop: '1.25rem' }}>Open the contact form</a>
+            <a href="/contact" className="btn btn-outline" style={{ marginTop: '1.25rem' }}>Open the contact form</a>
           </div>
         </section>
       </>
@@ -342,7 +342,7 @@ export default function RoomBookingPage() {
                     <button className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }} onClick={reset}>
                       Book another
                     </button>
-                    <a href="#/dashboard" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
+                    <a href="/dashboard" className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
                       Open dashboard
                     </a>
                   </div>

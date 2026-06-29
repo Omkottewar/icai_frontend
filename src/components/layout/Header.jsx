@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { navigate } from '../../hooks/useRoute';
 import Link from '../ui/Link';
@@ -19,6 +19,28 @@ export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [q, setQ] = useState('');
   const menuRef = useRef(null);
+  const headerRef = useRef(null);
+
+  // The audience tab bar on /events (and any other page-level sticky bar)
+  // needs to stick *below* this header. The header height changes with
+  // viewport (mobile collapses the top-bar items) and with the mobile-nav
+  // expand state, so we publish the live height as a CSS variable that
+  // children can read with `top: var(--header-h)`.
+  useLayoutEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const publish = () => {
+      document.documentElement.style.setProperty('--header-h', `${el.offsetHeight}px`);
+    };
+    publish();
+    const ro = new ResizeObserver(publish);
+    ro.observe(el);
+    window.addEventListener('resize', publish);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', publish);
+    };
+  }, [open]);
 
   // tel: links need digits-only; mailto can pass the raw email through.
   const phoneTel = (settings.branch_phone || '').replace(/[^\d+]/g, '');
@@ -37,7 +59,7 @@ export default function Header() {
   };
 
   return (
-    <header style={{ position: 'sticky', top: 0, zIndex: 50, background: 'var(--primary)', color: 'var(--primary-foreground)', borderBottom: '1px solid rgba(255,255,255,.12)' }}>
+    <header ref={headerRef} style={{ position: 'sticky', top: 0, zIndex: 100, background: 'var(--primary)', color: 'var(--primary-foreground)', borderBottom: '1px solid rgba(255,255,255,.12)' }}>
       {/* Top bar */}
       <div style={{ background: 'white', color: 'var(--foreground)', borderBottom: '1px solid rgba(0,0,0,.08)' }}>
         <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.375rem 1rem', fontSize: '.75rem' }}>
@@ -79,7 +101,7 @@ export default function Header() {
 
       {/* Main nav bar */}
       <div className="container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '.75rem 1rem' }}>
-        <a href="#/" className="row gap-3" style={{ color: 'white' }}>
+        <a href="/" className="row gap-3" style={{ color: 'white' }}>
           <div style={{ width: '2.75rem', height: '2.75rem', borderRadius: '.5rem', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', padding: '.25rem' }}>
             <img src={caIndiaLogo} alt="CA India" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
           </div>
@@ -108,7 +130,7 @@ export default function Header() {
             />
           </form>
 
-          {/* <a href="#/praygyaan" className="row gap-1 praygyaan-pill" style={{ display: 'none', padding: '.375rem .75rem', background: 'rgba(255,255,255,.12)', color: 'white', borderRadius: '.375rem', fontSize: '.75rem', fontWeight: 600 }}>
+          {/* <a href="/praygyaan" className="row gap-1 praygyaan-pill" style={{ display: 'none', padding: '.375rem .75rem', background: 'rgba(255,255,255,.12)', color: 'white', borderRadius: '.375rem', fontSize: '.75rem', fontWeight: 600 }}>
             <IconBot size="sm" /> PrayGyaan AI
           </a> */}
 
@@ -128,7 +150,7 @@ export default function Header() {
                     <div style={{ fontSize: '.75rem', color: 'var(--muted-foreground)' }}>{user.email}</div>
                     <span className="badge badge-secondary" style={{ marginTop: '.375rem' }}>{user.role}</span>
                   </div>
-                  <a href="#/dashboard" className="menu-item" onClick={() => setMenuOpen(false)}><IconUser size="sm" /> Dashboard</a>
+                  <a href="/dashboard" className="menu-item" onClick={() => setMenuOpen(false)}><IconUser size="sm" /> Dashboard</a>
                   {(() => {
                     // Office bearers get a prominent shortcut into the role-aware
                     // /admin home (chairman → ChairmanHome, treasurer → TreasurerHome,
@@ -148,18 +170,18 @@ export default function Header() {
                       null;
                     if (!label) return null;
                     return (
-                      <a href="#/admin" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                      <a href="/admin" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
                         <IconShield size="sm" /> {label}
                       </a>
                     );
                   })()}
                   {user.role === 'Employer' && (
-                    <a href="#/employer" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                    <a href="/employer" className="menu-item" onClick={() => setMenuOpen(false)} style={{ color: 'var(--primary)', fontWeight: 600 }}>
                       <IconShield size="sm" /> Employer dashboard
                     </a>
                   )}
-                  <a href="#/members" className="menu-item" onClick={() => setMenuOpen(false)}><IconShield size="sm" /> Member services</a>
-                  <a href="#/dashboard" className="menu-item" onClick={() => setMenuOpen(false)}><IconSettings size="sm" /> Settings</a>
+                  <a href="/members" className="menu-item" onClick={() => setMenuOpen(false)}><IconShield size="sm" /> Member services</a>
+                  <a href="/dashboard" className="menu-item" onClick={() => setMenuOpen(false)}><IconSettings size="sm" /> Settings</a>
                   <button className="menu-item" onClick={() => { setMenuOpen(false); logout(); }} style={{ color: 'var(--destructive)', width: '100%', textAlign: 'left' }}>
                     <IconLogOut size="sm" /> Sign out
                   </button>
@@ -168,8 +190,8 @@ export default function Header() {
             </div>
           ) : (
             <>
-              <a href="#/login" className="btn btn-outline" style={{ padding: '.4rem .9rem' }}>Sign in</a>
-              <a href="#/signup" className="btn btn-primary signup-cta" style={{ display: 'none', padding: '.4rem .9rem' }}>Sign up</a>
+              <a href="/login" className="btn btn-outline" style={{ padding: '.4rem .9rem' }}>Sign in</a>
+              <a href="/signup" className="btn btn-primary signup-cta" style={{ display: 'none', padding: '.4rem .9rem' }}>Sign up</a>
             </>
           )}
 
@@ -184,11 +206,11 @@ export default function Header() {
         <div className="container" style={{ paddingBottom: '.75rem' }}>
           <nav className="col" style={{ borderTop: '1px solid var(--border)', paddingTop: '.5rem' }}>
             {NAV.map((n) => (
-              <a key={n.to} href={'#' + n.to} onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 500 }}>
+              <a key={n.to} href={n.to} onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 500 }}>
                 {n.label}
               </a>
             ))}
-            <a href="#/praygyaan" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--secondary)' }}>PrayGyaan AI</a>
+            <a href="/praygyaan" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--secondary)' }}>PrayGyaan AI</a>
             {user && (() => {
               // Office bearers get a direct mobile link into /admin too — the
               // chairman approving from her phone during a meeting shouldn't
@@ -199,13 +221,13 @@ export default function Header() {
                 'accountant','branch_manager'].some((c) => codes.has(c));
               if (!officeBearer) return null;
               return (
-                <a href="#/admin" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)' }}>
+                <a href="/admin" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)' }}>
                   Open your dashboard →
                 </a>
               );
             })()}
             {!user && (
-              <a href="#/signup" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)' }}>Create account →</a>
+              <a href="/signup" onClick={() => setOpen(false)} style={{ padding: '.5rem 0', fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)' }}>Create account →</a>
             )}
           </nav>
         </div>

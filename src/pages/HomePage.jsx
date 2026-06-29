@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
 import EventRow from '../components/ui/EventRow';
@@ -93,7 +93,7 @@ export default function HomePage() {
       {tickerItems.length > 0 && (
         <div className="ticker-bar" aria-label="Branch announcements" role="region">
           <div className="container ticker-row">
-            <a href="#/announcements" className="ticker-label" aria-label="View all announcements">
+            <a href="/announcements" className="ticker-label" aria-label="View all announcements">
               LATEST
             </a>
             <div className="ticker-viewport" aria-live="polite">
@@ -105,7 +105,7 @@ export default function HomePage() {
                   // are absent, fall through to the announcements archive.
                   const targetUrl = a.file_url || a.link_url;
                   const isExternal = !!targetUrl;
-                  const href = isExternal ? targetUrl : '#/announcements';
+                  const href = isExternal ? targetUrl : '/announcements';
                   return (
                     <a
                       key={`${a.id}-${i}`}
@@ -127,7 +127,7 @@ export default function HomePage() {
                 })}
               </div>
             </div>
-            <a href="#/announcements" className="ticker-viewall">
+            <a href="/announcements" className="ticker-viewall">
               View all <IconArrowRight size="sm" />
             </a>
           </div>
@@ -214,9 +214,9 @@ export default function HomePage() {
               <button className="btn btn-primary" style={{ padding: '.4rem 1rem' }}>Search</button>
             </form> */}
             <div className="row gap-3" style={{ marginTop: '1.25rem', flexWrap: 'wrap' }}>
-              <a href="#/events" className="btn btn-primary">{heroText.cta_events_label} <IconArrowRight size="sm" /></a>
-              <a href="#/praygyaan" className="btn btn-outline"><IconBot size="sm" /> {heroText.cta_ai_label}</a>
-              {!user && <a href="#/signup" className="btn btn-outline">{heroText.cta_signup_label} <IconArrowRight size="sm" /></a>}
+              <a href="/events" className="btn btn-primary">{heroText.cta_events_label} <IconArrowRight size="sm" /></a>
+              <a href="/praygyaan" className="btn btn-outline"><IconBot size="sm" /> {heroText.cta_ai_label}</a>
+              {!user && <a href="/signup" className="btn btn-outline">{heroText.cta_signup_label} <IconArrowRight size="sm" /></a>}
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(.6rem, 2vw, 1rem)' }}>
@@ -243,8 +243,8 @@ export default function HomePage() {
               {renderMarkdown(leadership.body)}
             </div>
             <div className="row gap-3" style={{ marginTop: '1.75rem', flexWrap: 'wrap' }}>
-              <a href="#/events" className="btn btn-primary"><IconCalendar size="sm" /> {leadershipExtra.cta_book_label}</a>
-              <a href="#/resources" className="btn btn-outline"><IconDownload size="sm" /> {leadershipExtra.cta_download_label}</a>
+              <a href="/events" className="btn btn-primary"><IconCalendar size="sm" /> {leadershipExtra.cta_book_label}</a>
+              <a href="/resources" className="btn btn-outline"><IconDownload size="sm" /> {leadershipExtra.cta_download_label}</a>
             </div>
           </div>
           <div style={{ position: 'relative' }}>
@@ -300,7 +300,7 @@ export default function HomePage() {
         </div>
         <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
           {SERVICES.map((s) => (
-            <a key={s.title} href={'#' + s.to} className="card feature-card" style={{ display: 'block', padding: '1.75rem' }}>
+            <a key={s.title} href={s.to} className="card feature-card" style={{ display: 'block', padding: '1.75rem' }}>
               <div className="icon-tile"><s.Icon size="lg" /></div>
               <h3 style={{ marginTop: '1.25rem', fontSize: '1.1875rem', fontWeight: 700 }}>{s.title}</h3>
               <p className="muted-text" style={{ marginTop: '.5rem', fontSize: '.9rem', lineHeight: 1.6 }}>{s.desc}</p>
@@ -321,7 +321,7 @@ export default function HomePage() {
               <div className="tiny-eyebrow">{eventsText.events_eyebrow}</div>
               <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>{eventsText.events_title}</h2>
             </div>
-            <a href="#/events" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>{eventsText.events_view_all_label}</a>
+            <a href="/events" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>{eventsText.events_view_all_label}</a>
           </div>
 
           <div className="tiny-eyebrow" style={{ marginBottom: '1rem' }}>{eventsText.upcoming_eyebrow}</div>
@@ -393,7 +393,7 @@ export default function HomePage() {
                 ))}
               </div>
               <a
-                href="#/book-room?room=reading-room"
+                href="/book-room?room=reading-room"
                 className="btn btn-primary"
                 style={{ marginTop: '.85rem' }}
               >
@@ -415,7 +415,7 @@ export default function HomePage() {
               <div className="tiny-eyebrow">{knowledgeText.eyebrow}</div>
               <h2 style={{ marginTop: '.5rem', fontSize: 'clamp(2rem, 4vw, 2.75rem)', fontWeight: 700, lineHeight: 1.1, letterSpacing: '-.01em' }}>{knowledgeText.title}</h2>
             </div>
-            <a href="#/resources" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>{knowledgeText.view_all_label}</a>
+            <a href="/resources" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem' }}>{knowledgeText.view_all_label}</a>
           </div>
           <div style={{ display: 'grid', gap: '1.5rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
             {[
@@ -423,7 +423,7 @@ export default function HomePage() {
               { Icon: IconBookOpen, t: 'Standards (AS / SA)', d: 'Accounting Standards, Ind AS and Standards on Auditing.' },
               { Icon: IconDownload, t: 'e-Journal Archive', d: 'Browse The Chartered Accountant journal archives.' },
             ].map((k) => (
-              <a key={k.t} href="#/resources" className="card feature-card" style={{ padding: '1.75rem' }}>
+              <a key={k.t} href="/resources" className="card feature-card" style={{ padding: '1.75rem' }}>
                 <div className="icon-tile"><k.Icon size="lg" /></div>
                 <h3 style={{ marginTop: '1.25rem', fontSize: '1.1875rem', fontWeight: 700 }}>{k.t}</h3>
                 <p className="muted-text" style={{ marginTop: '.5rem', fontSize: '.9rem', lineHeight: 1.6 }}>{k.d}</p>

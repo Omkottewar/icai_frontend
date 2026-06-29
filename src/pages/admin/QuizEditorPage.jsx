@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
@@ -111,7 +111,7 @@ export default function QuizEditorPage() {
         </div>
       }
     >
-      <a href="#/admin/resources">← Back to Resources admin</a>
+      <a href="/admin/resources">← Back to Resources admin</a>
 
       <div className="qe-cfg">
         <label>Pass threshold (of {questions.length} questions)

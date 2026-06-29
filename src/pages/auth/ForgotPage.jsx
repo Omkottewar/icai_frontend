@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSiteContent } from '../../hooks/useSiteContent';
 import AuthSidePanel from '../../components/auth/AuthSidePanel';
@@ -34,7 +34,7 @@ export default function ForgotPage() {
       <AuthSidePanel mode="login" />
       <div className="auth-form-wrap">
         <div className="auth-card">
-          <a href="#/login" className="row gap-1 muted-text" style={{ fontSize: '.8125rem', marginBottom: '1rem' }}>
+          <a href="/login" className="row gap-1 muted-text" style={{ fontSize: '.8125rem', marginBottom: '1rem' }}>
             <IconArrowLeft size="sm" /> Back to sign in
           </a>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{header.title}</h1>

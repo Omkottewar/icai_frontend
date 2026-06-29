@@ -1,4 +1,4 @@
-import { useAdminList } from '../../../hooks/useAdminList';
+﻿import { useAdminList } from '../../../hooks/useAdminList';
 import { navigate } from '../../../hooks/useRoute';
 import { Shimmer, ShimmerStatTile } from '../../ui/Shimmer';
 import {
@@ -96,7 +96,7 @@ export default function SysAdminHome({ data }) {
       <section className="admin-panel" style={{ marginTop: '1.5rem' }}>
         <div className="admin-panel-head">
           <h2>Recent events</h2>
-          <a href="#/admin/events" className="muted-text" style={{ fontSize: '.8125rem' }}>View all →</a>
+          <a href="/admin/events" className="muted-text" style={{ fontSize: '.8125rem' }}>View all →</a>
         </div>
         <div className="admin-event-list">
           {eventsLoading && Array.from({ length: 3 }).map((_, i) => (
@@ -109,7 +109,7 @@ export default function SysAdminHome({ data }) {
             </div>
           ))}
           {!eventsLoading && eventsData?.rows?.length ? eventsData.rows.map((e) => (
-            <a key={e.id} href={`#/admin/events?edit=${e.id}`} className="admin-event-row">
+            <a key={e.id} href={`/admin/events?edit=${e.id}`} className="admin-event-row">
               <div>
                 <div style={{ fontWeight: 600, fontSize: '.875rem' }}>{e.title}</div>
                 <div className="muted-text" style={{ fontSize: '.75rem' }}>

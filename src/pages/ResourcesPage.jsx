@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
+import { navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import {
@@ -100,19 +101,17 @@ async function api(url) {
   return r.json();
 }
 
-// Read URL-hash query string ("#/resources?q=foo&topic=gst") so a filtered
-// view is shareable + back/forward friendly.
+// Read URL query string ("/resources?q=foo&topic=gst") so a filtered view
+// is shareable + back/forward friendly.
 function readHashQuery() {
-  const i = window.location.hash.indexOf('?');
-  if (i < 0) return new URLSearchParams();
-  return new URLSearchParams(window.location.hash.slice(i + 1));
+  return new URLSearchParams(window.location.search);
 }
 function writeHashQuery(params) {
-  const base = window.location.hash.split('?')[0] || '#/resources';
   const qs = params.toString();
-  const newHash = qs ? `${base}?${qs}` : base;
-  if (window.location.hash !== newHash) {
-    window.history.replaceState(null, '', newHash);
+  const next = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+  const current = window.location.pathname + window.location.search + window.location.hash;
+  if (next !== current) {
+    window.history.replaceState(null, '', next);
   }
 }
 
@@ -236,7 +235,7 @@ export default function ResourcesPage() {
             {ejournalIssues.map((j) => (
               <a
                 key={j.id}
-                href={`#/resources/journal/${j.slug}`}
+                href={`/resources/journal/${j.slug}`}
                 className="card hover-lift"
                 style={{ display: 'flex', flexDirection: 'column', padding: '0', overflow: 'hidden', textDecoration: 'none', color: 'inherit' }}
               >
@@ -441,7 +440,7 @@ function PapersSection({ user, initialErr, sections }) {
             return (
               <a
                 key={p.id}
-                href={p.slug ? `#/resources/papers/${p.slug}/read` : '#'}
+                href={p.slug ? `/resources/papers/${p.slug}/read` : '#'}
                 className="card hover-lift"
                 style={{ display: 'flex', flexDirection: 'column', padding: '1.25rem', textDecoration: 'none', color: 'inherit' }}
               >
@@ -473,7 +472,7 @@ function PapersSection({ user, initialErr, sections }) {
                     role="button"
                     tabIndex={0}
                     className="pp-details-link"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.hash = `#/resources/papers/${p.slug}`; }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/resources/papers/${p.slug}`); }}
                   >Details →</span>
                 </div>
               </a>
@@ -485,10 +484,10 @@ function PapersSection({ user, initialErr, sections }) {
       {/* Member CTAs */}
       {user && (
         <div className="row gap-2" style={{ marginTop: '2rem', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <a href="#/my-library" className="btn btn-outline">
+          <a href="/my-library" className="btn btn-outline">
             <IconBookOpen size="sm" /> My Library
           </a>
-          <a href="#/resources/submit" className="btn btn-outline">
+          <a href="/resources/submit" className="btn btn-outline">
             <IconPlus size="sm" /> Submit a paper
           </a>
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import PageHeader from '../../components/layout/PageHeader';
 import { Shimmer } from '../../components/ui/Shimmer';
@@ -136,7 +136,7 @@ export default function MockTestQuestionsAdminPage() {
 
       <section className="container" style={{ padding: '2rem 1rem' }}>
         <div className="row" style={{ marginBottom: '1.25rem', gap: '.5rem', flexWrap: 'wrap' }}>
-          <a href={`#/admin/mock-tests`} className="btn btn-outline">← Back to mock tests</a>
+          <a href={`/admin/mock-tests`} className="btn btn-outline">← Back to mock tests</a>
           <span style={{ flex: 1 }} />
           <input
             ref={fileInputRef}

@@ -1,4 +1,4 @@
-// Service worker for ICAI Nagpur PWA.
+﻿// Service worker for ICAI Nagpur PWA.
 //
 // Two responsibilities:
 //   1. Precache the Vite-built shell (HTML/JS/CSS/icons) so the app launches
@@ -24,10 +24,11 @@ precacheAndRoute(self.__WB_MANIFEST);
 registerRoute(({ url }) => url.pathname.startsWith('/api/'),     new NetworkOnly());
 registerRoute(({ url }) => url.pathname.startsWith('/uploads/'), new NetworkOnly());
 
-// Fallback for navigation requests not in the precache (e.g. hash routes
-// like /#/dashboard) — go straight to the network. Without this, an old
-// Workbox install can swallow same-origin GETs into a "cache or 503"
-// strategy.
+// Fallback for navigation requests not in the precache (e.g. SPA deep
+// links like /dashboard) — go straight to the network. Without this, an
+// old Workbox install can swallow same-origin GETs into a "cache or 503"
+// strategy. The server returns index.html for any unknown path (SPA
+// fallback), so the navigation succeeds and the SPA boots.
 setDefaultHandler(new NetworkOnly());
 
 // Activate the new SW immediately on update so users see fresh notifications

@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+﻿import { useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../hooks/useNotifications';
+import { navigate } from '../../hooks/useRoute';
 import { IconBell, IconCheck } from '../../icons';
 import { Shimmer } from '../ui/Shimmer';
 import FlipMenu from '../ui/FlipMenu';
@@ -54,14 +55,13 @@ export default function NotificationsBell() {
       if (n.link_url.startsWith('http')) {
         window.open(n.link_url, '_blank');
       } else {
-        // Stored URLs from notify() callers are in one of three shapes:
-        //   '/#/dashboard'          (hash-routed, common)
-        //   '#/dashboard'           (hash-routed, no leading slash)
-        //   '/dashboard'            (plain path → treat as hash route)
-        // window.location.hash adds its own '#', so we must strip any
-        // leading '/' and '#' from the stored value before assigning,
-        // otherwise we end up with '/#/#/dashboard' (the double-hash 404).
-        window.location.hash = n.link_url.replace(/^\/?#?\/?/, '/');
+        // Stored link_url shapes (older rows used hash routing):
+        //   '/#/dashboard'   (legacy hash-routed, leading slash)
+        //   '#/dashboard'    (legacy hash-routed, no leading slash)
+        //   '/dashboard'     (clean URL — the current shape)
+        // Strip any '#'/'/' noise to land on a clean path, then SPA-route.
+        const clean = '/' + n.link_url.replace(/^\/?#?\/?/, '');
+        navigate(clean);
       }
     }
     setOpen(false);

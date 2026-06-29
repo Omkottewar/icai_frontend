@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+﻿import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { toast as notify } from '../lib/notify';
+import { navigate } from '../hooks/useRoute';
 
 const AuthContext = createContext(null);
 
@@ -140,8 +141,9 @@ export function AuthProvider({ children }) {
   // To close that gap we revalidate /api/auth/me on three triggers:
   //   1. The tab regaining focus (`visibilitychange`) — catches the most
   //      common case: admin changes a role in tab A, user has tab B open.
-  //   2. Every SPA route change (`hashchange`) — anyone navigating into an
-  //      admin route gets a fresh role check before the gate evaluates.
+  //   2. Every SPA route change (`popstate` + custom `routechange`) —
+  //      anyone navigating into an admin route gets a fresh role check
+  //      before the gate evaluates.
   //   3. A periodic poll (every 5 min) — for the "tab open all day" case.
   //
   // We also expose a global event `auth:revalidate` that callers anywhere
@@ -151,17 +153,19 @@ export function AuthProvider({ children }) {
     const onVisible = () => {
       if (document.visibilityState === 'visible') refresh();
     };
-    const onHashChange = () => { refresh(); };
+    const onRouteChange = () => { refresh(); };
     const onForceRevalidate = () => { refresh(); };
     document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('hashchange', onHashChange);
+    window.addEventListener('popstate', onRouteChange);
+    window.addEventListener('routechange', onRouteChange);
     window.addEventListener('auth:revalidate', onForceRevalidate);
     const poll = setInterval(() => {
       if (document.visibilityState === 'visible') refresh();
     }, 5 * 60 * 1000);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('hashchange', onHashChange);
+      window.removeEventListener('popstate', onRouteChange);
+      window.removeEventListener('routechange', onRouteChange);
       window.removeEventListener('auth:revalidate', onForceRevalidate);
       clearInterval(poll);
     };
@@ -179,7 +183,7 @@ export function AuthProvider({ children }) {
   const login = async ({ email, password }) => {
     const body = await postJson('/api/auth/login', { email, password });
     await refresh();
-    window.location.hash = '#' + (body.redirect ?? '/dashboard');
+    navigate(body.redirect ?? '/dashboard');
   };
 
   // Embedded sign-up: posts to /api/auth/signup, which creates the Auth0
@@ -192,17 +196,17 @@ export function AuthProvider({ children }) {
     // tenant blocks first-login auto-auth). Send them to /login with a hint.
     if (body.requiresVerification || body.requiresLogin) {
       showToast(body.message || 'Account created. Please verify your email and sign in.', 'success');
-      window.location.hash = '#/login';
+      navigate('/login');
       return;
     }
     await refresh();
-    window.location.hash = '#' + (body.redirect ?? '/onboarding');
+    navigate(body.redirect ?? '/onboarding');
   };
 
   // Social IdPs (Google, Microsoft, …) can't be embedded — they require a
   // redirect to the provider's domain. The server bounces through Auth0 and
   // back to /api/auth/callback, which sets the cookie and redirects to
-  // /#/dashboard or /#/onboarding.
+  // /dashboard or /onboarding.
   const socialLogin = (provider, opts = {}) => {
     const params = new URLSearchParams();
     if (opts.signup) params.set('mode', 'signup');
@@ -224,7 +228,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     writeCachedUser(null);
     showToast('Signed out', 'info');
-    window.location.hash = '#/';
+    navigate('/');
   };
 
   const logout = () => logoutInternal('/api/auth/logout');

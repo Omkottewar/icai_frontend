@@ -1,4 +1,4 @@
-import GenericPage from '../components/ui/GenericPage';
+﻿import GenericPage from '../components/ui/GenericPage';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconHandshake, IconArrowRight } from '../icons';
@@ -50,7 +50,7 @@ export default function BenevolentFundPage() {
                 {c.icai_btn_label} <IconArrowRight size="sm" />
               </a>
               <a
-                href="#/contact"
+                href="/contact"
                 className="btn btn-outline"
                 style={{ justifyContent: 'center' }}
               >

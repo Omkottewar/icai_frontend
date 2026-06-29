@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { IconArrowRight, IconCalendar } from '../../icons';
 
 // Recent Photos strip — surfaces the 4 most-recent gallery albums on the
@@ -59,7 +59,7 @@ export default function RecentPhotosStrip({ limit = 4 }) {
             Recent events in pictures
           </h2>
         </div>
-        <a href="#/gallery" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem', whiteSpace: 'nowrap' }}>
+        <a href="/gallery" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '.9375rem', whiteSpace: 'nowrap' }}>
           View all <IconArrowRight size="sm" />
         </a>
       </div>
@@ -70,7 +70,7 @@ export default function RecentPhotosStrip({ limit = 4 }) {
           return (
             <a
               key={a.id}
-              href="#/gallery"
+              href="/gallery"
               style={{
                 background: 'var(--card)',
                 border: '1px solid var(--border)',

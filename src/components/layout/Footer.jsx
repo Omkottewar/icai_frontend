@@ -1,4 +1,4 @@
-import { SOCIALS, ICAI_LINKS } from '../../data/constants';
+﻿import { SOCIALS, ICAI_LINKS } from '../../data/constants';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
 import { useSiteContent } from '../../hooks/useSiteContent';
 import { renderMarkdown } from '../../lib/markdown.jsx';
@@ -83,23 +83,23 @@ export default function Footer() {
         <div>
           <div style={{ fontSize: '.875rem', fontWeight: 600 }}>{footer.quick_links_heading}</div>
           <ul className="col gap-2 muted-text" style={{ marginTop: '.75rem', padding: 0, listStyle: 'none', fontSize: '.875rem' }}>
-            <li><a href="#/about">About the Branch</a></li>
-            <li><a href="#/events">Events & CPE</a></li>
-            <li><a href="#/members">For Members</a></li>
-            <li><a href="#/students">For Students</a></li>
-            <li><a href="#/gallery">Photo Gallery</a></li>
-            <li><a href="#/job-vacancies">Job Vacancies</a></li>
-            <li><a href="#/members-directory">Members' Directory</a></li>
+            <li><a href="/about">About the Branch</a></li>
+            <li><a href="/events">Events & CPE</a></li>
+            <li><a href="/members">For Members</a></li>
+            <li><a href="/students">For Students</a></li>
+            <li><a href="/gallery">Photo Gallery</a></li>
+            <li><a href="/job-vacancies">Job Vacancies</a></li>
+            <li><a href="/members-directory">Members' Directory</a></li>
           </ul>
         </div>
 
         <div>
           <div style={{ fontSize: '.875rem', fontWeight: 600 }}>{footer.initiatives_heading}</div>
           <ul className="col gap-2 muted-text" style={{ marginTop: '.75rem', padding: 0, listStyle: 'none', fontSize: '.875rem' }}>
-            <li><a href="#/benevolent-fund">CA Benevolent Fund</a></li>
-            <li><a href="#/ca2-vision">CA 2.0 Vision</a></li>
-            <li><a href="#/investor-awareness">Investor Awareness</a></li>
-            <li><a href="#/career-counselling">Career Counselling</a></li>
+            <li><a href="/benevolent-fund">CA Benevolent Fund</a></li>
+            <li><a href="/ca2-vision">CA 2.0 Vision</a></li>
+            <li><a href="/investor-awareness">Investor Awareness</a></li>
+            <li><a href="/career-counselling">Career Counselling</a></li>
           </ul>
         </div>
 

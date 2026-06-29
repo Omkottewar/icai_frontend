@@ -1,4 +1,4 @@
-import { createContext, memo, useContext, useLayoutEffect, useMemo, useState } from 'react';
+﻿import { createContext, memo, useContext, useLayoutEffect, useMemo, useState } from 'react';
 import { useRoute } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
 import { useAdminHome } from '../../hooks/useAdminHome';
@@ -186,7 +186,7 @@ const Sidebar = memo(function Sidebar({
   return (
     <aside className={'admin-sidebar' + (mobileOpen ? ' is-open' : '')}>
       <div className="admin-sidebar-head">
-        <a href="#/" className="row gap-2" style={{ color: 'white', textDecoration: 'none' }}>
+        <a href="/" className="row gap-2" style={{ color: 'white', textDecoration: 'none' }}>
           <div style={{ width: '2rem', height: '2rem', borderRadius: '.375rem', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '.2rem' }}>
             <img src={caIndiaLogo} alt="CA India" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
           </div>
@@ -206,7 +206,7 @@ const Sidebar = memo(function Sidebar({
               return (
                 <a
                   key={it.to}
-                  href={'#' + it.to}
+                  href={it.to}
                   className={'admin-nav-link' + (active ? ' is-active' : '')}
                   onClick={onCloseMobile}
                 >
@@ -232,7 +232,7 @@ const Sidebar = memo(function Sidebar({
             </div>
           </div>
         )}
-        <a href="#/" className="admin-foot-link">
+        <a href="/" className="admin-foot-link">
           <IconArrowLeft size="sm" /> Back to site
         </a>
         <button className="admin-foot-link" onClick={onLogout} style={{ color: '#fca5a5' }}>

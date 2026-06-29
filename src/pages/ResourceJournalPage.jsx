@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
@@ -53,7 +53,7 @@ export default function ResourceJournalPage() {
   };
 
   const shareWhatsApp = () => {
-    const text = `${issue.title} — ${issue.issue_label}\n${window.location.origin}/#/resources/journal/${issue.slug}`;
+    const text = `${issue.title} — ${issue.issue_label}\n${window.location.origin}/resources/journal/${issue.slug}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -61,7 +61,7 @@ export default function ResourceJournalPage() {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p style={{ color: 'var(--destructive)' }}>{err}</p>
-        <a href="#/resources">← Back to Resources</a>
+        <a href="/resources">← Back to Resources</a>
       </section>
     );
   }
@@ -73,7 +73,7 @@ export default function ResourceJournalPage() {
     <>
       <PageHeader title="E-Journal" />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '900px' }}>
-        <a href="#/resources">← All resources</a>
+        <a href="/resources">← All resources</a>
 
         <div className="jp-hero">
           {issue.cover_url

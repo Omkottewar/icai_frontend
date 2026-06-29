@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'; // eslint-disable-line no-unused-vars
+﻿import { useEffect, useMemo, useState } from 'react'; // eslint-disable-line no-unused-vars
 import AdminLayout from '../../components/admin/AdminLayout';
 import Drawer from '../../components/admin/Drawer';
 import FormField from '../../components/admin/FormField';
@@ -417,7 +417,7 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
             </label>
             {!isNew && form.supports_online && (
               <a
-                href={`#/admin/mock-tests/${form.id}/questions`}
+                href={`/admin/mock-tests/${form.id}/questions`}
                 className="btn btn-outline"
                 style={{ marginTop: '.5rem', display: 'inline-flex' }}
               >

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import DataTable from '../../components/admin/DataTable';
 import Drawer from '../../components/admin/Drawer';
@@ -1189,7 +1189,7 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
                   <p className="muted-text" style={{ marginBottom: '.5rem' }}>
                     No active templates yet.
                   </p>
-                  <a href="#/admin/checklist-templates" className="btn-primary" style={{ padding: '.375rem .75rem', display: 'inline-block', textDecoration: 'none', fontSize: '.8125rem' }}>
+                  <a href="/admin/checklist-templates" className="btn-primary" style={{ padding: '.375rem .75rem', display: 'inline-block', textDecoration: 'none', fontSize: '.8125rem' }}>
                     Build one →
                   </a>
                 </div>

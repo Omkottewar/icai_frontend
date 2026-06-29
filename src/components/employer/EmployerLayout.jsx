@@ -26,7 +26,7 @@ export default function EmployerLayout({ title, subtitle, children, actions }) {
           {NAV.map((n) => (
             <a
               key={n.to}
-              href={'#' + n.to}
+              href={n.to}
               className={'emp-nav-item' + (route.path === n.to ? ' active' : '')}
             >
               <n.Icon size="sm" /> {n.label}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
 import { useSiteContent } from '../../hooks/useSiteContent';
@@ -94,8 +94,8 @@ export default function SignupPage() {
           </div>
 
           <div className="auth-tabs">
-            <a href="#/login" className="auth-tab" style={{ textAlign: 'center' }}>Sign in</a>
-            <a href="#/signup" className="auth-tab active" style={{ textAlign: 'center' }}>Create account</a>
+            <a href="/login" className="auth-tab" style={{ textAlign: 'center' }}>Sign in</a>
+            <a href="/signup" className="auth-tab active" style={{ textAlign: 'center' }}>Create account</a>
           </div>
 
           <form onSubmit={onSubmit} className="col gap-4">

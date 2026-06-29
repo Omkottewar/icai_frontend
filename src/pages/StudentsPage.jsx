@@ -1,4 +1,4 @@
-import PageHeader from '../components/layout/PageHeader';
+﻿import PageHeader from '../components/layout/PageHeader';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconGraduationCap, IconArrowRight, IconBriefcase, IconBookOpen, IconUsers, IconAward, IconMessageSquare } from '../icons';
@@ -13,12 +13,12 @@ import { IconGraduationCap, IconArrowRight, IconBriefcase, IconBookOpen, IconUse
 // optional "Coming soon" pill. Title and description are filled in from
 // site content at render time using the keys below.
 const CARD_FRAMES = [
-  { Icon: IconGraduationCap, href: '#/mock-tests',                        comingSoon: false },
-  { Icon: IconBriefcase,     href: '#/job-vacancies?type=articleship',    comingSoon: false },
-  { Icon: IconUsers,         href: '#/career-counselling',                comingSoon: true  },
-  { Icon: IconBookOpen,      href: '#/resources',                          comingSoon: false },
-  { Icon: IconAward,         href: '#/contact',                            comingSoon: true  },
-  { Icon: IconMessageSquare, href: '#/mock-tests',                        comingSoon: false },
+  { Icon: IconGraduationCap, href: '/mock-tests',                        comingSoon: false },
+  { Icon: IconBriefcase,     href: '/job-vacancies?type=articleship',    comingSoon: false },
+  { Icon: IconUsers,         href: '/career-counselling',                comingSoon: true  },
+  { Icon: IconBookOpen,      href: '/resources',                          comingSoon: false },
+  { Icon: IconAward,         href: '/contact',                            comingSoon: true  },
+  { Icon: IconMessageSquare, href: '/mock-tests',                        comingSoon: false },
 ];
 
 export default function StudentsPage() {
@@ -54,13 +54,13 @@ export default function StudentsPage() {
 
         {/* Quick access row */}
         <div className="row gap-3" style={{ marginBottom: '2.5rem', flexWrap: 'wrap' }}>
-          <a href="#/mock-tests" className="btn btn-primary" style={{ gap: '.5rem' }}>
+          <a href="/mock-tests" className="btn btn-primary" style={{ gap: '.5rem' }}>
             <IconGraduationCap size="sm" /> {quickAccess.mock_tests_label}
           </a>
-          <a href="#/job-vacancies?type=articleship" className="btn btn-outline" style={{ gap: '.5rem' }}>
+          <a href="/job-vacancies?type=articleship" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconBriefcase size="sm" /> {quickAccess.articleship_label}
           </a>
-          <a href="#/events?audience=Students" className="btn btn-outline" style={{ gap: '.5rem' }}>
+          <a href="/events?audience=Students" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconGraduationCap size="sm" /> {quickAccess.events_label}
           </a>
         </div>

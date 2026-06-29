@@ -1,35 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
 
-// Two-way sync between component state and the URL hash query — so the
+// Two-way sync between component state and the URL query string — so the
 // chairman can copy/paste the URL and the recipient lands on the exact same
-// filtered view. Uses history.replaceState so we don't trigger hashchange
+// filtered view. Uses history.replaceState so we don't trigger popstate
 // (which would scroll the page back to top).
 //
 // Reads on mount (so direct links work), writes on change. Empty values are
 // stripped to keep URLs clean.
 
-function readHashQuery() {
-  const raw = window.location.hash.replace(/^#/, '');
-  const [, qs] = raw.split('?');
+function readQuery() {
   const out = {};
-  if (qs) {
-    qs.split('&').forEach((p) => {
-      const [k, v] = p.split('=');
-      if (k) out[decodeURIComponent(k)] = decodeURIComponent(v || '');
-    });
-  }
+  const params = new URLSearchParams(window.location.search);
+  params.forEach((v, k) => { out[k] = v; });
   return out;
 }
 
-function writeHashQuery(next) {
-  const raw = window.location.hash.replace(/^#/, '');
-  const [path] = raw.split('?');
+function writeQuery(next) {
   const entries = Object.entries(next).filter(([, v]) => v !== undefined && v !== null && v !== '');
   const qs = entries
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('&');
-  const target = '#' + (path || '/') + (qs ? `?${qs}` : '');
-  if (target !== window.location.hash) {
+  const target = window.location.pathname + (qs ? `?${qs}` : '') + window.location.hash;
+  const current = window.location.pathname + window.location.search + window.location.hash;
+  if (target !== current) {
     history.replaceState(null, '', target);
   }
 }
@@ -37,11 +30,10 @@ function writeHashQuery(next) {
 export function useUrlState(initial) {
   const [state, setState] = useState(() => {
     if (typeof window === 'undefined') return initial;
-    const q = readHashQuery();
-    return { ...initial, ...q };
+    return { ...initial, ...readQuery() };
   });
 
-  useEffect(() => { writeHashQuery(state); }, [state]);
+  useEffect(() => { writeQuery(state); }, [state]);
 
   const update = useCallback((patch) => {
     setState((s) => ({ ...s, ...patch }));

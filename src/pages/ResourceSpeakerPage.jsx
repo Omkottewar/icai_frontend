@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { ShimmerPageBody } from '../components/ui/Shimmer';
@@ -30,7 +30,7 @@ export default function ResourceSpeakerPage() {
     return (
       <section className="container" style={{ padding: '3rem 1rem' }}>
         <p style={{ color: 'var(--destructive)' }}>{err}</p>
-        <a href="#/resources">← Back to Resources</a>
+        <a href="/resources">← Back to Resources</a>
       </section>
     );
   }
@@ -42,11 +42,11 @@ export default function ResourceSpeakerPage() {
     <>
       <PageHeader title={data.speaker.name} subtitle={`${data.papers.length} paper${data.papers.length === 1 ? '' : 's'} published`} />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '900px' }}>
-        <a href="#/resources">← All resources</a>
+        <a href="/resources">← All resources</a>
 
         <div className="sp-grid" style={{ marginTop: '1.5rem' }}>
           {data.papers.map((p) => (
-            <a key={p.id} href={`#/resources/papers/${p.slug}`} className="sp-card">
+            <a key={p.id} href={`/resources/papers/${p.slug}`} className="sp-card">
               {p.cover_url
                 ? <div className="sp-card-cover" style={{ backgroundImage: `url(${p.cover_url})` }} />
                 : <div className="sp-card-cover sp-card-cover-fallback"><span>📄</span></div>
