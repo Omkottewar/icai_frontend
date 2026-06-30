@@ -391,7 +391,7 @@ const READER_STYLES = `
     display: grid;
     grid-template-rows: auto 1fr auto;
     transition: background-color .25s ease, color .25s ease;
-    z-index: 50;
+    z-index: 200;
   }
 
   .pr-topbar, .pr-bottombar {
