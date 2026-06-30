@@ -2,6 +2,7 @@
 import PageHeader from '../components/layout/PageHeader';
 import { cachedGet } from '../lib/apiCache';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconSearch, IconArrowRight, IconLock } from '../icons';
 import { ShimmerTableRow } from '../components/ui/Shimmer';
@@ -41,6 +42,12 @@ function useDirectoryData(q, statusFilter, page) {
 
 export default function MembersDirectoryPage() {
   const header = useSiteContent('members_directory_page_header');
+  // Use the AuthContext as the source of truth for "is the user signed in".
+  // Without this, `authed` is derived purely from the directory API response,
+  // which is null on first paint → the page briefly renders the "sign in to
+  // see contact details" banner before the API call returns and flips back.
+  // Signed-in users were seeing the modal flash before the directory loaded.
+  const { user } = useAuth();
   const [query, setQuery]           = useState('');
   const [debouncedQ, setDebouncedQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -51,7 +58,12 @@ export default function MembersDirectoryPage() {
     return () => clearTimeout(t);
   }, [query]);
 
-  const { rows, total, authed, loading } = useDirectoryData(debouncedQ, statusFilter, page);
+  const directory = useDirectoryData(debouncedQ, statusFilter, page);
+  const { rows, total, loading } = directory;
+  // Trust the auth context first (no flash), then let the API response
+  // override only when the call has actually come back. The API can only
+  // *upgrade* an anonymous viewer to authed, never the other way around.
+  const authed = !!user || directory.authed;
 
   return (
     <>
