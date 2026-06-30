@@ -24,6 +24,17 @@ export function firstName(name) {
   return first || stripped;
 }
 
+/**
+ * Returns the name prefixed with "CA " when the viewer's primary_role is
+ * "member" — but only if a CA honorific isn't already present, so we never
+ * end up with "CA CA Anjali Singh".
+ */
+export function withCAPrefix(name, primaryRole) {
+  const raw = String(name ?? '').trim();
+  if (!raw || primaryRole !== 'member') return raw;
+  return /^CA\.?\s+/i.test(raw) ? raw : `CA ${raw}`;
+}
+
 /** Returns up-to-2-letter initials, ignoring honorifics. */
 export function initials(name) {
   const stripped = stripHonorific(name);

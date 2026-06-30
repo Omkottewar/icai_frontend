@@ -139,7 +139,7 @@ export default function Header() {
           {user ? (
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button className="avatar-trigger" onClick={() => setMenuOpen(!menuOpen)}>
-                <span className="avatar-circle">{initials(user.name)}</span>
+                <span className="avatar-circle">{user.primary_role === 'member' ? 'CA' : initials(user.name)}</span>
                 <span className="hide-on-mobile">{firstName(user.name)}</span>
                 <IconChevronDown size="sm" />
               </button>

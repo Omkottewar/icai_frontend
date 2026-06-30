@@ -9,6 +9,7 @@ import {
   IconSparkles, IconEdit,
 } from '../../icons';
 import { googleCalendarEventUrl, googleCalendarSubscribeUrl } from '../../lib/googleCalendar';
+import { withCAPrefix } from '../../lib/displayName';
 import { toast } from '../../lib/notify';
 import { dialog } from '../../lib/dialog';
 import Button from '../ui/Button';
@@ -276,7 +277,7 @@ function JumpNav({ sections }) {
 // portal screens for (MRN, FCA status, COP details, member-since).
 function MembershipIdentityCard({ user, profile, pendingBadge, onEdit }) {
   const initials = (user?.name || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
-  const firstName = (user?.name || '').split(' ')[0];
+  const displayName = withCAPrefix(user?.name, user?.primary_role);
   const memberYears = yearsBetween(profile?.member_since);
   const fcaBadge   = profile?.is_fca ? 'FCA' : 'ACA';
   const copStatus  = profile?.cop_status && profile.cop_status !== 'none' ? profile.cop_status : null;
@@ -292,7 +293,7 @@ function MembershipIdentityCard({ user, profile, pendingBadge, onEdit }) {
             <IconEdit size="sm" /> Edit profile
           </button>
         </div>
-        <h1 className="md-identity-name">Welcome back, {firstName || 'Member'}</h1>
+        <h1 className="md-identity-name">Welcome back, {displayName || 'Member'}</h1>
         <div className="md-identity-meta">
           <span><strong>MRN:</strong> {profile?.mrn ?? '—'}</span>
           {profile?.member_since && <span className="md-identity-sep">·</span>}
@@ -904,7 +905,7 @@ function ProfileSidecard({ user, profile, logout, onEdit }) {
       <div className="row gap-3">
         <span className="avatar-circle" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>{initials}</span>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600 }}>{user.name}</div>
+          <div style={{ fontWeight: 600 }}>{withCAPrefix(user.name, user.primary_role)}</div>
           <div className="muted-text" style={{ fontSize: '.8125rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
           <span className="badge badge-secondary" style={{ marginTop: '.375rem' }}>{user.role}</span>
         </div>

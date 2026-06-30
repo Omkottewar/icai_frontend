@@ -157,7 +157,10 @@ export default function MembersDirectoryPage() {
                 <div className="dir-mobile-body">
                   <div className="dir-mobile-name">{m.name}</div>
                   <div className="dir-mobile-meta">
-                    <span className="dir-mobile-mrn">{m.mrn}</span>
+                    {authed
+                      ? <span className="dir-mobile-mrn">{m.mrn}</span>
+                      : m.firm_name && <span className="dir-mobile-firm" title={m.firm_name}>{m.firm_name}</span>
+                    }
                     <span style={{
                       padding: '.05rem .4rem', borderRadius: '.25rem',
                       fontSize: '.65rem', fontWeight: 700,
@@ -188,7 +191,7 @@ export default function MembersDirectoryPage() {
               <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
                 {(authed
                   ? ['#', 'Name', 'Membership No.', 'Status', 'City', 'Phone', 'Email', 'Firm']
-                  : ['#', 'Name', 'Membership No.', 'Status', 'City']
+                  : ['#', 'Name', 'Firm', 'Status', 'City']
                 ).map((h) => (
                   <th key={h} style={{ padding: '.625rem .75rem', fontWeight: 600, color: 'var(--muted-foreground)', fontSize: '.8125rem' }}>{h}</th>
                 ))}
@@ -221,7 +224,14 @@ export default function MembersDirectoryPage() {
                         <span style={{ fontWeight: 500 }}>{m.name}</span>
                       </div>
                     </td>
-                    <td style={{ padding: '.625rem .75rem', fontFamily: 'monospace', fontSize: '.8125rem', color: 'var(--muted-foreground)' }}>{m.mrn}</td>
+                    {authed ? (
+                      <td style={{ padding: '.625rem .75rem', fontFamily: 'monospace', fontSize: '.8125rem', color: 'var(--muted-foreground)' }}>{m.mrn}</td>
+                    ) : (
+                      <td style={{ padding: '.625rem .75rem', color: 'var(--muted-foreground)', fontSize: '.8125rem', maxWidth: '14rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={m.firm_name || ''}>
+                        {m.firm_name || '—'}
+                      </td>
+                    )}
                     <td style={{ padding: '.625rem .75rem' }}>
                       <span style={{
                         padding: '.125rem .5rem', borderRadius: '.25rem',
@@ -290,7 +300,7 @@ export default function MembersDirectoryPage() {
         <p className="muted-text" style={{ marginTop: '1.25rem', fontSize: '.75rem' }}>
           {authed
             ? 'Contact details are visible to signed-in members only, per ICAI Web-Media Policy 5(n).'
-            : 'Sign in to view phone, email and firm details. The roster itself is public.'}
+            : 'Sign in to view membership number, phone and email. Name, firm and city are public.'}
         </p>
       </section>
     </>

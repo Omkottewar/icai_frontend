@@ -1,6 +1,7 @@
 ﻿import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { toast as notify } from '../lib/notify';
 import { navigate } from '../hooks/useRoute';
+import { dialog } from '../lib/dialog';
 
 const AuthContext = createContext(null);
 
@@ -181,19 +182,43 @@ export function AuthProvider({ children }) {
   // /oauth/token (ROPG) server-side and sets the session cookie. The user
   // never leaves the site.
   const login = async ({ email, password }) => {
-    const body = await postJson('/api/auth/login', { email, password });
-    await refresh();
-    navigate(body.redirect ?? '/dashboard');
+    try {
+      const body = await postJson('/api/auth/login', { email, password });
+      await refresh();
+      navigate(body.redirect ?? '/dashboard');
+    } catch (e) {
+      // Self-signed-up accounts are blocked until the branch admin promotes
+      // them. Surface the server message in a blocking modal rather than the
+      // inline error banner so the user actually reads the next-step
+      // instructions (contact branch with MRN).
+      if (e?.code === 'account_pending_approval') {
+        await dialog.alert({
+          title: 'Account awaiting approval',
+          message: e.message,
+          okText: 'Got it',
+        });
+        return;
+      }
+      throw e;
+    }
   };
 
   // Embedded sign-up: posts to /api/auth/signup, which creates the Auth0
-  // user, auto-logs them in, and sets the session cookie. If the Auth0
-  // tenant requires email verification first, we get { requiresLogin: true }
-  // and bounce the user to /login with a friendly message.
+  // user (sends a verification email) but does NOT mint a session — the
+  // user must verify their email AND wait for branch-admin approval before
+  // they can sign in. We surface both states in a blocking dialog so the
+  // message is impossible to miss.
   const signup = async ({ email, password, name, role = 'Member', mrn }) => {
     const body = await postJson('/api/auth/signup', { email, password, name, role, mrn });
-    // Account created but the user has to verify their email first (or the
-    // tenant blocks first-login auto-auth). Send them to /login with a hint.
+    if (body.requiresApproval) {
+      await dialog.alert({
+        title: 'Account created — awaiting approval',
+        message: body.message,
+        okText: 'Got it',
+      });
+      navigate('/login');
+      return;
+    }
     if (body.requiresVerification || body.requiresLogin) {
       showToast(body.message || 'Account created. Please verify your email and sign in.', 'success');
       navigate('/login');

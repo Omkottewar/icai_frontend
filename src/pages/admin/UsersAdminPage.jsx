@@ -25,7 +25,7 @@ const EMPTY_ROLE_FORM = {
 };
 
 const PRIMARY_ROLES = ['member', 'student', 'employer', 'employee', 'mcm', 'chairman', 'admin', 'staff'];
-const STATUSES = ['active', 'inactive', 'suspended'];
+const STATUSES = ['active', 'inactive', 'suspended', 'pending_approval'];
 
 function fmtDate(iso) {
   if (!iso) return '—';
@@ -141,6 +141,7 @@ export default function UsersAdminPage() {
         .admin-pill-active    { background: #dcfce7; color: #166534; }
         .admin-pill-inactive  { background: #f1f5f9; color: #475569; }
         .admin-pill-suspended { background: #fee2e2; color: #991b1b; }
+        .admin-pill-pending_approval { background: #fef3c7; color: #92400e; }
         .admin-section-title {
           font-size: .75rem; text-transform: uppercase; letter-spacing: .06em;
           color: var(--muted-foreground); font-weight: 700;

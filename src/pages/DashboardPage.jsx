@@ -5,7 +5,7 @@ import { useRoleFlags } from '../hooks/useRoleFlags';
 import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
 import { cachedGet } from '../lib/apiCache';
-import { firstName, initials as displayInitials } from '../lib/displayName';
+import { initials as displayInitials, withCAPrefix } from '../lib/displayName';
 import StatCard from '../components/ui/StatCard';
 import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
@@ -123,7 +123,7 @@ export default function DashboardPage() {
         <div>
           <div className="tiny-eyebrow">My Account</div>
           <h1 style={{ marginTop: '.15rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
-            Welcome back, {firstName(user.name)}
+            Welcome back, {withCAPrefix(user.name, user.primary_role) || 'Member'}
           </h1>
           <p className="muted-text" style={{ marginTop: '.15rem', fontSize: '.875rem' }}>
             {memberNoLabel}{' '}
@@ -317,7 +317,7 @@ export default function DashboardPage() {
                 {displayInitials(user.name)}
               </span>
               <div>
-                <div style={{ fontWeight: 600 }}>{user.name}</div>
+                <div style={{ fontWeight: 600 }}>{withCAPrefix(user.name, user.primary_role)}</div>
                 <div className="muted-text" style={{ fontSize: '.8125rem' }}>{user.email}</div>
                 <span className="badge badge-secondary" style={{ marginTop: '.375rem' }}>{user.role}</span>
               </div>
@@ -485,7 +485,7 @@ function StudentTabbedBody({ data, user, logout }) {
                 {displayInitials(user.name)}
               </span>
               <div>
-                <div style={{ fontWeight: 600 }}>{user.name}</div>
+                <div style={{ fontWeight: 600 }}>{withCAPrefix(user.name, user.primary_role)}</div>
                 <div className="muted-text" style={{ fontSize: '.8125rem' }}>{user.email}</div>
                 <span className="badge badge-secondary" style={{ marginTop: '.375rem' }}>{user.role}</span>
               </div>
