@@ -183,8 +183,9 @@ export const SITE_CONTENT_DEFAULTS = {
     button_url:   'https://www.icai.org/members',
   },
   members_quick_access: {
-    directory_label: "Members' Directory",
-    jobs_label:      'Job Vacancies',
+    directory_label:   "Members' Directory",
+    jobs_label:        'Job Vacancies',
+    assignments_label: 'Assignment Openings',
   },
   members_services: {
     card_1_title: 'COP Renewal · Restoration · Firm Registration',
@@ -318,7 +319,9 @@ export const SITE_CONTENT_DEFAULTS = {
     job_subtitle:         'Member job opportunities in Nagpur / Vidarbha region',
     articleship_title:    'Articleship Vacancies',
     articleship_subtitle: 'Articleship openings posted by member firms in Nagpur / Vidarbha',
-    notice:               '**Notice:** These vacancies are posted by member firms and organisations in Nagpur / Vidarbha region. The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.',
+    assignment_title:     'Assignment Openings',
+    assignment_subtitle:  'Short-term and freelance engagements posted by member firms — audit assistance, due-diligence, GST/tax projects and consulting work.',
+    notice:               '**Notice:** These postings are made by member firms and organisations in Nagpur / Vidarbha region. The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.',
   },
   // ── Track grievance defaults ────────────────────────────────────────
   track_grievance_page_header: {

@@ -48,7 +48,7 @@ function StatusPill({ status }) {
   return <span className={'admin-pill ' + (PILL_CLASS[status] ?? '')}>{status.replace('_', ' ')}</span>;
 }
 
-const TYPE_LABEL = { job: 'Job', articleship: 'Articleship' };
+const TYPE_LABEL = { job: 'Job', articleship: 'Articleship', assignment: 'Assignment' };
 const TYPE_AUDIENCE = { job: 'Members', articleship: 'Students' };
 
 export default function JobPostingsAdminPage() {
@@ -130,6 +130,7 @@ export default function JobPostingsAdminPage() {
               <option value="">All types</option>
               <option value="job">Job</option>
               <option value="articleship">Articleship</option>
+              <option value="assignment">Assignment</option>
             </select>
           </>
         }
@@ -302,16 +303,21 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
                 <select className="input-base" value={form.type} onChange={(e) => set('type', e.target.value)} required>
                   <option value="job">Job — visible to Members</option>
                   <option value="articleship">Articleship — visible to Students</option>
+                  <option value="assignment">Assignment — short-term / freelance for Members</option>
                 </select>
               </FormField>
-              <FormField label="Seats available" required>
+              <FormField label={form.type === 'assignment' ? 'Openings available' : 'Seats available'} required>
                 <input type="number" min="1" step="1" className="input-base" value={form.seat_count}
                   onChange={(e) => set('seat_count', e.target.value)} required />
               </FormField>
               <FormField label="Title" required span={2}>
                 <input className="input-base" value={form.title}
                   onChange={(e) => set('title', e.target.value)} required
-                  placeholder={form.type === 'articleship' ? 'e.g. Articleship opening — Tax & Audit' : 'e.g. Senior Auditor'} />
+                  placeholder={
+                    form.type === 'articleship' ? 'e.g. Articleship opening — Tax & Audit' :
+                    form.type === 'assignment'  ? 'e.g. GST audit assistance — Oct-Nov engagement' :
+                                                  'e.g. Senior Auditor'
+                  } />
               </FormField>
               <FormField label="Description" required span={2} hint="Role details, eligibility, how to apply">
                 <textarea className="input-base" rows={5} value={form.description}

@@ -201,15 +201,17 @@ function UserDrawer({ userId, lookups, onClose, onSaved, showToast }) {
       if (isNew) {
         const created = await adminFetch('/api/admin/users', { method: 'POST', body });
         showToast?.('User created — they can now sign in with this email via Auth0', 'success');
-        onSaved?.();
+        // Await the parent's refresh so the list reflects the new row
+        // before the drawer closes — otherwise the drawer disappears
+        // while the list is mid-revalidate and the user briefly sees
+        // stale data. Mirrors EventsAdminPage line 448.
+        await onSaved?.();
         onClose?.();
-        // Could navigate to the new user's drawer here, but the user is
-        // listed at the top after refresh — admin can click in.
         return created;
       } else {
         const updated = await adminFetch(`/api/admin/users/${userId}`, { method: 'PATCH', body });
         showToast?.('User updated', 'success');
-        onSaved?.();
+        await onSaved?.();
         return updated;
       }
     } catch (e) {

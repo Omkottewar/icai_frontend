@@ -42,14 +42,25 @@ async function api(url, opts = {}) {
 export default function ChecklistInstancesPage() {
   const route = useRoute();
   const openId = route.query.id || null;
+  // Bump on every drawer-side mutation so the parent list refetches
+  // and the status pill / row order reflect the action without a
+  // manual page reload.
+  const [listTick, setListTick] = useState(0);
+  const refreshList = () => setListTick((t) => t + 1);
 
   return (
     <>
       <PageHeader title="My checklists" subtitle="Fill or review checklists assigned to you" />
       <section className="container" style={{ padding: '2rem 1rem' }}>
-        <InstancesList onOpen={(id) => navigate('/my-checklists?id=' + id)} />
+        <InstancesList tick={listTick} onOpen={(id) => navigate('/my-checklists?id=' + id)} />
       </section>
-      {openId && <InstanceDrawer id={openId} onClose={() => navigate('/my-checklists')} />}
+      {openId && (
+        <InstanceDrawer
+          id={openId}
+          onClose={() => navigate('/my-checklists')}
+          onListChanged={refreshList}
+        />
+      )}
     </>
   );
 }
@@ -70,17 +81,20 @@ function StatusPill({ status }) {
   );
 }
 
-function InstancesList({ onOpen }) {
+function InstancesList({ onOpen, tick = 0 }) {
   const [rows, setRows] = useState(null);
   const [err, setErr] = useState('');
 
+  // Refetch whenever the parent bumps `tick` (e.g. after a drawer action
+  // like submit/approve/reject/release). Without this, the row's status
+  // pill stays stale until the user navigates away and back.
   useEffect(() => {
     let cancelled = false;
     api('/api/checklist-instances')
       .then((j) => { if (!cancelled) setRows(j.rows || []); })
       .catch((e) => { if (!cancelled) setErr(e.message); });
     return () => { cancelled = true; };
-  }, []);
+  }, [tick]);
 
   if (err)        return <p className="muted-text" style={{ color: 'var(--destructive)' }}>{err}</p>;
   if (rows === null) return (
@@ -132,7 +146,7 @@ function InstancesList({ onOpen }) {
   );
 }
 
-function InstanceDrawer({ id, onClose }) {
+function InstanceDrawer({ id, onClose, onListChanged }) {
   const { showToast } = useAuth();
   const roleFlags = useRoleFlags();
   const [data, setData] = useState(null);
@@ -289,6 +303,7 @@ function InstanceDrawer({ id, onClose }) {
       await api(`/api/checklist-tasks/${taskId}/${action}`, { method: 'POST', body });
       showToast?.(`Task ${action}`, 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -304,6 +319,7 @@ function InstanceDrawer({ id, onClose }) {
       });
       showToast?.('Saved', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -315,6 +331,7 @@ function InstanceDrawer({ id, onClose }) {
       await api(`/api/checklist-instances/${id}/submit`, { method: 'POST' });
       showToast?.('Submitted for review', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -331,6 +348,7 @@ function InstanceDrawer({ id, onClose }) {
       await api(`/api/checklist-instances/${id}/approve`, { method: 'POST' });
       showToast?.('Approved', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -351,6 +369,7 @@ function InstanceDrawer({ id, onClose }) {
       await api(`/api/checklist-instances/${id}/reject`, { method: 'POST', body: { note } });
       showToast?.('Rejected', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -374,6 +393,7 @@ function InstanceDrawer({ id, onClose }) {
       });
       showToast?.('Stage approved', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -395,6 +415,7 @@ function InstanceDrawer({ id, onClose }) {
       });
       showToast?.('Stage rejected — sent back to the committee', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -427,6 +448,7 @@ function InstanceDrawer({ id, onClose }) {
       });
       showToast?.('Rejected and event cancelled', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
@@ -452,6 +474,7 @@ function InstanceDrawer({ id, onClose }) {
       await api(`/api/checklist-instances/${id}/release`, { method: 'POST' });
       showToast?.('Released — chairman can now fill it.', 'success');
       await load();
+      onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };

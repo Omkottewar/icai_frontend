@@ -53,6 +53,9 @@ export default function MembersPage() {
           <a href="/job-vacancies" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconBriefcase size="sm" /> {quickAccess.jobs_label}
           </a>
+          <a href="/job-vacancies?type=assignment" className="btn btn-outline" style={{ gap: '.5rem' }}>
+            <IconBriefcase size="sm" /> {quickAccess.assignments_label || 'Assignment Openings'}
+          </a>
         </div>
 
         <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>

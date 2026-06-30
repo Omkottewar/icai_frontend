@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { IconArrowRight, IconX } from '../../icons';
 import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 import Button from '../../components/ui/Button';
+import { invalidate } from '../../lib/apiCache';
 
 const EMPTY = {
   type:        'job',
@@ -72,6 +73,12 @@ export default function EmployerPostingFormPage() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? 'Save failed');
+      // Bust the postings-list cache so EmployerPostingsPage shows the
+      // new/edited row on the very next mount instead of after its 30s TTL.
+      invalidate('/api/employer/postings');
+      // Also bust the employer dashboard cache so the "Active postings"
+      // count on EmployerDashboardPage reflects the new row.
+      invalidate('/api/employer/me');
       showToast?.(isNew ? 'Posting created' : 'Posting saved', 'success');
       navigate('/employer/postings');
     } catch (e) {

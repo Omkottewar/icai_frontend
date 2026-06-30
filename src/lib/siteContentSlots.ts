@@ -283,11 +283,12 @@ export const SITE_SLOTS = {
     ],
   },
   members_quick_access: {
-    label: "Members — Quick-access buttons (2 chips above service cards)",
+    label: "Members — Quick-access buttons (3 chips above service cards)",
     page:  "Members",
     fields: [
-      { key: "directory_label", label: "Members directory button label", kind: "text" },
-      { key: "jobs_label",      label: "Job vacancies button label",     kind: "text" },
+      { key: "directory_label",   label: "Members directory button label",   kind: "text" },
+      { key: "jobs_label",        label: "Job vacancies button label",       kind: "text" },
+      { key: "assignments_label", label: "Assignment openings button label", kind: "text" },
     ],
   },
   members_services: {
@@ -483,11 +484,13 @@ export const SITE_SLOTS = {
     label: "Job Vacancies — Page headers + notice",
     page:  "Job Vacancies",
     fields: [
-      { key: "job_title",           label: "Title when ?type=job",            kind: "text" },
-      { key: "job_subtitle",        label: "Subtitle when ?type=job",         kind: "text" },
-      { key: "articleship_title",   label: "Title when ?type=articleship",    kind: "text" },
+      { key: "job_title",            label: "Title when ?type=job",            kind: "text" },
+      { key: "job_subtitle",         label: "Subtitle when ?type=job",         kind: "text" },
+      { key: "articleship_title",    label: "Title when ?type=articleship",    kind: "text" },
       { key: "articleship_subtitle", label: "Subtitle when ?type=articleship", kind: "text" },
-      { key: "notice",              label: "Disclaimer notice at top",        kind: "markdown" },
+      { key: "assignment_title",     label: "Title when ?type=assignment",     kind: "text" },
+      { key: "assignment_subtitle",  label: "Subtitle when ?type=assignment",  kind: "text" },
+      { key: "notice",               label: "Disclaimer notice at top",        kind: "markdown" },
     ],
   },
   // ── Track grievance ────────────────────────────────────────

@@ -35,12 +35,43 @@ function usePostings(type) {
   return { rows, loading, error };
 }
 
+// Three modes the page can show — picked via ?type= query string. Each
+// resolves the page header copy from site-content with a per-type fallback,
+// so editors can override individual strings via /admin/site-content
+// without changing the URL contract. New `assignment` mode surfaces
+// short-term / freelance engagements for Members.
+const MODE_CONFIG = {
+  job: {
+    type: 'job',
+    eyebrow: 'For CA Members',
+    defaultHeading: 'Member Job Vacancies',
+    defaultLead: 'Positions in industry, corporates and practice firms seeking qualified Chartered Accountants.',
+    defaultEmpty: 'No job vacancies at the moment. Check back soon.',
+    headerKey: { title: 'job_title', subtitle: 'job_subtitle' },
+  },
+  articleship: {
+    type: 'articleship',
+    eyebrow: 'For CA Students',
+    defaultHeading: 'Articleship Vacancies',
+    defaultLead: 'Member firms in Nagpur seeking articles for practical training.',
+    defaultEmpty: 'No articleship vacancies at the moment. Check back soon.',
+    headerKey: { title: 'articleship_title', subtitle: 'articleship_subtitle' },
+  },
+  assignment: {
+    type: 'assignment',
+    eyebrow: 'For CA Members',
+    defaultHeading: 'Assignment Openings',
+    defaultLead: 'Short-term and freelance engagements — audit assistance, due-diligence, GST/tax projects and other consulting work picked up by firms looking for member support.',
+    defaultEmpty: 'No assignment openings at the moment. Check back soon.',
+    headerKey: { title: 'assignment_title', subtitle: 'assignment_subtitle' },
+  },
+};
+
 export default function JobVacanciesPage() {
   const route = useRoute();
   const header = useSiteContent('job_vacancies_page_header');
-  const isArticleship = route.query.type === 'articleship';
-  const postingType = isArticleship ? 'articleship' : 'job';
-  const { rows, loading, error } = usePostings(postingType);
+  const mode = MODE_CONFIG[route.query.type] ?? MODE_CONFIG.job;
+  const { rows, loading, error } = usePostings(mode.type);
   const [enquiryTarget, setEnquiryTarget] = useState(null);
 
   const notice = (
@@ -60,30 +91,26 @@ export default function JobVacanciesPage() {
   return (
     <>
       <PageHeader
-        title={isArticleship ? header.articleship_title : header.job_title}
-        subtitle={isArticleship ? header.articleship_subtitle : header.job_subtitle}
+        title={header[mode.headerKey.title] || mode.defaultHeading}
+        subtitle={header[mode.headerKey.subtitle] || mode.defaultLead}
       />
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
         {notice}
 
         <div style={{ marginBottom: '1.5rem' }}>
-          <div className="tiny-eyebrow">{isArticleship ? 'For CA Students' : 'For CA Members'}</div>
+          <div className="tiny-eyebrow">{mode.eyebrow}</div>
           <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
-            {isArticleship ? 'Articleship Vacancies' : 'Member Job Vacancies'}
+            {mode.defaultHeading}
           </h2>
           <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>
-            {isArticleship
-              ? 'Member firms in Nagpur seeking articles for practical training.'
-              : 'Positions in industry, corporates and practice firms seeking qualified Chartered Accountants.'}
+            {mode.defaultLead}
           </p>
         </div>
 
         {loading && <LoadingGrid count={3} />}
         {error && <ErrorMessage message={error} />}
         {!loading && !error && rows?.length === 0 && (
-          <EmptyState message={isArticleship
-            ? 'No articleship vacancies at the moment. Check back soon.'
-            : 'No job vacancies at the moment. Check back soon.'} />
+          <EmptyState message={mode.defaultEmpty} />
         )}
         {!loading && !error && rows?.length > 0 && (
           <div style={{ display: 'grid', gap: '1.25rem' }}>
@@ -91,7 +118,7 @@ export default function JobVacanciesPage() {
               <PostingCard
                 key={v.id}
                 posting={v}
-                isArticleship={isArticleship}
+                mode={mode}
                 onEnquire={() => setEnquiryTarget(v)}
               />
             ))}
@@ -106,7 +133,16 @@ export default function JobVacanciesPage() {
   );
 }
 
-function PostingCard({ posting: v, isArticleship, onEnquire }) {
+function PostingCard({ posting: v, mode, onEnquire }) {
+  const isArticleship = mode.type === 'articleship';
+  const isAssignment  = mode.type === 'assignment';
+  const ctaLabel = isArticleship ? 'Apply' : isAssignment ? 'Express interest' : 'Enquire';
+  const seatLine = isArticleship
+    ? <><IconGraduationCap size="sm" /> {v.seat_count} seat{v.seat_count !== 1 ? 's' : ''} available</>
+    : isAssignment
+      ? <><IconBriefcase size="sm" /> {v.seat_count} opening{v.seat_count !== 1 ? 's' : ''}</>
+      : <><IconBriefcase size="sm" /> {v.seat_count} position{v.seat_count !== 1 ? 's' : ''}</>;
+
   return (
     <div className="card" style={{ padding: '1.5rem' }}>
       {/* Header row */}
@@ -120,6 +156,16 @@ function PostingCard({ posting: v, isArticleship, onEnquire }) {
           <h3 style={{ fontWeight: 700, fontSize: '1.0625rem', margin: 0 }}>{v.title}</h3>
           {/* Meta chips */}
           <div className="row gap-3" style={{ marginTop: '.625rem', flexWrap: 'wrap' }}>
+            {isAssignment && (
+              <span style={{
+                padding: '.15rem .5rem', borderRadius: '.25rem',
+                fontSize: '.7rem', fontWeight: 700,
+                background: 'oklch(0.7 0.16 60 / 0.18)', color: 'oklch(0.42 0.16 60)',
+                textTransform: 'uppercase', letterSpacing: '.04em',
+              }}>
+                Short-term
+              </span>
+            )}
             {v.experience_required && (
               <span style={{
                 padding: '.15rem .5rem', borderRadius: '.25rem',
@@ -136,7 +182,7 @@ function PostingCard({ posting: v, isArticleship, onEnquire }) {
           className="btn btn-primary"
           style={{ padding: '.45rem 1rem', fontSize: '.8125rem', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '.375rem' }}
         >
-          <IconMail size="sm" /> {isArticleship ? 'Apply' : 'Enquire'}
+          <IconMail size="sm" /> {ctaLabel}
         </button>
       </div>
 
@@ -155,9 +201,7 @@ function PostingCard({ posting: v, isArticleship, onEnquire }) {
           </span>
         )}
         <span className="row gap-1 muted-text" style={{ fontSize: '.8125rem' }}>
-          {isArticleship
-            ? <><IconGraduationCap size="sm" /> {v.seat_count} seat{v.seat_count !== 1 ? 's' : ''} available</>
-            : <><IconBriefcase size="sm" /> {v.seat_count} position{v.seat_count !== 1 ? 's' : ''}</>}
+          {seatLine}
         </span>
         <span className="row gap-1 muted-text" style={{ fontSize: '.8125rem' }}>
           <IconCalendar size="sm" /> Posted {fmtDate(v.created_at)}
