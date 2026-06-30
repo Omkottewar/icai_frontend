@@ -5,6 +5,7 @@ import { useRoleFlags } from '../hooks/useRoleFlags';
 import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
 import { cachedGet } from '../lib/apiCache';
+import { firstName, initials as displayInitials } from '../lib/displayName';
 import StatCard from '../components/ui/StatCard';
 import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
@@ -122,7 +123,7 @@ export default function DashboardPage() {
         <div>
           <div className="tiny-eyebrow">My Account</div>
           <h1 style={{ marginTop: '.15rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
-            Welcome back, {user.name.split(' ')[0]}
+            Welcome back, {firstName(user.name)}
           </h1>
           <p className="muted-text" style={{ marginTop: '.15rem', fontSize: '.875rem' }}>
             {memberNoLabel}{' '}
@@ -313,7 +314,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="row gap-3">
               <span className="avatar-circle" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
-                {user.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                {displayInitials(user.name)}
               </span>
               <div>
                 <div style={{ fontWeight: 600 }}>{user.name}</div>
@@ -481,7 +482,7 @@ function StudentTabbedBody({ data, user, logout }) {
           <div className="card">
             <div className="row gap-3">
               <span className="avatar-circle" style={{ width: '3.5rem', height: '3.5rem', fontSize: '1rem' }}>
-                {user.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                {displayInitials(user.name)}
               </span>
               <div>
                 <div style={{ fontWeight: 600 }}>{user.name}</div>

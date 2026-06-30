@@ -6,6 +6,7 @@ import { useSiteContent } from '../hooks/useSiteContent';
 // feeds the `about_committee_members` site-content slot). No more derived
 // list from role assignments.
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { initials as displayInitials } from '../lib/displayName';
 import { IconDownload, IconCalendar } from '../icons';
 
 async function api(url) {
@@ -25,15 +26,9 @@ const ROLE_LABELS = {
   mcm:                  'Managing Committee Member',
 };
 
-function initials(name) {
-  return (name || '')
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase() || 'CA';
-}
+// Wrap the shared helper so the "CA" fallback for blank names stays
+// (cosmetic — used only when a member row has no name at all).
+const initials = (name) => displayInitials(name) || 'CA';
 
 export default function AboutPage() {
   const header     = useSiteContent('about_page_header');

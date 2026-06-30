@@ -7,6 +7,7 @@ import {
 } from '../../icons';
 import { toast } from '../../lib/notify';
 import { dialog } from '../../lib/dialog';
+import { initials as displayInitials } from '../../lib/displayName';
 
 // Discord-style event chat. Channels in a left rail, message canvas in the
 // middle, composer at the bottom. Built around the useEventChat hook which
@@ -49,8 +50,10 @@ function fmtDay(iso) {
     ? { weekday: 'short', day: '2-digit', month: 'short' }
     : { day: '2-digit', month: 'short', year: 'numeric' });
 }
+// Strips honorifics ("CA", "Dr", etc.) before computing initials — so
+// CA Swaroopa Wazalwar's bubble shows "SW" instead of "CS".
 function initials(name) {
-  return (name || '?').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+  return displayInitials(name) || '?';
 }
 const AUTHOR_TINTS = ['#3622FF', '#16A34A', '#0891B2', '#F59E0B', '#7C3AED', '#E11D48', '#0EA5E9', '#65A30D'];
 function authorTint(id) {

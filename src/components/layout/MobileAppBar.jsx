@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useRoute } from '../../hooks/useRoute';
 import caIndiaLogo from '../../assets/CA India Logo.png';
 import NotificationsBell from './NotificationsBell';
+import { initials as displayInitials } from '../../lib/displayName';
 
 // Mobile-only top app bar. Shown only ≤768 px; the desktop Header is
 // hidden in that range via CSS. Slim 56-px tall, solid primary background,
@@ -60,9 +61,7 @@ export default function MobileAppBar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const initials = user?.name
-    ? user.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
-    : null;
+  const initials = user?.name ? displayInitials(user.name) : null;
 
   return (
     <header className={'mobile-appbar' + (elevated ? ' is-scrolled' : '')} aria-label="App header">

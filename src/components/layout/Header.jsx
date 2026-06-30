@@ -4,6 +4,7 @@ import { navigate } from '../../hooks/useRoute';
 import Link from '../ui/Link';
 import { NAV, SOCIALS } from '../../data/constants';
 import { useSiteSettings } from '../../hooks/useSiteSettings';
+import { firstName, initials } from '../../lib/displayName';
 import caIndiaLogo from '../../assets/CA India Logo.png';
 import NotificationsBell from './NotificationsBell';
 import {
@@ -138,8 +139,8 @@ export default function Header() {
           {user ? (
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button className="avatar-trigger" onClick={() => setMenuOpen(!menuOpen)}>
-                <span className="avatar-circle">{user.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}</span>
-                <span className="hide-on-mobile">{user.name.split(' ')[0]}</span>
+                <span className="avatar-circle">{initials(user.name)}</span>
+                <span className="hide-on-mobile">{firstName(user.name)}</span>
                 <IconChevronDown size="sm" />
               </button>
               {menuOpen && (

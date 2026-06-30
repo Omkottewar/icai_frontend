@@ -4,6 +4,7 @@ import { cachedGet } from '../lib/apiCache';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { initials as displayInitials } from '../lib/displayName';
 import { IconSearch, IconArrowRight, IconLock } from '../icons';
 import { ShimmerTableRow } from '../components/ui/Shimmer';
 
@@ -151,7 +152,7 @@ export default function MembersDirectoryPage() {
             return (
               <li key={'mob-' + m.id} className="dir-mobile-card">
                 <div className="dir-mobile-avatar">
-                  {m.name.split(' ').slice(0, 2).map((w) => w[0]).join('')}
+                  {displayInitials(m.name)}
                 </div>
                 <div className="dir-mobile-body">
                   <div className="dir-mobile-name">{m.name}</div>
@@ -215,7 +216,7 @@ export default function MembersDirectoryPage() {
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           fontSize: '.625rem', fontWeight: 700, flexShrink: 0,
                         }}>
-                          {m.name.split(' ').slice(0, 2).map((w) => w[0]).join('')}
+                          {displayInitials(m.name)}
                         </div>
                         <span style={{ fontWeight: 500 }}>{m.name}</span>
                       </div>
