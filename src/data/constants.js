@@ -38,8 +38,7 @@ export const SOCIALS = [
 export const ICAI_LINKS = [
   { label: 'Self Service Portal',  url: 'https://eservices.icai.org' },
   { label: 'Digital Learning Hub', url: 'https://learning.icai.org' },
-  { label: 'eServices',            url: 'https://www.icai.org/new_post.html?post_id=5509' },
-  { label: 'CDS',                  url: 'https://icai-cds.org/' },
+  { label: 'CDS',                  url: 'https://cds.icai.org/cds/marketplace' },
   { label: 'ICAI Social Media',    url: 'https://www.icai.org/followus' },
   { label: 'ICAI Mobile App',      url: 'https://www.icai.org/mobile/' },
   { label: 'eSahaayataa',          url: 'https://www.icai.org/help/' },

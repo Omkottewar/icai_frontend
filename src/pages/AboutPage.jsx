@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useSiteContent } from '../hooks/useSiteContent';
-import { useManagingCommittee } from '../hooks/useManagingCommittee';
+// useManagingCommittee removed — the public About page now relies solely
+// on the admin-curated roster saved through /admin/office-bearers (which
+// feeds the `about_committee_members` site-content slot). No more derived
+// list from role assignments.
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { IconDownload, IconCalendar } from '../icons';
 
@@ -39,7 +42,6 @@ export default function AboutPage() {
   const mission    = useSiteContent('about_mission');
   const history    = useSiteContent('about_history');
   const committee  = useSiteContent('about_committee_members');
-  const { rows: profileRoster } = useManagingCommittee();
 
   // Past Chairmen + Annual Reports — both load on mount. Failures degrade
   // gracefully: if the API isn't reachable, those sections silently hide
@@ -56,11 +58,12 @@ export default function AboutPage() {
     });
   }, []);
 
-  // When manual members have been saved in the admin, prefer that list.
-  // Fall back to role-assignment roster (useManagingCommittee) otherwise.
-  const roster = Array.isArray(committee.members) && committee.members.length > 0
+  // The MCM roster is admin-curated only. When the chairman hasn't added
+  // any members yet, the section renders the empty-state copy from
+  // `about_section_headings.committee_empty_msg`.
+  const roster = Array.isArray(committee.members)
     ? committee.members.map((m) => ({ user_id: m.user_id, name: m.name, avatar_url: m.photo_url, role_name: m.designation }))
-    : profileRoster;
+    : [];
 
   return (
     <>

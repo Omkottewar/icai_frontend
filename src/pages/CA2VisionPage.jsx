@@ -15,6 +15,14 @@ export default function CA2VisionPage() {
       subtitle={c.subtitle}
       body={
         <div className="col gap-5">
+          <div style={{
+            padding: '.75rem .9rem',
+            background: 'oklch(0.95 0.05 90)',
+            border: '1px solid oklch(0.85 0.08 90)',
+            borderRadius: '.4rem', fontSize: '.875rem', lineHeight: 1.5,
+          }}>
+            <strong>Coming soon.</strong> The CA 2.0 programme is being finalised by the Nagpur branch — full details, schedules and sign-ups will be live here shortly.
+          </div>
           <div className="muted-text" style={{ lineHeight: 1.6 }}>
             {renderMarkdown(c.intro)}
           </div>

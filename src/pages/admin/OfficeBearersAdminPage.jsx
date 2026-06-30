@@ -30,7 +30,19 @@ const FIELDS = [
     placeholder: 'leave blank for a display-only entry',
     help: 'When linked, removing or hiding this row also revokes the user\'s portal access for the matching role. Leave blank for historical office bearers without a portal account.',
   },
-  { name: 'photo_file_id', label: 'Photo',      type: 'file', accept: 'image/*', bucket: 'office_bearers' },
+  // MCM photo — uses the in-browser ImageCropper modal so admins can pick
+  // any source image and frame it square (matches the round avatar shown
+  // on /about). Min source dims keep the public roster from going grainy.
+  {
+    name: 'photo_file_id',
+    label: 'Photo',
+    type: 'file',
+    accept: 'image/*',
+    bucket: 'office_bearers',
+    crop: true,
+    minWidth: 300,
+    minHeight: 300,
+  },
   { name: 'bio',          label: 'Bio (optional)', type: 'textarea', rows: 4 },
   { type: 'group', children: [
     { name: 'email', label: 'Email (optional)', type: 'email' },

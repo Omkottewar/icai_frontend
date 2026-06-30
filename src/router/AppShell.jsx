@@ -288,7 +288,7 @@ function AuthBootstrapSplash() {
         <img src={caIndiaLogo} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
       </div>
       <div style={{ marginTop: '1rem', fontSize: '.85rem', fontWeight: 600, color: 'var(--muted-foreground, #64748b)' }}>
-        Nagpur Branch of ICAI
+        ICAI Nagpur Branch (WIRC)
       </div>
       <div className="bs-spinner" />
       <style>{`

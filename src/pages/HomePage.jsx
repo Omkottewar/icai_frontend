@@ -182,7 +182,7 @@ export default function HomePage() {
               width: 'clamp(220px, 45vw, 560px)',
               maxHeight: '70%',
               objectFit: 'contain',
-              opacity: 0.32,
+              opacity: 0.6,
               pointerEvents: 'none',
               userSelect: 'none',
             }}
@@ -190,10 +190,7 @@ export default function HomePage() {
         </div>
         <div className="container" style={{ position: 'relative', zIndex: 1, width: '100%', display: 'grid', gap: '2.5rem', gridTemplateColumns: '1fr', alignItems: 'center' }} data-hero-grid>
           <div>
-            <div className="row gap-2" style={{ width: 'fit-content', padding: '.25rem .75rem', borderRadius: 999, border: '1px solid var(--border)', background: 'rgba(54,34,255,.06)', fontSize: '.75rem', fontWeight: 500, color: 'var(--primary)' }}>
-              <IconAward size="sm" /> {heroText.badge}
-            </div>
-            <h1 style={{ marginTop: '1rem', fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
+            <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 700, lineHeight: 1.1 }}>
               {heroText.title_prefix} <span className="home-hero-icai">{heroText.title_highlight}</span>
             </h1>
             <div style={{ marginTop: '1rem', maxWidth: '32rem', color: 'rgba(0,0,0,.7)' }}>
@@ -219,6 +216,10 @@ export default function HomePage() {
               {!user && <a href="/signup" className="btn btn-outline">{heroText.cta_signup_label} <IconArrowRight size="sm" /></a>}
             </div>
           </div>
+          {/* Hero stat tiles (Members / Students / Events / Established) —
+              hidden per client request. The data is still admin-editable
+              under home_hero_stats so this can be uncommented later. */}
+          {/*
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'clamp(.6rem, 2vw, 1rem)' }}>
             {(heroStats.stats || []).map((s, i) => (
               <div key={s.v || i} style={{ padding: 'clamp(.9rem, 3vw, 1.5rem)', border: '1px solid var(--border)', background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', borderRadius: '.75rem', boxShadow: '0 10px 24px -16px rgba(11,61,145,.25)' }}>
@@ -227,6 +228,7 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+          */}
         </div>
         <style>{`@media (min-width: 768px) { [data-hero-grid] { grid-template-columns: 1fr 1fr !important; } }`}</style>
       </section>
@@ -326,7 +328,15 @@ export default function HomePage() {
 
           <div className="tiny-eyebrow" style={{ marginBottom: '1rem' }}>{eventsText.upcoming_eyebrow}</div>
           <div>
-            {upcoming.map((e) => <EventRow key={e.title} event={e} />)}
+            {upcoming.length > 0 ? (
+              upcoming.map((e) => <EventRow key={e.title} event={e} />)
+            ) : (
+              <div className="card" style={{ textAlign: 'center', padding: '2rem 1rem' }}>
+                <p className="muted-text" style={{ margin: 0 }}>
+                  No upcoming events for now — check back soon.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Committee categories */}

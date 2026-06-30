@@ -22,19 +22,19 @@ export const SITE_CONTENT_DEFAULTS = {
       { k: '5,000+', v: 'Members' },
       { k: '8,500+', v: 'Students' },
       { k: '150+',   v: 'Events / yr' },
-      { k: '1962',   v: 'Established' },
+      { k: '1978',   v: 'Established' },
     ],
   },
   home_leadership_banner: {
     eyebrow:  'ESTABLISHED UNDER THE CHARTERED ACCOUNTANTS ACT, 1949',
     headline: 'Nurturing excellence\nin professional services\nfor Central India.',
-    body:     'The official portal of the Nagpur Branch of WIRC of ICAI — supporting over 5,000 members and 8,500+ students through education, regulation and continuous professional development.',
+    body:     'The official portal of the ICAI Nagpur Branch (WIRC) — supporting over 5,000 members and 8,500+ students through education, regulation and continuous professional development.',
   },
   home_branch_premises: {
     // Default Unsplash photo — the admin can replace it from
     // /admin/site-content → Home tab → "Branch premises section".
     image_url: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=960&h=440&q=80&auto=format&fit=crop',
-    body: 'A purpose-built three-storey facility housing the Branch office, a 220-seat seminar hall, a digital library and a dedicated student wing for residential coaching.',
+    body: 'A purpose-built two-storey facility housing the Branch office, a 100-seat seminar hall and Reading Room ITT Lab, a Conference Hall, a digital library and a dedicated student wing.',
     stats: [
       { k: '80 seats',      v: 'READING ROOM' },
       { k: '4,200+ titles', v: 'LIBRARY' },
@@ -50,8 +50,9 @@ export const SITE_CONTENT_DEFAULTS = {
     bg_image_url:     null,
     watermark_url:    null,
     badge:            'Branch of WIRC of ICAI',
-    title_prefix:     'Nagpur Branch of',
+    title_prefix:     '',
     title_highlight:  'ICAI',
+    title_suffix:     'Nagpur Branch (WIRC)',
     cta_events_label: 'Upcoming Events',
     cta_ai_label:     'Ask PrayGyaan AI',
     cta_signup_label: 'Create account',
@@ -60,7 +61,7 @@ export const SITE_CONTENT_DEFAULTS = {
     cta_book_label:     'Book CPE Event',
     cta_download_label: 'Download Circulars',
     since_label:        'SINCE',
-    since_year:         '1962',
+    since_year:         '1978',
   },
   home_leadership_carousel: {
     // Same Unsplash placeholders the page used to ship with — admin can
@@ -86,7 +87,7 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   home_events_section: {
     events_eyebrow:        'EVENTS',
-    events_title:          'Upcoming programmes and committees',
+    events_title:          'Upcoming programmes and Events',
     events_view_all_label: 'View full calendar →',
     upcoming_eyebrow:      'UPCOMING EVENTS',
     committees_eyebrow:    'BROWSE BY COMMITTEE',
@@ -121,7 +122,7 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   about_page_header: {
     title:    'About the Branch',
-    subtitle: 'Established 1962 · Branch of WIRC of ICAI',
+    subtitle: 'Established 1978 · Branch of WIRC of ICAI',
   },
   about_section_headings: {
     vision_card_title:        'A model branch of ICAI',
@@ -141,7 +142,7 @@ export const SITE_CONTENT_DEFAULTS = {
     body: "Deliver world-class CPE programmes, advocate for members' interests, mentor students, and contribute to financial literacy in the wider community.",
   },
   about_history: {
-    body: 'The Nagpur Branch was established in 1962 and has grown into one of the most active branches of WIRC, serving over 5,000 members and 8,500+ students.',
+    body: 'The Nagpur Branch was established in 1978 and has grown into one of the most active branches of WIRC, serving over 5,000 members and 8,500+ students.',
   },
   // ── Students page defaults ──────────────────────────────────────────
   students_page_header: {
@@ -279,7 +280,7 @@ export const SITE_CONTENT_DEFAULTS = {
   },
   events_sections: {
     events_eyebrow:        'EVENTS',
-    events_title:          'Upcoming programmes and committees',
+    events_title:          'Upcoming programmes and Events',
     upcoming_eyebrow:      'UPCOMING EVENTS',
     view_list_label:       'List',
     view_month_label:      'Month',
@@ -365,10 +366,10 @@ export const SITE_CONTENT_DEFAULTS = {
     about_body:         'The Chartered Accountants Benevolent Fund (CABF) provides financial assistance to members and their dependents in case of distress, illness or untimely demise. The fund is administered by the ICAI Head Office; the Nagpur branch facilitates contributions and disbursement requests.',
     contribute_heading: 'Contribute',
     contribute_body:    'Contributions are eligible for deduction under Section 80G. Suggested slabs:',
-    slabs_csv:          '₹501, ₹1,001, ₹5,001, ₹11,001',
+    slabs_csv:          '₹100; ₹500; ₹1,000; ₹10,000',
     alert_body:         '**Online contributions open soon.** In the meantime, contribute via the official ICAI CABF portal or contact the Nagpur branch directly.',
     icai_btn_label:     'ICAI CABF (HQ) ↗',
-    icai_btn_url:       'https://www.icai.org/post/cabf',
+    icai_btn_url:       'https://cabf.icai.org/',
     contact_btn_label:  'Contact Nagpur Branch',
   },
   // ── CA 2.0 defaults ─────────────────────────────────────────────────
@@ -400,7 +401,7 @@ export const SITE_CONTENT_DEFAULTS = {
     subtitle: 'One-to-one sessions with volunteer CAs and alma-mater mentors — launching soon.',
     benefits_heading:       "What you'll get",
     benefits_body:
-`- A 30-minute 1:1 with a practising CA
+`- A 30-minute Session with a practising CA
 - Help with articleship, exams and career paths
 - Optional follow-up over email`,
     bookings_heading:       'Bookings open soon',

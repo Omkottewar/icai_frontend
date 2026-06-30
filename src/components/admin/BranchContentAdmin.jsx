@@ -5,6 +5,7 @@ import { IconX } from '../../icons';
 import { Shimmer } from '../ui/Shimmer';
 import { dialog } from '../../lib/dialog';
 import Button from '../ui/Button';
+import ImageCropper from '../ui/ImageCropper';
 
 // Generic admin CRUD page used by the 5 branch-content entities
 // (paper-presentations, gallery-albums, newsletters, office-bearers,
@@ -15,7 +16,10 @@ import Button from '../ui/Button';
 // `fields` is a flat list. Each entry is one of:
 //   { name, label, type: 'text' | 'textarea' | 'number' | 'date' | 'datetime' | 'select' | 'checkbox' | 'file' }
 //   { name, label, type: 'select', options: [{value, label}] }
-//   { name, label, type: 'file', bucket, accept: 'application/pdf' | 'image/*' }
+//   { name, label, type: 'file', bucket, accept: 'application/pdf' | 'image/*',
+//     crop?: boolean,  // when true (image fields only): opens ImageCropper after pick
+//     minWidth?, minHeight?: number,  // refuses sources smaller than this
+//   }
 //   { name, label, type: 'group', children: [field, field] }   // horizontal row
 //
 // File-type fields produce TWO form keys:
@@ -326,18 +330,25 @@ function Field({ field, form, set }) {
 
 // File upload — base64 POST to /api/admin/files. Stores `id` on form[name]
 // and the preview URL on form[name + '__url'].
+//
+// When `field.crop === true` (only valid for image accepts), the picked
+// file goes through the ImageCropper modal first. The cropper resolves
+// with the cropped base64 + mime, which we then upload — so what lands in
+// storage is exactly what the admin chose, at the requested aspect.
 function FileUpload({ field, form, set }) {
   const { showToast } = useAuth();
   const [busy, setBusy] = useState(false);
+  const [pendingFile, setPendingFile] = useState(null);
   const id  = form[field.name];
   const url = form[field.name + '__url'];
+  const isImage   = (field.accept || '').includes('image');
+  const useCrop   = isImage && !!field.crop;
 
-  const onPick = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Direct (no-crop) flow — original behaviour, kept for non-image fields
+  // and image fields that don't opt into cropping.
+  const uploadDirect = async (file) => {
     if (file.size > 6 * 1024 * 1024) {
       showToast?.('File too large (max 6 MB)', 'error');
-      e.target.value = '';
       return;
     }
     setBusy(true);
@@ -359,11 +370,45 @@ function FileUpload({ field, form, set }) {
       showToast?.(err.message || 'Upload failed', 'error');
     } finally {
       setBusy(false);
-      e.target.value = '';
     }
   };
 
-  const isImage = (field.accept || '').includes('image');
+  // Crop-then-upload flow — receives the cropped payload from ImageCropper
+  // (already a data URL + mime) and forwards to the same /api/admin/files
+  // endpoint. The backend strips the `data:…;base64,` prefix server-side.
+  const uploadCropped = async (cropped) => {
+    setBusy(true);
+    try {
+      const r = await api('/api/admin/files', {
+        method: 'POST',
+        body: {
+          name: cropped.name,
+          mime_type: cropped.mime_type,
+          bucket: field.bucket || 'branch_content',
+          data_base64: cropped.data_base64,
+        },
+      });
+      set(field.name, r.id);
+      set(field.name + '__url', r.url);
+      showToast?.('Uploaded', 'success');
+      setPendingFile(null);
+    } catch (err) {
+      showToast?.(err.message || 'Upload failed', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPick = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';     // let admin re-pick the same file later
+    if (!file) return;
+    if (useCrop) {
+      setPendingFile(file);  // ImageCropper modal opens
+      return;
+    }
+    await uploadDirect(file);
+  };
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
@@ -386,6 +431,15 @@ function FileUpload({ field, form, set }) {
       {id && (
         <button type="button" className="btn btn-ghost" style={{ fontSize: '.8rem', color: '#b91c1c' }}
           onClick={() => { set(field.name, ''); set(field.name + '__url', ''); }}>Remove</button>
+      )}
+      {useCrop && pendingFile && (
+        <ImageCropper
+          file={pendingFile}
+          onConfirm={uploadCropped}
+          onCancel={() => setPendingFile(null)}
+          minWidth={field.minWidth || 0}
+          minHeight={field.minHeight || 0}
+        />
       )}
     </div>
   );

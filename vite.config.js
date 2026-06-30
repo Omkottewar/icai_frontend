@@ -55,9 +55,9 @@ export default defineConfig({
         navigateFallback: 'index.html',
       },
       manifest: {
-        name: 'ICAI Nagpur Branch',
+        name: 'ICAI Nagpur Branch (WIRC)',
         short_name: 'ICAI Nagpur',
-        description: 'Official portal of the Nagpur Branch of WIRC of ICAI — events, CPE, members, and committees.',
+        description: 'Official portal of the ICAI Nagpur Branch (WIRC) — events, CPE, members, and committees.',
         theme_color: '#1e40af',
         background_color: '#ffffff',
         display: 'standalone',

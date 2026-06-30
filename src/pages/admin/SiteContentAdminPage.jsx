@@ -322,6 +322,7 @@ function SlotDrawer({ slug, initial, onClose, onSaved, showToast }) {
             key={field.key}
             field={field}
             value={form[field.key]}
+            defaultValue={defaults[field.key]}
             onChange={(v) => setField(field.key, v)}
             previewing={preview.has(field.key)}
             onTogglePreview={() => togglePreview(field.key)}
@@ -333,15 +334,30 @@ function SlotDrawer({ slug, initial, onClose, onSaved, showToast }) {
   );
 }
 
-function FieldEditor({ field, value, onChange, previewing, onTogglePreview, showToast }) {
+function FieldEditor({ field, value, defaultValue, onChange, previewing, onTogglePreview, showToast }) {
+  // Every text/markdown field is optional. The admin can clear it to fall
+  // back to whatever the page renders for an empty slot (often nothing).
+  // We surface the bundled default as a placeholder so the admin can see
+  // what's being overridden, and never gate the save on a non-empty value.
+  const placeholder = typeof defaultValue === 'string' && defaultValue ? defaultValue : '';
+  const isEmpty = !value;
+
   if (field.kind === 'text') {
     return (
       <FormField label={field.label} hint={field.hint}>
         <input
           className="input-base"
           value={value ?? ''}
+          placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
         />
+        {placeholder && (
+          <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.2rem' }}>
+            {isEmpty
+              ? <>Optional — leave empty to hide this on the live site.</>
+              : <button type="button" onClick={() => onChange('')} style={{ background: 'transparent', border: 0, padding: 0, color: 'var(--primary)', cursor: 'pointer', font: 'inherit', fontSize: '.7rem', textDecoration: 'underline' }}>Clear (leave empty)</button>}
+          </div>
+        )}
       </FormField>
     );
   }
@@ -376,12 +392,16 @@ function FieldEditor({ field, value, onChange, previewing, onTogglePreview, show
             className="input-base"
             rows={5}
             value={value ?? ''}
+            placeholder={placeholder}
             onChange={(e) => onChange(e.target.value)}
           />
         )}
-        {field.hint && (
-          <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>{field.hint}</div>
-        )}
+        <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem', display: 'flex', justifyContent: 'space-between', gap: '.5rem' }}>
+          <span>{field.hint || (placeholder ? 'Optional — leave empty to hide this on the live site.' : '')}</span>
+          {!isEmpty && placeholder && (
+            <button type="button" onClick={() => onChange('')} style={{ background: 'transparent', border: 0, padding: 0, color: 'var(--primary)', cursor: 'pointer', font: 'inherit', fontSize: '.7rem', textDecoration: 'underline' }}>Clear</button>
+          )}
+        </div>
       </div>
     );
   }
@@ -660,6 +680,10 @@ function CommitteeMembersList({ members, onChange, showToast }) {
 
 function CommitteeMemberRow({ index, member, isFirst, isLast, onChange, onSelectUser, onMoveUp, onMoveDown, onRemove, showToast }) {
   const [uploading, setUploading] = useState(false);
+  // Picked-but-not-yet-cropped file. When set, the ImageCropper modal
+  // renders over the page so the admin can frame the photo square (matches
+  // the round avatar on /about) before it uploads.
+  const [pendingFile, setPendingFile] = useState(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -702,23 +726,32 @@ function CommitteeMemberRow({ index, member, isFirst, isLast, onChange, onSelect
     onChange('name', '');
   }
 
-  async function onFile(e) {
+  // Pick a file → open ImageCropper. The crop step lets the admin frame
+  // the face square so the /about round avatar is centred well.
+  function onFile(e) {
     const file = e.target.files?.[0];
+    e.target.value = '';  // let admin re-pick the same file later
     if (!file) return;
+    setPendingFile(file);
+  }
+
+  // Receives the cropped payload from ImageCropper. The base64 is already
+  // a full data URL; /api/admin/files strips the prefix server-side.
+  async function uploadCropped(cropped) {
     setUploading(true);
     try {
-      const data_base64 = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(String(r.result || ''));
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      });
       const resp = await apiWrite('/api/admin/files', {
         method: 'POST',
-        body: { name: file.name, mime_type: file.type, bucket: 'site', data_base64 },
+        body: {
+          name: cropped.name,
+          mime_type: cropped.mime_type,
+          bucket: 'site',
+          data_base64: cropped.data_base64,
+        },
       });
       onChange('photo_url', resp.url);
       showToast?.('Photo uploaded', 'success');
+      setPendingFile(null);
     } catch (err) {
       showToast?.(err.message || 'Upload failed', 'error');
     } finally {
@@ -763,6 +796,15 @@ function CommitteeMemberRow({ index, member, isFirst, isLast, onChange, onSelect
             >
               Remove
             </button>
+          )}
+          {pendingFile && (
+            <ImageCropper
+              file={pendingFile}
+              onConfirm={uploadCropped}
+              onCancel={() => setPendingFile(null)}
+              minWidth={300}
+              minHeight={300}
+            />
           )}
         </div>
 

@@ -7,7 +7,10 @@ import { IconHandshake, IconArrowRight } from '../icons';
 // can rewrite anything from /admin/site-content → Benevolent Fund tab.
 export default function BenevolentFundPage() {
   const c = useSiteContent('benevolent_fund_content');
-  const slabs = (c.slabs_csv || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const rawSlabs = c.slabs_csv || '';
+  const slabs = (rawSlabs.includes(';') ? rawSlabs.split(';') : rawSlabs.split(','))
+    .map((s) => s.trim())
+    .filter(Boolean);
   return (
     <GenericPage
       title={c.title}

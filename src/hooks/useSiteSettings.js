@@ -6,7 +6,7 @@ import { cachedGet } from '../lib/apiCache';
 // the site_settings table.
 export const SITE_SETTINGS_DEFAULTS = {
   branch_address:     'ICAI Bhawan, 20/1, Dhantoli, Nagpur — 440 012',
-  branch_phone:       '+91 712 244 1590',
+  branch_phone:       '+91 712 244 3968',
   branch_email:       'nagpur@icai.org',
   branch_hours:       'Mon–Sat 10:30–18:00',
   branch_map_url:     'https://maps.google.com/?q=ICAI+Bhawan+Nagpur',

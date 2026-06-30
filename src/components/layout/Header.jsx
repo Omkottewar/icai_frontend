@@ -106,8 +106,7 @@ export default function Header() {
             <img src={caIndiaLogo} alt="CA India" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
           </div>
           <div>
-            <div style={{ fontSize: '.875rem', fontWeight: 700, lineHeight: 1.2 }}>Nagpur Branch of ICAI</div>
-            <div style={{ fontSize: '.75rem', color: 'rgba(255,255,255,.75)' }}>of WIRC of ICAI</div>
+            <div style={{ fontSize: '.875rem', fontWeight: 700, lineHeight: 1.2 }}>ICAI Nagpur Branch (WIRC)</div>
           </div>
         </a>
 
