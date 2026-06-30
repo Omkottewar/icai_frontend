@@ -510,17 +510,21 @@ function DrillShell({ title, onClose, children }) {
 function DrillEvents({ rows = [], onClose }) {
   return (
     <DrillShell title="All events — quick view" onClose={onClose}>
-      <div className="insights-drill-grid">
-        {rows.slice(0, 12).map((r) => (
-          <div key={r.id} className="insights-drill-item">
-            <div style={{ minWidth: 0 }}>
-              <div className="ditem-title">{r.title}</div>
-              <div className="ditem-sub">{r.committee_code || '—'} · {fmtDate(r.starts_at)}</div>
+      {rows.length === 0 ? (
+        <p className="muted-text" style={{ fontSize: 12, margin: 0 }}>No events to show.</p>
+      ) : (
+        <div className="insights-drill-grid">
+          {rows.slice(0, 12).map((r) => (
+            <div key={r.id} className="insights-drill-item">
+              <div style={{ minWidth: 0 }}>
+                <div className="ditem-title">{r.title}</div>
+                <div className="ditem-sub">{r.committee_code || '—'} · {fmtDate(r.starts_at)}</div>
+              </div>
+              <div className="ditem-num">{r.registered_count}{r.capacity ? `/${r.capacity}` : ''}</div>
             </div>
-            <div className="ditem-num">{r.registered_count}{r.capacity ? `/${r.capacity}` : ''}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </DrillShell>
   );
 }
@@ -549,17 +553,21 @@ function DrillApprovals({ rows = [], onClose }) {
 function DrillCommittees({ rows = [], onClose }) {
   return (
     <DrillShell title="Active managing committee members" onClose={onClose}>
-      <div className="insights-drill-grid">
-        {rows.slice(0, 12).map((r, i) => (
-          <div key={r.committee_id} className="insights-drill-item">
-            <div style={{ minWidth: 0 }}>
-              <div className="ditem-title">CA Member {i + 1}</div>
-              <div className="ditem-sub">Chair · {r.committee_name}</div>
+      {rows.length === 0 ? (
+        <p className="muted-text" style={{ fontSize: 12, margin: 0 }}>No committee chairs assigned yet.</p>
+      ) : (
+        <div className="insights-drill-grid">
+          {rows.slice(0, 12).map((r, i) => (
+            <div key={r.committee_id} className="insights-drill-item">
+              <div style={{ minWidth: 0 }}>
+                <div className="ditem-title">CA Member {i + 1}</div>
+                <div className="ditem-sub">Chair · {r.committee_name}</div>
+              </div>
+              <div className="ditem-num"><span className="mono" style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{r.committee_code}</span></div>
             </div>
-            <div className="ditem-num"><span className="mono" style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>{r.committee_code}</span></div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </DrillShell>
   );
 }

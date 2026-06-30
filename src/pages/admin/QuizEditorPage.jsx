@@ -45,7 +45,7 @@ export default function QuizEditorPage() {
         setQuestions((r.questions || []).map((q) => ({
           text: q.text,
           explanation: q.explanation || '',
-          options: q.options.map((o) => ({ text: o.text, is_correct: o.is_correct })),
+          options: (q.options ?? []).map((o) => ({ text: o.text, is_correct: o.is_correct })),
         })));
       } else {
         // No quiz yet — seed with one starter question.

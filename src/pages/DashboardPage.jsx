@@ -4,6 +4,7 @@ import { useDashboard } from '../hooks/useDashboard';
 import { useRoleFlags } from '../hooks/useRoleFlags';
 import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
+import { cachedGet } from '../lib/apiCache';
 import StatCard from '../components/ui/StatCard';
 import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
@@ -85,9 +86,12 @@ export default function DashboardPage() {
     ? <OfficeBearerCTA labels={officeBearerCard} />
     : null;
 
-  // For members we delegate to a richer, purpose-built dashboard. Students
-  // and non-office-bearer/chairmen keep the legacy layout below.
-  if (isMember) {
+  // For regular members we delegate to a richer, purpose-built dashboard.
+  // Chairmen (branch + committee) are almost always also Members, so we
+  // exclude them here — they need the legacy layout below, which is the
+  // only place the BranchInsightsCard / ApprovalsQueueCard render.
+  // Students and non-office-bearer/non-chairman members fall through too.
+  if (isMember && !isBranchChairman && !isCommitteeChairman) {
     return (
       <>
         {dashError && (
@@ -539,14 +543,14 @@ function BranchInsightsCard() {
         </div>
 
         <div className="bic-kpis">
-          <BicMiniKpi label="Events" value={loading ? '—' : k?.events.total ?? 0}
-                      sub={k ? `${k.events.this_month} this month` : ''} accent="primary" />
-          <BicMiniKpi label="Registrations" value={loading ? '—' : k?.registrations.total ?? 0}
-                      sub={k ? `${k.registrations.this_month} this month` : ''} accent="success" />
-          <BicMiniKpi label="Pending approvals" value={loading ? '—' : k?.approvals.pending ?? 0}
-                      sub={k ? `${k.approvals.avg_cycle_hours}h avg cycle` : ''}
-                      accent={k?.approvals.pending > 0 ? 'warning' : 'neutral'} highlight={k?.approvals.pending > 0} />
-          <BicMiniKpi label="Upcoming (30d)" value={loading ? '—' : k?.events.upcoming_30d ?? 0}
+          <BicMiniKpi label="Events" value={loading ? '—' : k?.events?.total ?? 0}
+                      sub={k?.events ? `${k.events.this_month} this month` : ''} accent="primary" />
+          <BicMiniKpi label="Registrations" value={loading ? '—' : k?.registrations?.total ?? 0}
+                      sub={k?.registrations ? `${k.registrations.this_month} this month` : ''} accent="success" />
+          <BicMiniKpi label="Pending approvals" value={loading ? '—' : k?.approvals?.pending ?? 0}
+                      sub={k?.approvals ? `${k.approvals.avg_cycle_hours}h avg cycle` : ''}
+                      accent={k?.approvals?.pending > 0 ? 'warning' : 'neutral'} highlight={k?.approvals?.pending > 0} />
+          <BicMiniKpi label="Upcoming (30d)" value={loading ? '—' : k?.events?.upcoming_30d ?? 0}
                       sub="Published & ahead" accent="teal" />
         </div>
       </a>
@@ -703,12 +707,14 @@ function OfficeBearerCTA({ labels }) {
 
 // Surfaces the count of checklists the current user can act on. Hidden when
 // there are none, so non-chairmen don't see a noisy "0 pending" pill.
+// Routes through cachedGet so this shares one network hit with any other
+// checklist consumer on the page (e.g. ChecklistInstancesPage on navigation,
+// or the dashboard's ApprovalsQueueCard).
 function PendingInstancesBadge() {
   const [count, setCount] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/checklist-instances', { credentials: 'include' })
-      .then((r) => r.ok ? r.json() : { rows: [] })
+    cachedGet('/api/checklist-instances')
       .then((j) => { if (!cancelled) setCount((j.rows || []).filter((r) => r.status !== 'approved').length); })
       .catch(() => { if (!cancelled) setCount(0); });
     return () => { cancelled = true; };

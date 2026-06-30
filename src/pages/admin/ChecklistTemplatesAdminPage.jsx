@@ -162,7 +162,7 @@ function StarterGalleryDrawer({ onClose, onPicked, onStartBlank }) {
           </div>
         )}
 
-        {starters && (
+        {starters && starters.length > 0 && (
           <div className="sg-grid">
             {starters.map((s) => (
               <button
@@ -186,6 +186,17 @@ function StarterGalleryDrawer({ onClose, onPicked, onStartBlank }) {
                 </div>
               </button>
             ))}
+          </div>
+        )}
+
+        {starters && starters.length === 0 && (
+          <div style={{
+            background: 'var(--card)', border: '1px dashed var(--border)',
+            borderRadius: '.55rem', padding: '1.5rem 1rem', textAlign: 'center',
+          }}>
+            <p className="muted-text" style={{ margin: 0, fontSize: '.875rem' }}>
+              No starter templates are seeded yet. Use <strong>Start with a blank template</strong> below.
+            </p>
           </div>
         )}
 
@@ -1507,9 +1518,11 @@ function PreviewDrawer({ id, onClose }) {
         <>
           <h2 style={{ marginTop: 0 }}>{data.template.name}</h2>
           {data.template.description && <p className="muted-text">{data.template.description}</p>}
-          {data.questions.map((q) => (
-            <QuestionRenderer key={q.id} question={q} value={null} onChange={() => {}} />
-          ))}
+          {(data.questions ?? []).length === 0
+            ? <p className="muted-text" style={{ fontSize: '.875rem' }}>This template has no questions yet.</p>
+            : (data.questions ?? []).map((q) => (
+                <QuestionRenderer key={q.id} question={q} value={null} onChange={() => {}} />
+              ))}
         </>
       )}
     </Drawer>

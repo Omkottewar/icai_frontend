@@ -85,7 +85,8 @@ export default function ResourcePaperPage() {
   };
 
   const shareWhatsApp = () => {
-    const text = `${paper.title} — by ${paper.speaker_name}\n${window.location.origin}/resources/papers/${paper.slug}`;
+    const byline = paper.speaker_name ? ` — by ${paper.speaker_name}` : '';
+    const text = `${paper.title}${byline}\n${window.location.origin}/resources/papers/${paper.slug}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
   };
 
@@ -117,7 +118,7 @@ export default function ResourcePaperPage() {
   const dateLabel = paper.presented_on
     ? new Date(paper.presented_on).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
     : null;
-  const speakerSlug = paper.author?.id || paper.speaker_name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const speakerSlug = paper.author?.id || (paper.speaker_name || 'unknown').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
   return (
     <>
@@ -147,19 +148,19 @@ export default function ResourcePaperPage() {
         <div className="pp-author">
           <a href={`/resources/speakers/${speakerSlug}`} className="pp-author-link">
             <span className="pp-author-avatar">
-              {paper.speaker_name.split(' ').map((w) => w[0]).slice(0, 2).join('')}
+              {(paper.speaker_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('')}
             </span>
             <div>
-              <strong>{paper.speaker_name}</strong>
+              <strong>{paper.speaker_name || 'Unknown speaker'}</strong>
               {paper.author_designation && <span className="muted-text"> · {paper.author_designation}</span>}
             </div>
           </a>
           <div className="pp-meta">
             {dateLabel && <span><IconCalendar size="sm" /> {dateLabel}</span>}
             {paper.event && (
-              <a href={`/events/${paper.event.slug}`}>
+              <span>
                 <IconUsers size="sm" /> {paper.event.title}
-              </a>
+              </span>
             )}
             {paper.committee && <span>· {paper.committee.name}</span>}
           </div>

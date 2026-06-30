@@ -5,6 +5,7 @@ import { useSiteSettings } from '../hooks/useSiteSettings';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useRecaptcha } from '../hooks/useRecaptcha';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { cachedGet } from '../lib/apiCache';
 import Button from '../components/ui/Button';
 
 const AGAINST_TYPES = [
@@ -39,16 +40,18 @@ export default function ContactPage() {
 
   // Subject list comes from the admin-editable route table. If the call
   // fails (e.g. dev with empty DB), the FALLBACK_SUBJECTS list keeps the
-  // form usable.
+  // form usable. 10min TTL — routing rules change rarely; visitors who
+  // open Contact twice in a session don't refetch.
   useEffect(() => {
-    fetch('/api/grievances/subjects')
-      .then((r) => (r.ok ? r.json() : null))
+    let cancelled = false;
+    cachedGet('/api/grievances/subjects', undefined, 600_000)
       .then((j) => {
-        if (!j?.items?.length) return;
+        if (cancelled || !j?.items?.length) return;
         setSubjects(j.items);
         setForm((f) => ({ ...f, subject: j.items[0].value }));
       })
       .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { cachedGet } from '../lib/apiCache';
 import {
   IconArrowRight, IconFileText, IconBookOpen, IconDownload, IconAward, IconShield,
   IconCalendar, IconUsers, IconPlus, IconSearch,
@@ -327,10 +328,15 @@ function PapersSection({ user, initialErr, sections }) {
     writeHashQuery(mirror);
 
     setLoading(true);
-    fetch(`/api/resources/papers?${params}`, { credentials: 'include', signal: ac.signal })
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then((j) => { setPapers(j.items || []); setTotal(j.total || 0); setErr(''); })
-      .catch((e) => { if (e.name !== 'AbortError') setErr(e.message); })
+    // 60s TTL — the published-papers list rarely changes during a single
+    // session; returning users see results instantly on back-navigation
+    // and tab changes. Filter-state debounce already coalesces rapid keystrokes.
+    cachedGet(`/api/resources/papers?${params}`, undefined, 60_000)
+      .then((j) => {
+        if (ac.signal.aborted) return;
+        setPapers(j.items || []); setTotal(j.total || 0); setErr('');
+      })
+      .catch((e) => { if (e.name !== 'AbortError' && !ac.signal.aborted) setErr(e.message); })
       .finally(() => { if (!ac.signal.aborted) setLoading(false); });
 
     return () => ac.abort();

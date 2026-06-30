@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
+import { cachedGet, invalidate } from '../lib/apiCache';
 import {
   IconUsers, IconCheck, IconCheckCircle, IconClock, IconArrowRight, IconMapPin,
 } from '../icons';
@@ -71,44 +72,46 @@ export default function RoomBookingPage() {
   const [confirmed, setConfirmed] = useState(null);       // booking row after success
   const [error, setError] = useState('');
 
-  // Load the room list once on mount.
+  // Load the room list once on mount. Rooms are admin-managed and rarely
+  // change — 5min TTL is fine; if an admin edits a room, invalidate
+  // explicitly from the admin save handler.
   useEffect(() => {
+    let cancelled = false;
     (async () => {
       try {
-        const r = await fetch('/api/rooms', { credentials: 'include' });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || 'Failed to load rooms');
+        const j = await cachedGet('/api/rooms', undefined, 300_000);
+        if (cancelled) return;
         setRooms(j.rows);
-        // Seed roomId from ?room= query param if it matches an available room,
-        // otherwise the first room in the list.
         const preferred = j.rows.find((r2) => r2.id === route.query?.room || r2.name === route.query?.room);
         setRoomId(preferred?.id ?? j.rows[0]?.id ?? null);
       } catch (e) {
-        setError(e.message);
-        setRooms([]);
+        if (!cancelled) { setError(e.message); setRooms([]); }
       }
     })();
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line
 
   // Whenever room or date changes, refetch availability for that day.
+  // Short TTL (15s) so a successful booking by another user shows up
+  // when the picker is reopened. We also invalidate after our own POST.
   useEffect(() => {
     if (!roomId) { setAvailability([]); return; }
     setLoadingAvail(true);
     setSlotIdx(null);
+    let cancelled = false;
     (async () => {
       try {
         const date = ymd(DATES[dateIdx]);
-        const r = await fetch(`/api/rooms/${roomId}/availability?date=${date}`, { credentials: 'include' });
-        const j = await r.json();
-        if (!r.ok) throw new Error(j.error || 'Failed to load availability');
+        const j = await cachedGet(`/api/rooms/${roomId}/availability?date=${date}`, undefined, 15_000);
+        if (cancelled) return;
         setAvailability(j.bookings ?? []);
       } catch (e) {
-        setError(e.message);
-        setAvailability([]);
+        if (!cancelled) { setError(e.message); setAvailability([]); }
       } finally {
-        setLoadingAvail(false);
+        if (!cancelled) setLoadingAvail(false);
       }
     })();
+    return () => { cancelled = true; };
   }, [roomId, dateIdx]);
 
   const room = useMemo(() => rooms?.find((r) => r.id === roomId) ?? null, [rooms, roomId]);
@@ -150,6 +153,9 @@ export default function RoomBookingPage() {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'Booking failed');
+      // Bust the availability cache for this room so anyone who reopens
+      // the picker sees the new slot as taken.
+      invalidate(`/api/rooms/${roomId}/availability`);
       setConfirmed({
         room: j.room.name,
         date: dateLabel,
@@ -185,7 +191,7 @@ export default function RoomBookingPage() {
               Bookings are confirmed against your branch profile so we can contact you
               and apply the right fee category (member / student).
             </p>
-            <button className="btn btn-primary" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login?next=/room-booking')}>
+            <button className="btn btn-primary" style={{ marginTop: '1.25rem' }} onClick={() => navigate('/login?next=/book-room')}>
               Sign in to continue
             </button>
           </div>

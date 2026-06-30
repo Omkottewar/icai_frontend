@@ -213,6 +213,15 @@ const ADMIN_ROUTES = {
   '/admin/icai-directory':      IcaiDirectoryAdminPage,
   '/admin/student-suggestions':       StudentSuggestionsAdminPage,
   '/admin/student-suggestion-topics': StudentSuggestionTopicsAdminPage,
+  // Sidebar entries exist but the admin UIs are not yet built. Backend
+  // endpoints (bills, refunds, iut-transfers, mentorship, articleship-
+  // matches) are already wired — these stubs ship the navigation without
+  // 404s while the views land in follow-up releases.
+  '/admin/bills':                () => <ComingSoonPage title="Bills" description="Vendor bill submissions, approvals, and payment tracking. Backend wiring is ready; the admin view ships in a follow-up." />,
+  '/admin/refunds':              () => <ComingSoonPage title="Refunds" description="Event-fee refund requests with approvals and payout tracking. Backend wiring is ready; the admin view ships in a follow-up." />,
+  '/admin/iut-transfers':        () => <ComingSoonPage title="IUT transfers" description="Inter-unit transfer ledger between the branch and other ICAI units. Backend wiring is ready; the admin view ships in a follow-up." />,
+  '/admin/mentorship':           () => <ComingSoonPage title="Mentorship" description="Member-mentor pairings and meeting logs. Backend wiring is ready; the admin view ships in a follow-up." />,
+  '/admin/articleship-matches':  () => <ComingSoonPage title="Articleship matching" description="Match students to firms offering articleship vacancies. Backend wiring is ready; the admin view ships in a follow-up." />,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);

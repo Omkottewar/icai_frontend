@@ -194,7 +194,7 @@ export default function MockTestQuestionsAdminPage() {
                     <div style={{ whiteSpace: 'pre-wrap', fontSize: '.92rem' }}>{q.body}</div>
                     {q.question_type === 'mcq' && (
                       <ul style={{ marginTop: '.5rem', paddingLeft: '1.2rem', fontSize: '.85rem' }}>
-                        {q.options.map((o) => (
+                        {(q.options ?? []).map((o) => (
                           <li key={o.id} style={{ color: o.is_correct ? '#16a34a' : 'var(--foreground)' }}>
                             <strong>{o.option_label}.</strong> {o.body}
                             {o.is_correct && <IconCheck size="sm" style={{ marginLeft: '.4rem', verticalAlign: 'middle' }} />}

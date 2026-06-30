@@ -3,6 +3,7 @@ import PageHeader from '../components/layout/PageHeader';
 import { useRoute } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { cachedGet } from '../lib/apiCache';
 import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap } from '../icons';
 
 function fmtDate(iso) {
@@ -20,12 +21,15 @@ function usePostings(type) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true); setError(null);
-    fetch(`/api/jobs?type=${type}`)
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error('Failed to load postings')))
-      .then((data) => setRows(data.rows))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    // 60s TTL — postings change at most a few times per day; this makes
+    // toggling between Jobs / Articleships tabs feel instant.
+    cachedGet(`/api/jobs?type=${type}`, undefined, 60_000)
+      .then((data) => { if (!cancelled) setRows(data.rows); })
+      .catch((e) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [type]);
 
   return { rows, loading, error };
@@ -184,8 +188,29 @@ function EnquiryModal({ posting, onClose }) {
     if (e.target === overlayRef.current) onClose();
   }
 
+  // Until a backend enquiry endpoint exists (POST /api/jobs/:id/enquire
+  // with email-routing to the firm/employer), hand off to the user's mail
+  // client so the message isn't silently discarded. The branch inbox is
+  // the safe destination — admin staff route enquiries from there.
   function handleSend(e) {
     e.preventDefault();
+    const body = [
+      `Posting: ${posting.title}`,
+      `Organisation: ${org}`,
+      '',
+      `Name: ${form.name}`,
+      `Email: ${form.email}`,
+      form.phone ? `Phone: ${form.phone}` : '',
+      '',
+      form.message,
+      '',
+      resumeFile ? '(Please attach your resume to this email before sending.)' : '',
+    ].filter(Boolean).join('\n');
+    const href =
+      `mailto:nagpur@icai.org` +
+      `?subject=${encodeURIComponent(subject)}` +
+      `&body=${encodeURIComponent(body)}`;
+    window.location.href = href;
     setSent(true);
   }
 
@@ -226,10 +251,11 @@ function EnquiryModal({ posting, onClose }) {
 
         {sent ? (
           <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center', flex: 1 }}>
-            <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>✓</div>
-            <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: '.375rem' }}>Enquiry submitted</div>
+            <div style={{ fontSize: '2rem', marginBottom: '.75rem' }}>✉</div>
+            <div style={{ fontWeight: 700, fontSize: '1.0625rem', marginBottom: '.375rem' }}>Email draft opened</div>
             <div className="muted-text" style={{ fontSize: '.875rem' }}>
-              Your enquiry for <strong>{posting.title}</strong> has been received. {org} will reach out to you.
+              Your message for <strong>{posting.title}</strong> has been prepared in your email client.
+              {resumeFile && <> Please attach <strong>{resumeFile.name}</strong> before hitting Send.</>}
             </div>
             <button onClick={onClose} className="btn btn-primary" style={{ marginTop: '1.5rem', padding: '.5rem 1.5rem' }}>
               Close

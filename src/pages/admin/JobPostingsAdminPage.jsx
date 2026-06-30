@@ -324,8 +324,7 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
             <Grid>
               <FormField label="CA Firm" hint="For articleship / CA firm postings">
                 <select className="input-base" value={form.firm_id} onChange={(e) => set('firm_id', e.target.value)}>
-                  <option value="">ICAI Nagpur</option>
-                  <option value="">— No firm selected —</option>
+                  <option value="">ICAI Nagpur (no firm)</option>
                   {lookups?.firms?.map((f) => (
                     <option key={f.id} value={f.id}>{f.name}</option>
                   ))}
@@ -333,8 +332,7 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
               </FormField>
               <FormField label="Employer" hint="For industry / corporate jobs">
                 <select className="input-base" value={form.employer_id} onChange={(e) => set('employer_id', e.target.value)}>
-                  <option value="">ICAI Nagpur</option>
-                  <option value="">— No employer selected —</option>
+                  <option value="">ICAI Nagpur (no employer)</option>
                   {lookups?.employers?.map((e) => (
                     <option key={e.id} value={e.id}>{e.name}</option>
                   ))}

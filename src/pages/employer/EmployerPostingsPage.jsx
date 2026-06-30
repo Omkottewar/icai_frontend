@@ -6,6 +6,7 @@ import { IconBriefcase, IconX } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
 import { dialog } from '../../lib/dialog';
 import Button from '../../components/ui/Button';
+import { cachedGet, revalidate, invalidate } from '../../lib/apiCache';
 
 const STATUS_BADGE = {
   draft:           { bg: '#f1f5f9', fg: '#475569', label: 'Draft'   },
@@ -27,11 +28,13 @@ export default function EmployerPostingsPage() {
   const [items, setItems] = useState(null);
   const [err, setErr] = useState('');
 
-  const load = async () => {
+  // `force` switches to revalidate() to bypass the cache, so post-mutation
+  // reloads (close / delete) always fetch fresh data.
+  const load = async (force = false) => {
     try {
-      const r = await fetch('/api/employer/postings', { credentials: 'include' });
-      if (!r.ok) throw new Error('Could not load postings');
-      const j = await r.json();
+      const j = force
+        ? await revalidate('/api/employer/postings')
+        : await cachedGet('/api/employer/postings');
       setItems(j.items);
     } catch (e) { setErr(e.message); }
   };
@@ -46,8 +49,13 @@ export default function EmployerPostingsPage() {
     });
     if (!ok) return;
     const r = await fetch(`/api/employer/postings/${id}/close`, { method: 'POST', credentials: 'include' });
-    if (r.ok) { showToast?.('Posting closed', 'success'); load(); }
-    else      { showToast?.('Could not close posting', 'error'); }
+    if (r.ok) {
+      invalidate('/api/employer/postings');
+      showToast?.('Posting closed', 'success');
+      load(true);
+    } else {
+      showToast?.('Could not close posting', 'error');
+    }
   };
 
   const del = async (id) => {
@@ -59,8 +67,13 @@ export default function EmployerPostingsPage() {
     });
     if (!ok) return;
     const r = await fetch(`/api/employer/postings/${id}`, { method: 'DELETE', credentials: 'include' });
-    if (r.ok) { showToast?.('Deleted', 'success'); load(); }
-    else      { showToast?.('Could not delete', 'error'); }
+    if (r.ok) {
+      invalidate('/api/employer/postings');
+      showToast?.('Deleted', 'success');
+      load(true);
+    } else {
+      showToast?.('Could not delete', 'error');
+    }
   };
 
   return (

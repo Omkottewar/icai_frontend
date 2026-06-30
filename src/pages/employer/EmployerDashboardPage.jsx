@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { navigate } from '../../hooks/useRoute';
+import { cachedGet } from '../../lib/apiCache';
 import { IconBriefcase, IconArrowRight } from '../../icons';
 
 export default function EmployerDashboardPage() {
@@ -8,10 +9,13 @@ export default function EmployerDashboardPage() {
   const [err, setErr] = useState('');
 
   useEffect(() => {
-    fetch('/api/employer/me', { credentials: 'include' })
-      .then((r) => r.ok ? r.json() : Promise.reject(new Error('Could not load employer profile')))
-      .then(setMe)
-      .catch((e) => setErr(e.message));
+    let cancelled = false;
+    // 30s TTL — keeps the dashboard snappy across navigations within the
+    // employer area while still reflecting profile/stat updates promptly.
+    cachedGet('/api/employer/me')
+      .then((j) => { if (!cancelled) setMe(j); })
+      .catch((e) => { if (!cancelled) setErr(e.message); });
+    return () => { cancelled = true; };
   }, []);
 
   const e = me?.employer;

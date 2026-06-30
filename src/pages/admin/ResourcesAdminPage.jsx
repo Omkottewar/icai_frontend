@@ -347,7 +347,7 @@ function TopicsTab() {
   const [items, setItems] = useState(null);
 
   const load = () => adminFetch('/api/admin/resources/topics').then((r) => setItems(r.items || [])).catch(() => setItems([]));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const toggleActive = async (t) => {
     try { await adminFetch(`/api/admin/resources/topics/${t.id}`, { method: 'PATCH', body: { active: !t.active } }); load(); }
@@ -382,23 +382,28 @@ function TopicsTab() {
       <div style={{ marginBottom: '.75rem', textAlign: 'right' }}>
         <button className="btn btn-primary" onClick={addTopic}><IconPlus size="sm" /> <span>New topic</span></button>
       </div>
-      <table className="ra-table">
-        <thead><tr><th>Name</th><th>Code</th><th>Description</th><th>Active</th></tr></thead>
-        <tbody>
-          {items.map((t) => (
-            <tr key={t.id}>
-              <td><strong>{t.name}</strong></td>
-              <td><code>{t.code}</code></td>
-              <td className="muted-text">{t.description || '—'}</td>
-              <td>
-                <button className="ra-icon-btn" onClick={() => toggleActive(t)}>
-                  {t.active ? '✓ Active' : '○ Inactive'}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {items.length === 0
+        ? <div className="ra-empty">No topics yet. Click <strong>New topic</strong> to create the first one (e.g. &ldquo;GST&rdquo;, &ldquo;Audit&rdquo;).</div>
+        : (
+          <table className="ra-table">
+            <thead><tr><th>Name</th><th>Code</th><th>Description</th><th>Active</th></tr></thead>
+            <tbody>
+              {items.map((t) => (
+                <tr key={t.id}>
+                  <td><strong>{t.name}</strong></td>
+                  <td><code>{t.code}</code></td>
+                  <td className="muted-text">{t.description || '—'}</td>
+                  <td>
+                    <button className="ra-icon-btn" onClick={() => toggleActive(t)}>
+                      {t.active ? '✓ Active' : '○ Inactive'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
     </>
   );
 }
@@ -410,7 +415,7 @@ function LinkCardsTab() {
   const [editing, setEditing] = useState(null);
 
   const load = () => adminFetch('/api/admin/resources/link-cards').then((r) => setItems(r.items || [])).catch(() => setItems([]));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   const remove = async (id) => {
     const ok = await dialog.confirm({
@@ -430,22 +435,27 @@ function LinkCardsTab() {
       <div style={{ marginBottom: '.75rem', textAlign: 'right' }}>
         <button className="btn btn-primary" onClick={() => setEditing({})}><IconPlus size="sm" /> <span>New link card</span></button>
       </div>
-      <table className="ra-table">
-        <thead><tr><th>Title</th><th>Category</th><th>URL</th><th></th></tr></thead>
-        <tbody>
-          {items.map((c) => (
-            <tr key={c.id}>
-              <td><strong>{c.icon_emoji} {c.title}</strong>{c.description && <div className="muted-text" style={{ fontSize: '.72rem' }}>{c.description}</div>}</td>
-              <td><span className="ra-pill ra-pill-draft">{c.category}</span></td>
-              <td><a href={c.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.78rem' }}>{c.url.slice(0, 50)}…</a></td>
-              <td style={{ textAlign: 'right' }}>
-                <button className="ra-icon-btn" onClick={() => setEditing(c)}><IconEdit /></button>
-                <button className="ra-icon-btn" onClick={() => remove(c.id)} style={{ color: '#dc2626' }}><IconTrash /></button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {items.length === 0
+        ? <div className="ra-empty">No ICAI link cards yet. Use <strong>New link card</strong> to add a circular, standard, or knowledge-repo shortcut.</div>
+        : (
+          <table className="ra-table">
+            <thead><tr><th>Title</th><th>Category</th><th>URL</th><th></th></tr></thead>
+            <tbody>
+              {items.map((c) => (
+                <tr key={c.id}>
+                  <td><strong>{c.icon_emoji} {c.title}</strong>{c.description && <div className="muted-text" style={{ fontSize: '.72rem' }}>{c.description}</div>}</td>
+                  <td><span className="ra-pill ra-pill-draft">{c.category}</span></td>
+                  <td><a href={c.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '.78rem' }}>{(c.url || '').slice(0, 50)}…</a></td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="ra-icon-btn" onClick={() => setEditing(c)}><IconEdit /></button>
+                    <button className="ra-icon-btn" onClick={() => remove(c.id)} style={{ color: '#dc2626' }}><IconTrash /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      }
       {editing !== null && <LinkCardEditor row={editing} onClose={() => { setEditing(null); load(); }} />}
     </>
   );

@@ -101,8 +101,7 @@ export default function CookieConsentBanner() {
       <p style={{ margin: 0, marginBottom: '.75rem' }}>
         We use cookies to keep this site secure, remember your preferences and understand how the
         portal is used. Essential cookies are always on; analytics cookies are set only with your
-        consent. You can accept all, reject non-essential, or manage your choices anytime. See our{' '}
-        <a href="/privacy" style={{ textDecoration: 'underline' }}>Privacy Policy</a>.
+        consent. You can accept all, reject non-essential, or manage your choices anytime.
       </p>
       <div
         style={{
