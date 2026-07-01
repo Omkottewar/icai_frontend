@@ -162,8 +162,8 @@ function CreditsTab() {
 
       <Pager page={page} pageSize={50} total={total} onChange={setPage} />
 
-      {showIssue && <IssueCreditModal onClose={() => setShowIssue(false)} onSaved={() => { setShowIssue(false); load(); }} />}
-      {showBulk && <BulkIssueModal onClose={() => setShowBulk(false)} onSaved={() => { setShowBulk(false); load(); }} />}
+      {showIssue && <IssueCreditModal onClose={() => setShowIssue(false)} onSaved={async () => { setShowIssue(false); await load(); }} />}
+      {showBulk && <BulkIssueModal onClose={() => setShowBulk(false)} onSaved={async () => { setShowBulk(false); await load(); }} />}
     </div>
   );
 }

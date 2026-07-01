@@ -225,7 +225,7 @@ export default function MockTestQuestionsAdminPage() {
             testId={testId}
             initial={editing === 'new' ? null : editing}
             onClose={() => setEditing(null)}
-            onSaved={() => { setEditing(null); load(); }}
+            onSaved={async () => { setEditing(null); await load(); }}
           />
         )}
       </section>
@@ -294,7 +294,7 @@ function QuestionEditor({ testId, initial, onClose, onSaved }) {
       } else {
         await api(`/api/admin/mock-tests/${testId}/questions/${initial.id}`, { method: 'PATCH', body: payload });
       }
-      onSaved?.();
+      await onSaved?.();
     } catch (e) {
       toast.error(e.message);
     } finally {

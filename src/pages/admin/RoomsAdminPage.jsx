@@ -114,7 +114,7 @@ export default function RoomsAdminPage() {
         <RoomEditor
           room={editing.id ? editing : null}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
+          onSaved={async () => { setEditing(null); await load(); }}
         />
       )}
     </AdminLayout>

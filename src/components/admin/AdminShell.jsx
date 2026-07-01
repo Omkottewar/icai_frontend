@@ -77,9 +77,10 @@ const NAV_GROUPS = [
   {
     label: 'People',
     items: [
-      { to: '/admin/users',           label: 'Users',             Icon: IconUsers, roles: [] /* admin-only */ },
-      { to: '/admin/committees',      label: 'Committees',        Icon: IconShield, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
-      { to: '/admin/icai-directory',  label: 'ICAI directory',    Icon: IconUsers, roles: [] /* admin-only */ },
+      { to: '/admin/users',              label: 'Users',             Icon: IconUsers,       roles: [] /* admin-only */ },
+      { to: '/admin/signup-approvals',   label: 'Sign-up approvals', Icon: IconCheckCircle, roles: [] /* admin-only */ },
+      { to: '/admin/committees',         label: 'Committees',        Icon: IconShield,      roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
+      { to: '/admin/icai-directory',     label: 'ICAI directory',    Icon: IconUsers,       roles: [] /* admin-only */ },
     ],
   },
   {

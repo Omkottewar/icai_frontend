@@ -151,7 +151,9 @@ function CommitteeDrawer({ committeeId, onClose, onSaved, showToast }) {
         await adminFetch(`/api/admin/committees/${committeeId}`, { method: 'PATCH', body });
         showToast?.('Committee updated', 'success');
       }
-      onSaved?.();
+      // Await so the parent's list refetch lands before the drawer
+      // unmounts — otherwise reopening the same row shows stale data.
+      await onSaved?.();
       onClose?.();
     } catch (e) {
       showToast?.(e.message, 'error');
@@ -172,7 +174,7 @@ function CommitteeDrawer({ committeeId, onClose, onSaved, showToast }) {
     try {
       await adminFetch(`/api/admin/committees/${committeeId}`, { method: 'DELETE' });
       showToast?.('Committee deleted', 'success');
-      onSaved?.();
+      await onSaved?.();
       onClose?.();
     } catch (e) {
       showToast?.(e.message, 'error');

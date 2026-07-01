@@ -4,7 +4,7 @@ import Drawer from '../../components/admin/Drawer';
 import FormField from '../../components/admin/FormField';
 import { useAdminList, adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
-import { invalidate, apiWrite } from '../../lib/apiCache';
+import { apiWrite } from '../../lib/apiCache';
 import { SITE_SLOTS, SLOT_SLUGS } from '../../lib/siteContentSlots';
 import { SITE_CONTENT_DEFAULTS } from '../../hooks/useSiteContent';
 import { renderMarkdown } from '../../lib/markdown.jsx';
@@ -28,7 +28,7 @@ export default function SiteContentAdminPage() {
   const [editingCommittee, setEditingCommittee] = useState(false);
   const [editingCommitteeContent, setEditingCommitteeContent] = useState(null); // committee code
 
-  const { data, refresh } = useAdminList('/api/admin/site/content', {});
+  const { data, refresh, mutateRow } = useAdminList('/api/admin/site/content', {});
   const rowsBySlug = new Map((data?.rows ?? []).map((r) => [r.slug, r]));
 
   const { data: committeesData } = useAdminList('/api/admin/committees', {});
@@ -230,7 +230,10 @@ export default function SiteContentAdminPage() {
           slug={editingSlug}
           initial={rowsBySlug.get(editingSlug)?.data || {}}
           onClose={() => setEditingSlug(null)}
-          onSaved={() => { refresh(); invalidate('/api/site/content'); }}
+          // Optimistic merge — the API returns the freshly-saved row,
+          // we splice it into local state, React reconciles just the
+          // card that depends on it. No refetch, no reload.
+          onSaved={mutateRow}
           showToast={showToast}
         />
       )}
@@ -239,7 +242,7 @@ export default function SiteContentAdminPage() {
         <CommitteeMembersDrawer
           initial={committeeRow?.data || {}}
           onClose={() => setEditingCommittee(false)}
-          onSaved={() => { refresh(); invalidate('/api/site/content'); }}
+          onSaved={mutateRow}
           showToast={showToast}
         />
       )}
@@ -253,7 +256,7 @@ export default function SiteContentAdminPage() {
             chairmanName={c?.chairman_name ?? null}
             initial={rowsBySlug.get(`event_committee_${editingCommitteeContent.toLowerCase()}`)?.data || {}}
             onClose={() => setEditingCommitteeContent(null)}
-            onSaved={() => { refresh(); invalidate('/api/site/content'); }}
+            onSaved={mutateRow}
             showToast={showToast}
           />
         );
@@ -287,12 +290,17 @@ function SlotDrawer({ slug, initial, onClose, onSaved, showToast }) {
   async function save() {
     setSaving(true);
     try {
-      await adminFetch(`/api/admin/site/content/${slug}`, {
+      const saved = await adminFetch(`/api/admin/site/content/${slug}`, {
         method: 'PUT',
         body: { data: form },
       });
+      // Push the freshly-saved row back to the parent so its rowsBySlug
+      // reflects the write in the same commit as the drawer close. This
+      // is React reconciliation doing its job — the parent's state
+      // changes, and only the cards that actually depend on this row
+      // re-render. No full page reload.
+      onSaved?.(saved);
       showToast?.('Saved', 'success');
-      onSaved?.();
       onClose?.();
     } catch (e) {
       showToast?.(e.message || 'Save failed', 'error');
@@ -570,12 +578,12 @@ function CommitteeMembersDrawer({ initial, onClose, onSaved, showToast }) {
   async function save() {
     setSaving(true);
     try {
-      await adminFetch('/api/admin/site/content/about_committee_members', {
+      const saved = await adminFetch('/api/admin/site/content/about_committee_members', {
         method: 'PUT',
         body: { data: { members } },
       });
+      onSaved?.(saved);
       showToast?.('Saved', 'success');
-      onSaved?.();
       onClose?.();
     } catch (e) {
       showToast?.(e.message || 'Save failed', 'error');
@@ -954,12 +962,12 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
   async function save() {
     setSaving(true);
     try {
-      await adminFetch(`/api/admin/site/content/event_committee_${code.toLowerCase()}`, {
+      const saved = await adminFetch(`/api/admin/site/content/event_committee_${code.toLowerCase()}`, {
         method: 'PUT',
         body: { data: form },
       });
+      onSaved?.(saved);
       showToast?.('Saved', 'success');
-      onSaved?.();
       onClose?.();
     } catch (e) {
       showToast?.(e.message || 'Save failed', 'error');

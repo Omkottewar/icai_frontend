@@ -4,7 +4,7 @@ import PageHeader from '../components/layout/PageHeader';
 import EventCard from '../components/ui/EventCard';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
-import { cachedGet } from '../lib/apiCache';
+import { cachedGet, subscribe } from '../lib/apiCache';
 import { IconSearch } from '../icons';
 
 // Map a /api/events row onto the shape EventCard expects (title, committee,
@@ -28,8 +28,10 @@ export default function SearchPage() {
   const q = route.query.q || '';
   const [query, setQuery] = useState(q);
   const [events, setEvents] = useState([]);
+  const [nonce, setNonce] = useState(0);
 
   useEffect(() => setQuery(q), [q]);
+  useEffect(() => subscribe('/api/events', () => setNonce((n) => n + 1)), []);
 
   // Pull the live upcoming events list once and filter client-side. The
   // branch publishes a small number of events at a time, so a full fetch
@@ -41,7 +43,7 @@ export default function SearchPage() {
       .then((j) => { if (!cancelled) setEvents(j.rows || []); })
       .catch(() => { if (!cancelled) setEvents([]); });
     return () => { cancelled = true; };
-  }, []);
+  }, [nonce]);
 
   const lc = query.toLowerCase();
   const matches = events.filter(

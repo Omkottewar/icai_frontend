@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { cachedGet } from '../lib/apiCache';
+import { cachedGet, subscribe } from '../lib/apiCache';
 
 // Defaults mirror the values that are hardcoded in Header / Footer /
 // ContactPage today, so a fresh install renders correctly before admin seeds
@@ -23,6 +23,9 @@ export const SITE_SETTINGS_DEFAULTS = {
 export function useSiteSettings() {
   const [settings, setSettings] = useState(SITE_SETTINGS_DEFAULTS);
   const [loading, setLoading] = useState(true);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => subscribe('/api/site/settings', () => setNonce((n) => n + 1)), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +38,7 @@ export function useSiteSettings() {
       .catch(() => { /* defaults already in state */ })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [nonce]);
 
   return { settings, loading };
 }

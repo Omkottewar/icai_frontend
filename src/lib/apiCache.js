@@ -1,22 +1,28 @@
-// Tiny per-tab GET cache with in-flight deduplication.
+// Tiny per-tab GET cache with in-flight deduplication + subscription bus.
 //
-// Two problems we're solving:
+// Three problems we're solving:
 //  1. Components mounting at the same time (dashboard widgets, header badge)
 //     used to fire identical /api/checklists fetches in parallel.
 //  2. Navigating away and back used to refetch even if the data is fresh.
+//  3. When one component invalidates a URL, other components already
+//     rendering the same URL used to keep their stale local state until
+//     they unmounted / remounted. That's why admin edits to site content,
+//     events and checklists needed a full reload to reflect on the public
+//     site. Consumers now subscribe() to their URL prefix, and invalidate
+//     both wipes the cache AND fires their callback so they refetch in
+//     place. A BroadcastChannel mirrors invalidations across tabs.
 //
 // Cache rules:
 //   • Keyed by full URL (path + querystring).
 //   • TTL is per-key (default 30s). After TTL the next read still returns
 //     cached data instantly, then revalidates in the background.
 //   • In-flight requests are shared — N concurrent callers, one network hit.
-//   • invalidate(url|/regex/) wipes matching entries (called after writes).
-//
-// Not a full SWR replacement. No focus-revalidation, no offline, no
-// subscriptions across tabs. Just enough to stop wasteful refetches.
+//   • invalidate(url|/regex/) wipes matching entries AND notifies matching
+//     subscribers (called after writes).
 
 const CACHE = new Map();           // url → { data, ts, ttl }
 const INFLIGHT = new Map();        // url → Promise
+const SUBSCRIBERS = new Set();     // { pattern, callback }
 
 const DEFAULT_TTL = 30_000; // 30s
 
@@ -74,14 +80,23 @@ export async function cachedGet(path, qs, ttl = DEFAULT_TTL) {
   const existing = INFLIGHT.get(url);
   if (existing) return existing;
 
-  const p = rawFetch(url)
+  // Capture the promise reference so the .then can check whether it's
+  // still the "current" in-flight fetch. If invalidate() ran mid-flight,
+  // this promise's response is stale — it reflects state from *before*
+  // the write. We must not write it into CACHE, and we must not clear
+  // INFLIGHT (which may now belong to a newer fetch triggered by an
+  // invalidation subscriber).
+  let p;
+  p = rawFetch(url)
     .then((data) => {
-      CACHE.set(url, { data, ts: Date.now(), ttl });
-      INFLIGHT.delete(url);
+      if (INFLIGHT.get(url) === p) {
+        CACHE.set(url, { data, ts: Date.now(), ttl });
+        INFLIGHT.delete(url);
+      }
       return data;
     })
     .catch((err) => {
-      INFLIGHT.delete(url);
+      if (INFLIGHT.get(url) === p) INFLIGHT.delete(url);
       throw err;
     });
   INFLIGHT.set(url, p);
@@ -97,15 +112,87 @@ export async function revalidate(path, qs, ttl = DEFAULT_TTL) {
 }
 
 // Wipe cache entries. Pass a string for exact prefix match, or a RegExp.
-// Call this after a successful write so the next read is fresh.
+// Call this after a successful write so the next read is fresh — and so
+// any mounted subscribers refetch in place.
 export function invalidate(pattern) {
-  for (const key of Array.from(CACHE.keys())) {
-    if (typeof pattern === 'string') {
-      if (key.startsWith(pattern)) CACHE.delete(key);
-    } else if (pattern instanceof RegExp) {
-      if (pattern.test(key)) CACHE.delete(key);
+  const matches = (key) => (
+    typeof pattern === 'string' ? key.startsWith(pattern) :
+    pattern instanceof RegExp   ? pattern.test(key)       :
+    false
+  );
+  for (const key of Array.from(CACHE.keys()))    if (matches(key)) CACHE.delete(key);
+  // Also abandon any in-flight fetches for matching keys. Their responses
+  // reflect state from before this write; if we let them sit in INFLIGHT
+  // a subscriber's refetch would dedup onto the stale promise and see the
+  // OLD payload. Dropping them from INFLIGHT forces a fresh network hit.
+  // The stray promise's .then now checks INFLIGHT.get(url) === p before
+  // writing to CACHE, so it silently discards its own response.
+  for (const key of Array.from(INFLIGHT.keys())) if (matches(key)) INFLIGHT.delete(key);
+  notify(pattern);
+  broadcastInvalidation(pattern);
+}
+
+// Two subscriber patterns "intersect" if either could touch keys covered
+// by the other. In practice: a subscriber on '/api/site/content' should
+// fire when invalidate('/api/site') runs (broader wipe) OR when
+// invalidate('/api/site/content/foo') runs (child wipe). String
+// comparisons are cheap; RegExp patterns fall back to testing against the
+// string pattern.
+function patternsIntersect(a, b) {
+  if (typeof a === 'string' && typeof b === 'string') {
+    return a.startsWith(b) || b.startsWith(a);
+  }
+  if (a instanceof RegExp && typeof b === 'string') return a.test(b);
+  if (b instanceof RegExp && typeof a === 'string') return b.test(a);
+  return false;
+}
+
+function notify(pattern) {
+  // Snapshot before iterating — a callback that unsubscribes shouldn't
+  // skip its siblings.
+  for (const entry of Array.from(SUBSCRIBERS)) {
+    if (patternsIntersect(entry.pattern, pattern)) {
+      try { entry.callback(pattern); } catch { /* subscriber threw — ignore */ }
     }
   }
+}
+
+// subscribe(pattern, cb) → unsubscribe(). Called by consumer hooks so they
+// can refetch when their URL is invalidated. Pattern is a URL prefix
+// string (recommended) or a RegExp.
+export function subscribe(pattern, callback) {
+  const entry = { pattern, callback };
+  SUBSCRIBERS.add(entry);
+  return () => { SUBSCRIBERS.delete(entry); };
+}
+
+// Cross-tab: broadcast invalidations so a public tab that was open
+// before the admin edit still refetches. Lazy-init so SSR / test
+// environments without BroadcastChannel still work. Sentinel value
+// `null` means "we tried and it isn't supported."
+let _channel;   // undefined = untried, BroadcastChannel = live, null = unsupported
+function getBroadcastChannel() {
+  if (_channel !== undefined) return _channel;
+  if (typeof BroadcastChannel === 'undefined') { _channel = null; return null; }
+  try {
+    const ch = new BroadcastChannel('icai-api-cache');
+    ch.onmessage = (e) => {
+      const p = e?.data?.pattern;
+      if (typeof p !== 'string') return;
+      // Wipe local cache + inflight to match the other tab, then notify
+      // local subscribers so mounted components refetch.
+      for (const key of Array.from(CACHE.keys()))    if (key.startsWith(p)) CACHE.delete(key);
+      for (const key of Array.from(INFLIGHT.keys())) if (key.startsWith(p)) INFLIGHT.delete(key);
+      notify(p);
+    };
+    _channel = ch;
+    return ch;
+  } catch { _channel = null; return null; }
+}
+function broadcastInvalidation(pattern) {
+  if (typeof pattern !== 'string') return;   // don't ship RegExps across tabs
+  const ch = getBroadcastChannel();
+  if (ch) try { ch.postMessage({ pattern }); } catch { /* ignore */ }
 }
 
 // Non-GET wrapper. Sends the body, parses the response, and invalidates

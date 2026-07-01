@@ -29,7 +29,6 @@ const SHEET_ITEMS = [
   { to: '/announcements',       Icon: IconBell,            label: 'Announcements' },
   { to: '/praygyaan',           Icon: IconBot,             label: 'Ask PrayGyaan AI' },
   { to: '/job-vacancies',       Icon: IconBriefcase,       label: 'Job vacancies' },
-  { to: '/members-directory',   Icon: IconUser,            label: 'Members directory', authOnly: true },
   { to: '/mock-tests',          Icon: IconGraduationCap,   label: 'Mock tests' },
   { to: '/book-room',           Icon: IconCalendar,        label: 'Book a room' },
   { to: '/gallery',             Icon: IconBookOpen,        label: 'Photo gallery' },

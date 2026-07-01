@@ -62,6 +62,7 @@ const ADMIN_LOADERS = {
   '/admin/events':              () => import('../pages/admin/EventsAdminPage'),
   '/admin/registrations':       () => import('../pages/admin/EventRegistrationsAdminPage'),
   '/admin/users':               () => import('../pages/admin/UsersAdminPage'),
+  '/admin/signup-approvals':    () => import('../pages/admin/SignupApprovalsAdminPage'),
   '/admin/committees':          () => import('../pages/admin/CommitteesAdminPage'),
   '/admin/approvals':           () => import('../pages/admin/ApprovalsAdminPage'),
   '/admin/announcements':       () => import('../pages/admin/AnnouncementsAdminPage'),

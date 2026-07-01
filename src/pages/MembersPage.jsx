@@ -47,9 +47,6 @@ export default function MembersPage() {
 
         {/* Quick access row */}
         <div className="row gap-3" style={{ marginBottom: '2.5rem', flexWrap: 'wrap' }}>
-          <a href="/members-directory" className="btn btn-outline" style={{ gap: '.5rem' }}>
-            <IconUsers size="sm" /> {quickAccess.directory_label}
-          </a>
           <a href="/job-vacancies" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconBriefcase size="sm" /> {quickAccess.jobs_label}
           </a>

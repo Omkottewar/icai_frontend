@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { IconArrowLeft, IconArrowRight, IconSearch } from '../../icons';
 import { ShimmerTableRow } from '../ui/Shimmer';
 
@@ -20,11 +20,25 @@ export default function DataTable({
 }) {
   const [search, setSearch] = useState('');
 
+  // Hold onSearch in a ref so debounce only fires when the user actually
+  // types. Parents typically pass an inline `(v) => { setQ(v); setPage(1); }`
+  // whose reference changes every render — depending on it here caused the
+  // effect to re-run on every parent update, and 300ms later fire
+  // onSearch('') which resets the page to 1. That produced the bug where
+  // clicking "next page" briefly advanced then snapped back to page 1.
+  const onSearchRef = useRef(onSearch);
+  useEffect(() => { onSearchRef.current = onSearch; });
+
+  const isFirstSearchRender = useRef(true);
   useEffect(() => {
-    if (!onSearch) return;
-    const id = setTimeout(() => onSearch(search), 300);
+    if (isFirstSearchRender.current) {
+      isFirstSearchRender.current = false;
+      return;
+    }
+    if (!onSearchRef.current) return;
+    const id = setTimeout(() => onSearchRef.current(search), 300);
     return () => clearTimeout(id);
-  }, [search, onSearch]);
+  }, [search]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 

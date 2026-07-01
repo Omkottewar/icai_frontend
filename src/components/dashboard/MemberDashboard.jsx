@@ -858,7 +858,6 @@ function MemberServicesGrid() {
     { Icon: IconShield,    title: 'Generate UDIN',          desc: 'Issue UDIN for signed documents on the official portal.', href: ICAI_LINKS.udin,        external: true, needsIcaiLogin: true },
     { Icon: IconAward,     title: 'Track CPE certificates', desc: 'Download structured/unstructured CPE certificates.',     href: ICAI_LINKS.cpePortal,   external: true, needsIcaiLogin: true },
     { Icon: IconBriefcase, title: 'COP services',           desc: 'COP renewal, restoration, surrender, firm registration.', href: ICAI_LINKS.copServices, external: true, needsIcaiLogin: true },
-    { Icon: IconUsers,     title: 'Members directory',      desc: 'Find a Nagpur member by name, MRN or area.',              href: '/members-directory' },
     { Icon: IconBriefcase, title: 'Job vacancies',          desc: 'Senior positions and openings posted by member firms.',   href: '/job-vacancies' },
     { Icon: IconHandshake, title: 'Contribute to CABF',     desc: 'Support members and families in distress.',              href: '/benevolent-fund' },
   ];

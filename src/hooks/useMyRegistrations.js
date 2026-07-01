@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { cachedGet, invalidate } from '../lib/apiCache';
+import { cachedGet, invalidate, subscribe } from '../lib/apiCache';
 import { useAuth } from '../context/AuthContext';
 
 // Returns the set of event IDs the logged-in user is registered for. Used by
@@ -25,6 +25,10 @@ export function useMyRegistrations() {
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Refetch on any invalidation of the registrations endpoint (or the
+  // broader /api/events tree — e.g. an event was cancelled/deleted).
+  useEffect(() => subscribe('/api/events', load), [load]);
 
   const refresh = useCallback(() => {
     invalidate('/api/events/my-registrations');

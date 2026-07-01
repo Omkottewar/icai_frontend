@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { cachedGet } from '../lib/apiCache';
+import { cachedGet, subscribe } from '../lib/apiCache';
 
 // Bake the existing hardcoded copy into the defaults map so a fresh install
 // (no site_content rows in the DB) still renders the same page. Once admin
@@ -558,6 +558,11 @@ function useAllSiteContent() {
   // bit that eliminates the flash — the very first React paint already
   // has the data from the user's previous visit.
   const [data, setData] = useState(() => readPersistedSiteContent());
+  // Bumped by the invalidation subscription so admin edits reflect in
+  // place — otherwise the useEffect below only ran once per mount.
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => subscribe('/api/site/content', () => setNonce((n) => n + 1)), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -575,7 +580,7 @@ function useAllSiteContent() {
         setData((prev) => prev ?? { rows: [] });
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [nonce]);
 
   return data;
 }

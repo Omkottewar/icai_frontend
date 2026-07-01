@@ -4,7 +4,7 @@ import { useDashboard } from '../hooks/useDashboard';
 import { useRoleFlags } from '../hooks/useRoleFlags';
 import { useBranchMetrics } from '../hooks/useBranchMetrics';
 import { navigate } from '../hooks/useRoute';
-import { cachedGet } from '../lib/apiCache';
+import { cachedGet, subscribe } from '../lib/apiCache';
 import { initials as displayInitials, withCAPrefix } from '../lib/displayName';
 import StatCard from '../components/ui/StatCard';
 import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
@@ -713,13 +713,15 @@ function OfficeBearerCTA({ labels }) {
 // or the dashboard's ApprovalsQueueCard).
 function PendingInstancesBadge() {
   const [count, setCount] = useState(null);
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => subscribe('/api/checklist-instances', () => setNonce((n) => n + 1)), []);
   useEffect(() => {
     let cancelled = false;
     cachedGet('/api/checklist-instances')
       .then((j) => { if (!cancelled) setCount((j.rows || []).filter((r) => r.status !== 'approved').length); })
       .catch(() => { if (!cancelled) setCount(0); });
     return () => { cancelled = true; };
-  }, []);
+  }, [nonce]);
   if (!count) return null;
   return (
     <a href="/my-checklists" className="btn btn-outline" style={{ position: 'relative' }}>

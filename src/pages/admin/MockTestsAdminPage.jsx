@@ -152,7 +152,7 @@ export default function MockTestsAdminPage() {
         <MockTestDrawer
           initial={editing}
           onClose={closeDrawer}
-          onSaved={() => { closeDrawer(); refresh(); }}
+          onSaved={async () => { closeDrawer(); await refresh(); }}
         />
       )}
     </AdminLayout>
@@ -202,7 +202,7 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
       const r = await adminFetch(url, { method: isNew ? 'POST' : 'PATCH', body });
       showToast?.(isNew ? 'Mock test created' : 'Saved', 'success');
       setForm((f) => ({ ...f, ...r.item, scheduled_at: toLocalInputValue(r.item.scheduled_at) }));
-      onSaved?.();
+      await onSaved?.();
     } catch (e) {
       setError(e.message || 'Save failed');
     } finally {
@@ -222,7 +222,7 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
     try {
       await adminFetch(`/api/admin/mock-tests/${form.id}`, { method: 'DELETE' });
       showToast?.('Mock test deleted', 'success');
-      onSaved?.();
+      await onSaved?.();
     } catch (e) {
       setError(e.message || 'Delete failed');
     } finally {
@@ -268,7 +268,7 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
       set('result_published_at', r.item.result_published_at);
       set('status', r.item.status);
       showToast?.('Results published', 'success');
-      onSaved?.();
+      await onSaved?.();
     } catch (e) {
       showToast?.(e.message || 'Publish failed', 'error');
     }
@@ -287,7 +287,7 @@ function MockTestDrawer({ initial, onClose, onSaved }) {
       await adminFetch(`/api/admin/mock-tests/${form.id}/unpublish-results`, { method: 'POST' });
       set('result_published_at', null);
       showToast?.('Results unpublished', 'success');
-      onSaved?.();
+      await onSaved?.();
     } catch (e) {
       showToast?.(e.message || 'Unpublish failed', 'error');
     }

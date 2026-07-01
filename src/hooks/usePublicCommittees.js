@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { cachedGet } from '../lib/apiCache';
+import { cachedGet, subscribe } from '../lib/apiCache';
 
 // Public GET /api/committees. Cached for 5 minutes — committees rarely
 // change during a session.
@@ -7,6 +7,9 @@ export function usePublicCommittees() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => subscribe('/api/committees', () => setNonce((n) => n + 1)), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -16,7 +19,7 @@ export function usePublicCommittees() {
       .catch((e) => { if (!cancelled) setError(e); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+  }, [nonce]);
 
   return { data, loading, error };
 }

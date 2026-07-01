@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { cachedGet, revalidate } from '../lib/apiCache';
+import { cachedGet, revalidate, subscribe } from '../lib/apiCache';
 
 // Generic checklist-instance engine (templates + instances). The legacy
 // event_checklists hooks (useChecklistList, useChecklist, checklistFetch)
@@ -22,6 +22,11 @@ export function useChecklistInstanceList() {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [tick]);
+
+  // Auto-refetch when a checklist write happens anywhere — publish,
+  // approval, section save. Otherwise the badge/list keeps its old
+  // snapshot until the user re-navigates.
+  useEffect(() => subscribe('/api/checklist-instances', () => setTick((t) => t + 1)), []);
 
   const refresh = useCallback(() => {
     revalidate('/api/checklist-instances').catch(() => {});

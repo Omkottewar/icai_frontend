@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { cachedGet, invalidate } from '../lib/apiCache';
+import { cachedGet, invalidate, subscribe } from '../lib/apiCache';
 
 // Fetches /api/dashboard once auth resolves. Shape depends on user.primary_role:
 //   member  → { role, profile, cpe, upcomingEvents, recentCertificates, ... }
@@ -43,6 +43,13 @@ export function useDashboard() {
 
     return () => { cancelled = true; };
   }, [user, authLoading, reloadKey]);
+
+  // Refetch when anything the dashboard mirrors changes — events published,
+  // checklists updated, profile edited, etc. Otherwise the dashboard's
+  // cached snapshot lingers until manual reload.
+  useEffect(() => subscribe('/api/dashboard',            () => setReloadKey((k) => k + 1)), []);
+  useEffect(() => subscribe('/api/events',               () => setReloadKey((k) => k + 1)), []);
+  useEffect(() => subscribe('/api/checklist-instances',  () => setReloadKey((k) => k + 1)), []);
 
   const refresh = useCallback(() => {
     invalidate('/api/dashboard');

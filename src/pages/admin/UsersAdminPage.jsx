@@ -123,7 +123,7 @@ export default function UsersAdminPage() {
           userId={isNew ? null : editingId}
           lookups={lookups}
           onClose={() => setEditingId(null)}
-          onSaved={() => { refresh(); }}
+          onSaved={refresh}
           showToast={showToast}
         />
       )}

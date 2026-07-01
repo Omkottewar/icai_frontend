@@ -89,7 +89,6 @@ export default function Footer() {
             <li><a href="/students">For Students</a></li>
             <li><a href="/gallery">Photo Gallery</a></li>
             <li><a href="/job-vacancies">Job Vacancies</a></li>
-            <li><a href="/members-directory">Members' Directory</a></li>
           </ul>
         </div>
 

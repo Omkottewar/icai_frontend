@@ -231,7 +231,9 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
         await adminFetch(`/api/admin/jobs/${id}`, { method: 'PATCH', body: payload });
         showToast?.('Posting updated', 'success');
       }
-      onSaved?.();
+      // Await so the parent's list refetch lands before the drawer
+      // stays/closes — otherwise reopening the same row shows stale data.
+      await onSaved?.();
       if (isNew) onClose?.();
     } catch (e2) {
       setError(e2.message);
@@ -251,7 +253,8 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
     try {
       await adminFetch(`/api/admin/jobs/${id}`, { method: 'DELETE' });
       showToast?.('Posting deleted', 'success');
-      onSaved?.(); onClose?.();
+      await onSaved?.();
+      onClose?.();
     } catch (e) { showToast?.(e.message, 'error'); }
   };
 

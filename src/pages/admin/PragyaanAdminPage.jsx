@@ -212,7 +212,7 @@ function SourcesTab() {
 
       <Pager page={page} pageSize={25} total={total} onChange={setPage} />
 
-      {showUpload && <UploadSourceModal onClose={() => setShowUpload(false)} onSaved={() => { setShowUpload(false); load(); }} />}
+      {showUpload && <UploadSourceModal onClose={() => setShowUpload(false)} onSaved={async () => { setShowUpload(false); await load(); }} />}
     </div>
   );
 }

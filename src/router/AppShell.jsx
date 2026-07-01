@@ -75,6 +75,7 @@ const AdminDashboardPage         = lazy(() => import('../pages/admin/AdminDashbo
 const EventsAdminPage            = lazy(() => import('../pages/admin/EventsAdminPage'));
 const EventRegistrationsAdminPage = lazy(() => import('../pages/admin/EventRegistrationsAdminPage'));
 const UsersAdminPage             = lazy(() => import('../pages/admin/UsersAdminPage'));
+const SignupApprovalsAdminPage   = lazy(() => import('../pages/admin/SignupApprovalsAdminPage'));
 const CommitteesAdminPage        = lazy(() => import('../pages/admin/CommitteesAdminPage'));
 const SiteContentAdminPage       = lazy(() => import('../pages/admin/SiteContentAdminPage'));
 const SiteSettingsAdminPage      = lazy(() => import('../pages/admin/SiteSettingsAdminPage'));
@@ -169,15 +170,6 @@ const SLUG_ROUTES = [
   { prefix: '/attempts/',                              Page: MockTestAttemptPage },
 ];
 
-// Routes where the floating Pragyaan FAB should NOT render. These pages
-// have sticky action footers (Save / Submit / Approve buttons) or full-
-// screen forms where the bird would overlap with the primary CTAs. Drawer
-// / modal cases elsewhere are handled by the widget's own :has() CSS rule.
-const WIDGET_HIDDEN_ROUTES = new Set([
-  '/my-checklists',
-  '/praygyaan',          // already AI page — no point showing the FAB too
-]);
-
 // Admin routes. Each is wrapped in <RequireAdmin> at render time. Placeholder
 // sections render the shared ComingSoonPage with their own title.
 const ADMIN_ROUTES = {
@@ -185,6 +177,7 @@ const ADMIN_ROUTES = {
   '/admin/events': EventsAdminPage,
   '/admin/registrations': EventRegistrationsAdminPage,
   '/admin/users': UsersAdminPage,
+  '/admin/signup-approvals': SignupApprovalsAdminPage,
   '/admin/cpe': CpeAdminPage,
   '/admin/approvals': ApprovalsAdminPage,
   '/admin/rooms': RoomsAdminPage,
@@ -422,11 +415,10 @@ export default function AppShell() {
         </Suspense>
       </main>
       <Footer />
-      {/* Hide the floating Pragyaan widget on full-page form routes where it
-          overlaps with sticky action footers (Save progress / Submit for
-          review, etc.). Modal/drawer overlays elsewhere are handled by the
-          widget's own :has() CSS rule. */}
-      {!WIDGET_HIDDEN_ROUTES.has(route.path) && (
+      {/* Pragyaan floating widget: only shown on the home page. Every
+          other route hides it so it doesn't compete with page-specific
+          CTAs or sticky action footers. */}
+      {route.path === '/' && (
         <Suspense fallback={null}>
           <PrayGyaanWidget />
         </Suspense>
