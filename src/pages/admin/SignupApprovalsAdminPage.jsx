@@ -98,6 +98,22 @@ export default function SignupApprovalsAdminPage() {
 
         {rows.map((r) => {
           const busy = busyId === r.id;
+          // MRN badge — only meaningful for the member role. `signup_mrn_in_directory`
+          // is null when no MRN was declared (grey "no MRN" chip), true when the
+          // typed MRN matched the imported ICAI directory (green), false when
+          // it didn't (amber warning — the admin should sanity-check before
+          // approving).
+          const isMember = r.primary_role === 'member';
+          let mrnBadge = null;
+          if (isMember) {
+            if (!r.signup_mrn) {
+              mrnBadge = { label: 'No MRN provided', bg: '#f3f4f6', fg: '#4b5563', border: '#e5e7eb' };
+            } else if (r.signup_mrn_in_directory) {
+              mrnBadge = { label: `✓ MRN ${r.signup_mrn} · In directory`, bg: '#ecfdf5', fg: '#047857', border: '#a7f3d0' };
+            } else {
+              mrnBadge = { label: `⚠ MRN ${r.signup_mrn} · Not in directory`, bg: '#fffbeb', fg: '#92400e', border: '#fde68a' };
+            }
+          }
           return (
             <div key={r.id} className="sua-row">
               <div className="sua-row-body">
@@ -108,6 +124,18 @@ export default function SignupApprovalsAdminPage() {
                   <span> · {r.primary_role}</span>
                   <span> · signed up {fmtDate(r.created_at)}</span>
                 </div>
+                {mrnBadge && (
+                  <div
+                    className="sua-mrn-badge"
+                    style={{
+                      background: mrnBadge.bg,
+                      color: mrnBadge.fg,
+                      border: `1px solid ${mrnBadge.border}`,
+                    }}
+                  >
+                    {mrnBadge.label}
+                  </div>
+                )}
               </div>
               <div className="sua-row-actions">
                 <Button
@@ -152,6 +180,15 @@ export default function SignupApprovalsAdminPage() {
         .sua-row-meta {
           font-size: .75rem; color: var(--muted-foreground);
           margin-top: .2rem; word-break: break-word;
+        }
+        .sua-mrn-badge {
+          display: inline-block;
+          margin-top: .45rem;
+          padding: .2rem .55rem;
+          border-radius: .3rem;
+          font-size: .72rem;
+          font-weight: 600;
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         }
         .sua-row-actions {
           display: flex; gap: .5rem; flex-shrink: 0;
