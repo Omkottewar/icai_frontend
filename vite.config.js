@@ -91,12 +91,14 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: 'https://icai.fly.dev',
         changeOrigin: true,
+        secure: true,
       },
       '/uploads': {
-        target: 'http://localhost:4000',
+        target: 'https://icai.fly.dev',
         changeOrigin: true,
+        secure: true,
       },
       // WebSocket upgrade path for the event chat. `ws: true` forwards the
       // HTTP/1.1 Upgrade handshake to the API server.
@@ -115,10 +117,11 @@ export default defineConfig({
       // AFTER Vite has installed its built-in error logger; the strategy
       // is "remove Vite's loud handler, install our quiet one."
       '/ws': {
-        target: 'ws://localhost:4000',
+        target: 'wss://icai.fly.dev',
         ws: true,
         changeOrigin: true,
         rewriteWsOrigin: true,
+        secure: true,
         configure: (proxy) => {
           setImmediate(() => {
             proxy.removeAllListeners('error');
