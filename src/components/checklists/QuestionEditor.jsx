@@ -100,6 +100,12 @@ export default function QuestionEditor({
               <OptionsEditor cfg={question.config || {}} onPatchConfig={onPatchConfig} />
             )}
 
+            {/* Rows + columns editor for checklist_table — same reasoning:
+                the table structure IS the question, not a setting. */}
+            {question.type === 'checklist_table' && (
+              <ChecklistTableEditor cfg={question.config || {}} onPatchConfig={onPatchConfig} />
+            )}
+
             <div className="qe-required-row">
               <label className="qe-checkbox">
                 <input
@@ -428,6 +434,289 @@ function OptionsEditor({ cfg, onPatchConfig }) {
           cursor: pointer;
         }
         .qe-opt-add:hover { background: rgba(37, 99, 235, .06); }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── ChecklistTableEditor ────────────────────────────────────────────────
+// Inline editor for the checklist_table question type. Two lists:
+//   1) Columns — key + label + type (text | number | money | status)
+//   2) Rows    — id + label + kind (data | total | computed) + hint / formula
+// Both support add / delete / reorder / edit. IDs / keys are auto-slugged
+// from labels the same way OptionsEditor derives its option values.
+function ChecklistTableEditor({ cfg, onPatchConfig }) {
+  const columns = Array.isArray(cfg.columns) ? cfg.columns : [];
+  const rows    = Array.isArray(cfg.rows)    ? cfg.rows    : [];
+
+  const slug = (label, others) => {
+    const base = slugifyOptionValue(label) || 'row';
+    if (!others.includes(base)) return base;
+    let i = 2;
+    while (others.includes(`${base}_${i}`)) i++;
+    return `${base}_${i}`;
+  };
+
+  // ─── Column mutations ─────
+  const patchColumn = (i, patch) => {
+    const next = columns.map((c, idx) => {
+      if (idx !== i) return c;
+      const merged = { ...c, ...patch };
+      // Auto-derive key if label changed and key wasn't hand-edited.
+      if ('label' in patch) {
+        const others = columns.filter((_, j) => j !== i).map((c2) => c2.key);
+        merged.key = slug(merged.label, others);
+      }
+      return merged;
+    });
+    onPatchConfig({ columns: next });
+  };
+  const removeColumn = (i) => onPatchConfig({ columns: columns.filter((_, j) => j !== i) });
+  const addColumn = () => {
+    const label = `Column ${columns.length + 1}`;
+    const others = columns.map((c) => c.key);
+    onPatchConfig({ columns: [...columns, { key: slug(label, others), label, type: 'text' }] });
+  };
+  const moveColumn = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= columns.length) return;
+    const next = columns.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    onPatchConfig({ columns: next });
+  };
+
+  // ─── Row mutations ─────
+  const patchRow = (i, patch) => {
+    const next = rows.map((r, idx) => {
+      if (idx !== i) return r;
+      const merged = { ...r, ...patch };
+      if ('label' in patch) {
+        const others = rows.filter((_, j) => j !== i).map((r2) => r2.id);
+        merged.id = slug(merged.label, others);
+      }
+      return merged;
+    });
+    onPatchConfig({ rows: next });
+  };
+  const removeRow = (i) => onPatchConfig({ rows: rows.filter((_, j) => j !== i) });
+  const addRow = () => {
+    const label = `Item ${rows.length + 1}`;
+    const others = rows.map((r) => r.id);
+    onPatchConfig({ rows: [...rows, { id: slug(label, others), label, kind: 'data' }] });
+  };
+  const moveRow = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= rows.length) return;
+    const next = rows.slice();
+    [next[i], next[j]] = [next[j], next[i]];
+    onPatchConfig({ rows: next });
+  };
+
+  // Money / number columns available as `total_of` targets for total /
+  // computed rows. Text / status columns don't make sense to sum.
+  const summableCols = columns.filter((c) => c.type === 'money' || c.type === 'number');
+
+  return (
+    <div className="ct-ed">
+      {/* ─── Columns ─── */}
+      <div className="ct-ed-section">
+        <label className="ct-ed-head">Columns</label>
+        {columns.length === 0 && (
+          <div className="ct-ed-empty">No columns yet — add one below.</div>
+        )}
+        {columns.map((c, i) => (
+          <div key={i} className="ct-ed-row">
+            <span className="ct-ed-bullet">{i + 1}.</span>
+            <input
+              type="text" className="qe-input ct-ed-label"
+              value={c.label || ''}
+              placeholder="Column label"
+              onChange={(e) => patchColumn(i, { label: e.target.value })}
+            />
+            <select
+              className="qe-input ct-ed-select"
+              value={c.type || 'text'}
+              onChange={(e) => patchColumn(i, { type: e.target.value })}
+            >
+              <option value="text">Text</option>
+              <option value="number">Number</option>
+              <option value="money">Money (₹)</option>
+              <option value="status">Status (Done / Pending / N/A)</option>
+            </select>
+            <button type="button" className="ct-ed-move" onClick={() => moveColumn(i, -1)} disabled={i === 0} title="Move up">↑</button>
+            <button type="button" className="ct-ed-move" onClick={() => moveColumn(i, 1)} disabled={i === columns.length - 1} title="Move down">↓</button>
+            <button type="button" className="ct-ed-remove" onClick={() => removeColumn(i)} title="Remove column">
+              <IconTrash size="sm" />
+            </button>
+          </div>
+        ))}
+        <button type="button" onClick={addColumn} className="ct-ed-add">+ Add column</button>
+      </div>
+
+      {/* ─── Rows ─── */}
+      <div className="ct-ed-section">
+        <label className="ct-ed-head">Rows</label>
+        {rows.length === 0 && (
+          <div className="ct-ed-empty">No rows yet — add one below.</div>
+        )}
+        {rows.map((r, i) => {
+          const kind = r.kind || 'data';
+          return (
+            <div key={i} className="ct-ed-row-block">
+              <div className="ct-ed-row">
+                <span className="ct-ed-bullet">{i + 1}.</span>
+                <input
+                  type="text" className="qe-input ct-ed-label"
+                  value={r.label || ''}
+                  placeholder="Row label"
+                  onChange={(e) => patchRow(i, { label: e.target.value })}
+                />
+                <select
+                  className="qe-input ct-ed-select"
+                  value={kind}
+                  onChange={(e) => patchRow(i, { kind: e.target.value })}
+                >
+                  <option value="data">Data</option>
+                  <option value="total">Total (auto-sum)</option>
+                  <option value="computed">Computed (formula)</option>
+                </select>
+                <button type="button" className="ct-ed-move" onClick={() => moveRow(i, -1)} disabled={i === 0} title="Move up">↑</button>
+                <button type="button" className="ct-ed-move" onClick={() => moveRow(i, 1)} disabled={i === rows.length - 1} title="Move down">↓</button>
+                <button type="button" className="ct-ed-remove" onClick={() => removeRow(i)} title="Remove row">
+                  <IconTrash size="sm" />
+                </button>
+              </div>
+              {kind === 'data' && (
+                <input
+                  type="text" className="qe-input ct-ed-hint"
+                  value={r.hint || ''}
+                  placeholder="Optional hint (e.g. '6 Box', '50', '2 cordless + 1 collar mike')"
+                  onChange={(e) => patchRow(i, { hint: e.target.value })}
+                />
+              )}
+              {kind === 'total' && (
+                <div className="ct-ed-detail">
+                  <label className="ct-ed-detail-lbl">Sum column:</label>
+                  <select
+                    className="qe-input ct-ed-select-narrow"
+                    value={r.total_of || ''}
+                    onChange={(e) => patchRow(i, { total_of: e.target.value })}
+                  >
+                    <option value="">— pick a column —</option>
+                    {summableCols.map((c) => (
+                      <option key={c.key} value={c.key}>{c.label}</option>
+                    ))}
+                  </select>
+                  {summableCols.length === 0 && (
+                    <span className="ct-ed-warn">Add a Money or Number column first.</span>
+                  )}
+                </div>
+              )}
+              {kind === 'computed' && (
+                <>
+                  <div className="ct-ed-detail">
+                    <label className="ct-ed-detail-lbl">Result column:</label>
+                    <select
+                      className="qe-input ct-ed-select-narrow"
+                      value={r.total_of || ''}
+                      onChange={(e) => patchRow(i, { total_of: e.target.value })}
+                    >
+                      <option value="">— pick a column —</option>
+                      {summableCols.map((c) => (
+                        <option key={c.key} value={c.key}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <input
+                    type="text" className="qe-input ct-ed-formula"
+                    value={r.formula || ''}
+                    placeholder="Formula (e.g. 'income_fee - total_expenses')"
+                    onChange={(e) => patchRow(i, { formula: e.target.value })}
+                  />
+                  <div className="ct-ed-help">
+                    Reference other row IDs with + / − operators. IDs auto-generate from labels — see each row's label to know the ID (lowercased with underscores).
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+        <button type="button" onClick={addRow} className="ct-ed-add">+ Add row</button>
+      </div>
+
+      <style>{`
+        .ct-ed { margin-top: .5rem; display: flex; flex-direction: column; gap: 1rem; }
+        .ct-ed-section { display: flex; flex-direction: column; gap: .3rem; }
+        .ct-ed-head {
+          display: block; font-size: .7rem; font-weight: 700;
+          color: var(--foreground); margin-bottom: .1rem;
+          text-transform: uppercase; letter-spacing: .04em;
+        }
+        .ct-ed-empty {
+          font-size: .75rem; color: var(--muted-foreground);
+          padding: .4rem .5rem; background: var(--muted, #f8fafc);
+          border-radius: .25rem;
+        }
+        .ct-ed-row-block {
+          display: flex; flex-direction: column; gap: .25rem;
+          padding: .25rem 0;
+          border-bottom: 1px solid var(--border);
+        }
+        .ct-ed-row-block:last-of-type { border-bottom: 0; }
+        .ct-ed-row {
+          display: flex; align-items: center; gap: .35rem;
+        }
+        .ct-ed-bullet {
+          font-size: .75rem; color: var(--muted-foreground);
+          min-width: 1.5rem; font-weight: 600;
+        }
+        .ct-ed-label { flex: 1; }
+        .ct-ed-select { max-width: 200px; }
+        .ct-ed-select-narrow { max-width: 180px; }
+        .ct-ed-move, .ct-ed-remove {
+          background: transparent; border: 1px solid transparent;
+          border-radius: .25rem; padding: .25rem .35rem;
+          cursor: pointer; color: var(--muted-foreground);
+          font-size: .8125rem; line-height: 1;
+        }
+        .ct-ed-move:hover:not(:disabled), .ct-ed-remove:hover:not(:disabled) {
+          background: var(--muted, #f1f5f9); color: var(--foreground);
+          border-color: var(--border);
+        }
+        .ct-ed-remove:hover:not(:disabled) { color: var(--destructive, #dc2626); }
+        .ct-ed-move:disabled, .ct-ed-remove:disabled { opacity: .3; cursor: not-allowed; }
+        .ct-ed-add {
+          align-self: flex-start;
+          margin-top: .25rem; padding: .3rem .625rem;
+          font-size: .75rem; font-weight: 600;
+          background: transparent; color: var(--primary, #1e40af);
+          border: 1px dashed var(--primary, #1e40af); border-radius: .25rem;
+          cursor: pointer;
+        }
+        .ct-ed-add:hover { background: rgba(37, 99, 235, .06); }
+        .ct-ed-hint {
+          font-size: .8125rem; margin-left: 1.85rem;
+        }
+        .ct-ed-detail {
+          display: flex; align-items: center; gap: .35rem;
+          margin-left: 1.85rem;
+        }
+        .ct-ed-detail-lbl {
+          font-size: .75rem; color: var(--muted-foreground);
+          font-weight: 600;
+        }
+        .ct-ed-formula {
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+          font-size: .8125rem; margin-left: 1.85rem;
+        }
+        .ct-ed-help {
+          font-size: .7rem; color: var(--muted-foreground);
+          margin-left: 1.85rem; font-style: italic;
+        }
+        .ct-ed-warn {
+          font-size: .7rem; color: var(--destructive, #dc2626);
+          font-style: italic;
+        }
       `}</style>
     </div>
   );
