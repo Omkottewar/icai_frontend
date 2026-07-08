@@ -1,7 +1,7 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://icai-backend.onrender.com/api/:path*" },
-    { "source": "/uploads/:path*", "destination": "https://icai-backend.onrender.com/uploads/:path*" },
+    { "source": "/api/:path*", "destination": "https://icai.fly.dev/api/:path*" },
+    { "source": "/uploads/:path*", "destination": "https://icai.fly.dev/uploads/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
