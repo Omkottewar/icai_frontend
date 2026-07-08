@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { cachedGet, revalidate, apiWrite, invalidate, subscribe } from '../lib/apiCache';
 
+// Toggle in the browser console: `window.__ICAI_CACHE_DEBUG__ = true`. Same
+// flag apiCache.js reads — a single switch turns on the whole trace.
+function debug(...args) {
+  if (typeof window !== 'undefined' && window.__ICAI_CACHE_DEBUG__) {
+    // eslint-disable-next-line no-console
+    console.log('[useAdminList]', ...args);
+  }
+}
+
 // Generic fetcher for admin GET endpoints. Backed by the shared apiCache so
 // that mounting the same page twice (or two widgets calling the same URL)
 // doesn't fire duplicate requests.
@@ -27,12 +36,20 @@ export function useAdminList(endpoint, params, enabled = true, ttl) {
     let cancelled = false;
     setLoading(true); setError(null);
 
+    debug('effect run', endpoint, `key=${key}`, `tick=${tick}`);
     cachedGet(endpoint, JSON.parse(key), ttl)
-      .then((j) => { if (!cancelled) setData(j); })
+      .then((j) => {
+        if (!cancelled) {
+          debug('setData', endpoint, `rows=${Array.isArray(j?.rows) ? j.rows.length : '?'}`);
+          setData(j);
+        } else {
+          debug('setData suppressed (cancelled)', endpoint);
+        }
+      })
       .catch((e) => { if (!cancelled) { setError(e); setData(null); } })
       .finally(() => { if (!cancelled) setLoading(false); });
 
-    return () => { cancelled = true; };
+    return () => { debug('effect cleanup', endpoint, `tick=${tick}`); cancelled = true; };
   }, [endpoint, key, enabled, tick, ttl]);
 
   // Auto-refetch when any write invalidates our endpoint. Fires when the
@@ -42,7 +59,10 @@ export function useAdminList(endpoint, params, enabled = true, ttl) {
   // wiped cache.
   useEffect(() => {
     if (!enabled) return;
-    return subscribe(endpoint, () => setTick((t) => t + 1));
+    return subscribe(endpoint, () => {
+      debug('sub fired → tick++', endpoint);
+      setTick((t) => t + 1);
+    });
   }, [endpoint, enabled]);
 
   // Awaits the network round-trip and writes the result straight into
@@ -53,8 +73,10 @@ export function useAdminList(endpoint, params, enabled = true, ttl) {
   // before the new row was in the cache. Returning the promise lets
   // callers `await refresh()` and be certain the new data is visible.
   const refresh = useCallback(async () => {
+    debug('refresh() called', endpoint, `key=${key}`);
     try {
       const fresh = await revalidate(endpoint, JSON.parse(key), ttl);
+      debug('refresh() setData', endpoint, `rows=${Array.isArray(fresh?.rows) ? fresh.rows.length : '?'}`);
       setData(fresh);
       setError(null);
     } catch (e) {

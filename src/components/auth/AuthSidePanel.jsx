@@ -43,10 +43,6 @@ export default function AuthSidePanel({ mode }) {
           ))}
         </div>
       </div>
-
-      <div style={{ position: 'relative', zIndex: 1, fontSize: '.75rem', opacity: .7 }}>
-        Demo mockup · Not connected to live ICAI services · Any credentials work
-      </div>
     </div>
   );
 }

@@ -1,10 +1,12 @@
-﻿import GenericPage from '../components/ui/GenericPage';
+import GenericPage from '../components/ui/GenericPage';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { renderMarkdown } from '../lib/markdown.jsx';
 
 // All copy is admin-editable via the `career_counselling_content` slot.
-// Bookings are still on hold — once the volunteer panel is in place, this
-// page wires up to a real picker (slot stays the same, body text changes).
+// Bookings are currently on hold — once the volunteer panel + counsellor
+// availability workflow is finalised, this page wires up to a real
+// booking flow. Until then the CTA points members at the generic contact
+// form.
 export default function CareerCounsellingPage() {
   const c = useSiteContent('career_counselling_content');
   return (

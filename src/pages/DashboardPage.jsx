@@ -12,6 +12,9 @@ import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
 import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
 import MemberDashboard from '../components/dashboard/MemberDashboard';
+import StudentRequestsCard from '../components/student/StudentRequestsCard';
+import RequestMentorshipModal from '../components/student/RequestMentorshipModal';
+import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
 import InsightsStyles from '../components/dashboard/insights/insightsStyles';
 import Sparkline from '../components/dashboard/insights/Sparkline';
 import {
@@ -292,7 +295,7 @@ export default function DashboardPage() {
               ] : [
                 { Icon: IconBookOpen,  t: 'Take a mock test',       to: '/mock-tests' },
                 { Icon: IconBriefcase, t: 'Articleship vacancies',  to: '/job-vacancies?type=articleship' },
-                { Icon: IconUsers,     t: 'Book a mentor (soon)',   to: '/career-counselling' },
+                { Icon: IconHandshake, t: 'Request a mentor',       to: '/students#actions' },
                 { Icon: IconBookOpen,  t: 'Study material',         to: '/resources' },
               ]).map((a) => {
                 const linkProps = a.external
@@ -389,6 +392,7 @@ export default function DashboardPage() {
 function StudentTabbedBody({ data, user, logout }) {
   const TABS = [
     { id: 'events',    label: 'My events' },
+    { id: 'requests',  label: 'My requests' },
     { id: 'actions',   label: 'Quick actions' },
     { id: 'settings',  label: 'Profile & settings' },
   ];
@@ -401,6 +405,11 @@ function StudentTabbedBody({ data, user, logout }) {
       window.history.replaceState(null, '', `#${tab}`);
     }
   }, [tab]);
+
+  // Modal state — student can request a mentor or submit articleship
+  // preferences straight from the dashboard without hopping over to
+  // /students. Counselling is on hold and intentionally omitted here.
+  const [modal, setModal] = useState(null);
 
   const upcomingEvents = data?.upcomingEvents ?? [];
 
@@ -456,6 +465,12 @@ function StudentTabbedBody({ data, user, logout }) {
         </div>
       )}
 
+      {tab === 'requests' && (
+        <div role="tabpanel" className="sd-tab-body">
+          <StudentRequestsCard />
+        </div>
+      )}
+
       {tab === 'actions' && (
         <div role="tabpanel" className="sd-tab-body">
           <div className="card">
@@ -463,18 +478,33 @@ function StudentTabbedBody({ data, user, logout }) {
             <div style={{ marginTop: '.75rem', display: 'grid', gap: '.625rem', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
               {[
                 { Icon: IconBookOpen,  t: 'Take a mock test',      to: '/mock-tests' },
-                { Icon: IconBriefcase, t: 'Articleship vacancies', to: '/job-vacancies?type=articleship' },
-                { Icon: IconUsers,     t: 'Book a mentor (soon)',  to: '/career-counselling' },
+                { Icon: IconBriefcase, t: 'Articleship preferences', onClick: () => setModal('articleship') },
+                { Icon: IconHandshake, t: 'Request a mentor',      onClick: () => setModal('mentorship') },
                 { Icon: IconBookOpen,  t: 'Study material',        to: '/resources' },
-              ].map((a) => (
-                <a key={a.t} href={a.to} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
-                  <a.Icon size="sm" /> {a.t}
-                  <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
-                </a>
-              ))}
+                { Icon: IconBriefcase, t: 'Articleship vacancies', to: '/job-vacancies?type=articleship' },
+              ].map((a) => {
+                const common = (
+                  <>
+                    <a.Icon size="sm" /> {a.t}
+                    <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
+                  </>
+                );
+                const style = { padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)', background: 'transparent', color: 'inherit', font: 'inherit', textAlign: 'left', width: '100%', cursor: 'pointer' };
+                if (a.onClick) {
+                  return <button key={a.t} type="button" onClick={a.onClick} className="row gap-2" style={style}>{common}</button>;
+                }
+                return <a key={a.t} href={a.to} className="row gap-2" style={style}>{common}</a>;
+              })}
             </div>
           </div>
         </div>
+      )}
+
+      {modal === 'mentorship' && (
+        <RequestMentorshipModal onClose={() => setModal(null)} onSubmitted={() => setModal(null)} />
+      )}
+      {modal === 'articleship' && (
+        <RequestArticleshipModal onClose={() => setModal(null)} onSubmitted={() => setModal(null)} />
       )}
 
       {tab === 'settings' && (

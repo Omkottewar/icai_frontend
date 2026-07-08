@@ -26,6 +26,17 @@ const SUBSCRIBERS = new Set();     // { pattern, callback }
 
 const DEFAULT_TTL = 30_000; // 30s
 
+// Tracing — flip on in the browser console with `window.__ICAI_CACHE_DEBUG__ = true`.
+// Every cache event logs a single line so we can see whether writes fire invalidate,
+// whether invalidate wakes subscribers, and whether the next GET refetches. Off by
+// default so production and normal dev sessions stay quiet.
+function debug(...args) {
+  if (typeof window !== 'undefined' && window.__ICAI_CACHE_DEBUG__) {
+    // eslint-disable-next-line no-console
+    console.log('[cache]', ...args);
+  }
+}
+
 function buildUrl(path, qs) {
   if (!qs) return path;
   const params = Object.entries(qs)
@@ -73,12 +84,14 @@ export async function cachedGet(path, qs, ttl = DEFAULT_TTL) {
 
   // Fresh hit
   if (cached && Date.now() - cached.ts < cached.ttl) {
+    debug('GET hit', url, `age=${Date.now() - cached.ts}ms`);
     return cached.data;
   }
 
   // In-flight dedup
   const existing = INFLIGHT.get(url);
-  if (existing) return existing;
+  if (existing) { debug('GET dedup', url); return existing; }
+  debug('GET fetch', url);
 
   // Capture the promise reference so the .then can check whether it's
   // still the "current" in-flight fetch. If invalidate() ran mid-flight,
@@ -106,6 +119,7 @@ export async function cachedGet(path, qs, ttl = DEFAULT_TTL) {
 // Force a fresh fetch and replace the cache entry. Used by `refresh()`.
 export async function revalidate(path, qs, ttl = DEFAULT_TTL) {
   const url = buildUrl(path, qs);
+  debug('revalidate', url);
   INFLIGHT.delete(url);
   CACHE.delete(url);
   return cachedGet(path, qs, ttl);
@@ -120,14 +134,16 @@ export function invalidate(pattern) {
     pattern instanceof RegExp   ? pattern.test(key)       :
     false
   );
-  for (const key of Array.from(CACHE.keys()))    if (matches(key)) CACHE.delete(key);
+  let wiped = 0, inflightDropped = 0;
+  for (const key of Array.from(CACHE.keys()))    if (matches(key)) { CACHE.delete(key); wiped++; }
   // Also abandon any in-flight fetches for matching keys. Their responses
   // reflect state from before this write; if we let them sit in INFLIGHT
   // a subscriber's refetch would dedup onto the stale promise and see the
   // OLD payload. Dropping them from INFLIGHT forces a fresh network hit.
   // The stray promise's .then now checks INFLIGHT.get(url) === p before
   // writing to CACHE, so it silently discards its own response.
-  for (const key of Array.from(INFLIGHT.keys())) if (matches(key)) INFLIGHT.delete(key);
+  for (const key of Array.from(INFLIGHT.keys())) if (matches(key)) { INFLIGHT.delete(key); inflightDropped++; }
+  debug('invalidate', pattern, `wiped=${wiped}`, `inflight-dropped=${inflightDropped}`);
   notify(pattern);
   broadcastInvalidation(pattern);
 }
@@ -150,11 +166,15 @@ function patternsIntersect(a, b) {
 function notify(pattern) {
   // Snapshot before iterating — a callback that unsubscribes shouldn't
   // skip its siblings.
+  let matched = 0, total = 0;
   for (const entry of Array.from(SUBSCRIBERS)) {
+    total++;
     if (patternsIntersect(entry.pattern, pattern)) {
+      matched++;
       try { entry.callback(pattern); } catch { /* subscriber threw — ignore */ }
     }
   }
+  debug('notify', pattern, `matched=${matched}/${total} subscribers`);
 }
 
 // subscribe(pattern, cb) → unsubscribe(). Called by consumer hooks so they
@@ -163,7 +183,11 @@ function notify(pattern) {
 export function subscribe(pattern, callback) {
   const entry = { pattern, callback };
   SUBSCRIBERS.add(entry);
-  return () => { SUBSCRIBERS.delete(entry); };
+  debug('subscribe', pattern, `total=${SUBSCRIBERS.size}`);
+  return () => {
+    SUBSCRIBERS.delete(entry);
+    debug('unsubscribe', pattern, `total=${SUBSCRIBERS.size}`);
+  };
 }
 
 // Cross-tab: broadcast invalidations so a public tab that was open
@@ -199,6 +223,7 @@ function broadcastInvalidation(pattern) {
 // cache entries matching `invalidates` (string or array).
 export async function apiWrite(path, opts = {}) {
   const { method = 'POST', body, invalidates } = opts;
+  debug('write', method, path, `invalidates=${JSON.stringify(invalidates)}`);
   const r = await fetch(path, {
     method,
     credentials: 'include',

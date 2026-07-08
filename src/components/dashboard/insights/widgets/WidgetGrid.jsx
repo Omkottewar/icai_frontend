@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { WIDGET_BY_ID } from './registry';
+import { WIDGET_BY_ID as CHAIRMAN_WIDGET_BY_ID } from './registry';
 
 // Customizable 12-column widget grid.
 //
@@ -21,7 +21,10 @@ import { WIDGET_BY_ID } from './registry';
 //
 // This produces visible reordering with no flicker because we update state
 // the instant the user crosses a widget's mid-line via dragenter.
-export default function WidgetGrid({ layout, isEditing, onChange, renderArgs, onRemove }) {
+// `widgetById` is optional — defaults to the chairman registry for
+// backwards compatibility with BranchMetricsPage. Other dashboards (e.g.
+// TreasurerInsightsPage) pass in their own map keyed by their widget IDs.
+export default function WidgetGrid({ layout, isEditing, onChange, renderArgs, onRemove, widgetById = CHAIRMAN_WIDGET_BY_ID }) {
   const dragIndexRef = useRef(null);
   const [dragId, setDragId] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
@@ -80,7 +83,7 @@ export default function WidgetGrid({ layout, isEditing, onChange, renderArgs, on
   return (
     <div className="widget-grid" data-editing={isEditing ? 'true' : 'false'}>
       {layout.map((item, idx) => {
-        const w = WIDGET_BY_ID[item.id];
+        const w = widgetById[item.id];
         if (!w) return null;
         const sizeClass = `is-${item.size}`;
         const isDragging = dragId === item.id;

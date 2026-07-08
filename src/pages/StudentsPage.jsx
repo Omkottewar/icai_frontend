@@ -1,24 +1,30 @@
-﻿import PageHeader from '../components/layout/PageHeader';
+import { useState } from 'react';
+import PageHeader from '../components/layout/PageHeader';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../lib/markdown.jsx';
+import { navigate } from '../hooks/useRoute';
 import { IconGraduationCap, IconArrowRight, IconBriefcase, IconBookOpen, IconUsers, IconAward, IconMessageSquare } from '../icons';
+import RequestMentorshipModal from '../components/student/RequestMentorshipModal';
+import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
 
 // All copy is admin-editable via /admin/site-content → Students tab.
 // Icons + href targets stay structural (they map to internal routes / icon
 // components), but the title and description on each of the 6 service tiles
 // pulls from the `students_services` slot, so the admin can rename or
 // rewrite any card without touching code.
-
-// Fixed structural data for each card — the icon + destination + the
-// optional "Coming soon" pill. Title and description are filled in from
-// site content at render time using the keys below.
+//
+// Some cards open in-page modals rather than linking out — those pass an
+// `action` string that the render handler dispatches on. Everything else
+// still follows the plain `<a href>` path so admin-blanked cards silently
+// drop out.
 const CARD_FRAMES = [
   { Icon: IconGraduationCap, href: '/mock-tests',                        comingSoon: false },
-  { Icon: IconBriefcase,     href: '/job-vacancies?type=articleship',    comingSoon: false },
-  { Icon: IconUsers,         href: '/career-counselling',                comingSoon: true  },
+  { Icon: IconBriefcase,     action: 'articleship',                       comingSoon: false },
+  { Icon: IconUsers,         href: '/career-counselling',                 comingSoon: true  },
   { Icon: IconBookOpen,      href: '/resources',                          comingSoon: false },
-  { Icon: IconAward,         href: '/contact',                            comingSoon: true  },
-  { Icon: IconMessageSquare, href: '/mock-tests',                        comingSoon: false },
+  { Icon: IconAward,         href: '/scholarships',                       comingSoon: false },
+  { Icon: IconMessageSquare, href: '/student-forum',                       comingSoon: false },
 ];
 
 export default function StudentsPage() {
@@ -26,6 +32,25 @@ export default function StudentsPage() {
   const banner      = useSiteContent('students_icai_banner');
   const quickAccess = useSiteContent('students_quick_access');
   const services    = useSiteContent('students_services');
+  const { user } = useAuth();
+
+  const [modal, setModal] = useState(null); // 'mentorship' | 'articleship' | null
+
+  function openAction(action) {
+    // Actions that write to the DB require a signed-in student. Bounce
+    // guests to /login with a return hint so they land back here after auth.
+    if (!user) {
+      navigate('/login?next=/students');
+      return;
+    }
+    if (user.primary_role !== 'student') {
+      // Non-students hitting a student action — send them to the generic
+      // contact form rather than showing a modal that would 403 on submit.
+      navigate('/contact');
+      return;
+    }
+    setModal(action);
+  }
 
   return (
     <>
@@ -57,13 +82,18 @@ export default function StudentsPage() {
           <a href="/mock-tests" className="btn btn-primary" style={{ gap: '.5rem' }}>
             <IconGraduationCap size="sm" /> {quickAccess.mock_tests_label}
           </a>
-          <a href="/job-vacancies?type=articleship" className="btn btn-outline" style={{ gap: '.5rem' }}>
+          <button type="button" className="btn btn-outline" style={{ gap: '.5rem' }} onClick={() => openAction('articleship')}>
             <IconBriefcase size="sm" /> {quickAccess.articleship_label}
-          </a>
+          </button>
           <a href="/events?audience=Students" className="btn btn-outline" style={{ gap: '.5rem' }}>
             <IconGraduationCap size="sm" /> {quickAccess.events_label}
           </a>
         </div>
+
+        {/* 1-on-1 support strip removed. Mentor requests live on the
+            student dashboard's Quick actions tab; articleship preferences
+            are reachable via the Articleship card + the quick-access
+            "Articleship" button above. */}
 
         <div style={{ display: 'grid', gap: '1.25rem', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))' }}>
           {CARD_FRAMES.map((frame, i) => {
@@ -73,13 +103,9 @@ export default function StudentsPage() {
             // Skip the tile entirely if the admin has blanked out the title —
             // lets them shrink the grid from 6 → fewer cards without code.
             if (!title) return null;
-            return (
-              <a
-                key={n}
-                href={frame.href}
-                className="card students-svc-card"
-                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
-              >
+
+            const commonInner = (
+              <>
                 <div className="row gap-2" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div className="icon-tile green"><frame.Icon size="lg" /></div>
                   {frame.comingSoon && (
@@ -94,11 +120,52 @@ export default function StudentsPage() {
                   {frame.comingSoon ? 'Ask the branch' : 'Open'}
                   <IconArrowRight size="sm" />
                 </div>
+              </>
+            );
+
+            // Modal-triggering cards render as buttons; the rest stay as
+            // anchors so shift-click / middle-click still work like normal links.
+            if (frame.action) {
+              return (
+                <button
+                  key={n}
+                  type="button"
+                  className="card students-svc-card"
+                  style={{ textAlign: 'left', border: 'none', background: 'transparent', font: 'inherit', color: 'inherit', cursor: 'pointer', display: 'block', width: '100%', padding: undefined }}
+                  onClick={() => openAction(frame.action)}
+                >
+                  {commonInner}
+                </button>
+              );
+            }
+
+            return (
+              <a
+                key={n}
+                href={frame.href}
+                className="card students-svc-card"
+                style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}
+              >
+                {commonInner}
               </a>
             );
           })}
         </div>
       </section>
+
+      {modal === 'mentorship' && (
+        <RequestMentorshipModal
+          onClose={() => setModal(null)}
+          onSubmitted={() => setModal(null)}
+        />
+      )}
+      {modal === 'articleship' && (
+        <RequestArticleshipModal
+          onClose={() => setModal(null)}
+          onSubmitted={() => setModal(null)}
+        />
+      )}
+
       <style>{`
         .students-svc-card { transition: transform .12s, box-shadow .12s; }
         .students-svc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.08); }

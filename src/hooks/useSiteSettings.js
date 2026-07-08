@@ -10,7 +10,7 @@ export const SITE_SETTINGS_DEFAULTS = {
   branch_email:       'nagpur@icai.org',
   branch_hours:       'Mon–Sat 10:30–18:00',
   branch_map_url:     'https://maps.google.com/?q=ICAI+Bhawan+Nagpur',
-  footer_disclaimer:  '© 2026 ICAI Nagpur Branch · Demo mockup · Not affiliated with the official ICAI portal',
+  footer_disclaimer:  '© 2026 ICAI Nagpur Branch (WIRC)',
   social_facebook:    '',
   social_twitter:     '',
   social_linkedin:    '',

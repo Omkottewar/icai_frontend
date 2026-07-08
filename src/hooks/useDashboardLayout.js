@@ -23,12 +23,18 @@ function normaliseLayout(layout, knownIds) {
 // Per-user dashboard widget layout — load from /api/dashboard/layout,
 // edit in memory while in "edit mode", commit with save().
 //
+// `scope` targets a specific dashboard surface (chairman | treasurer) so a
+// single user can hold separate layouts side-by-side. Backwards compatible:
+// callers that omit `scope` get the chairman surface (the only one before
+// the treasurer dashboard shipped).
+//
 // Optimistic by design: the visible layout updates the instant the user
 // reorders/resizes a tile, and we only persist when they hit Save. Cancel
 // reverts to the last persisted version. Reset blows away the DB row so the
 // next load falls back to the registry default.
-export function useDashboardLayout({ defaultLayout, knownIds }) {
+export function useDashboardLayout({ defaultLayout, knownIds, scope = 'chairman' }) {
   const idSet = useMemo(() => new Set(knownIds), [knownIds]);
+  const endpoint = `/api/dashboard/layout?scope=${encodeURIComponent(scope)}`;
 
   const [persisted, setPersisted] = useState(null);   // last server-acknowledged
   const [draft, setDraft]         = useState(null);   // in-progress edits
@@ -36,11 +42,12 @@ export function useDashboardLayout({ defaultLayout, knownIds }) {
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState(null);
 
-  // Initial fetch.
+  // Initial fetch. Re-runs when `scope` changes so a user who toggles between
+  // dashboards sees the right layout for each.
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    cachedGet('/api/dashboard/layout', null, 5_000)
+    cachedGet(endpoint, null, 5_000)
       .then((j) => {
         if (cancelled) return;
         const normalised = normaliseLayout(j?.layout, idSet);
@@ -59,7 +66,7 @@ export function useDashboardLayout({ defaultLayout, knownIds }) {
   // the registry which is module-scope), so we intentionally omit them from
   // deps to avoid an infinite re-fetch loop.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [endpoint]);
 
   const layout = draft ?? persisted ?? defaultLayout;
 
@@ -80,10 +87,10 @@ export function useDashboardLayout({ defaultLayout, knownIds }) {
     if (!draft) return;
     setSaving(true); setError(null);
     try {
-      await apiWrite('/api/dashboard/layout', {
+      await apiWrite(endpoint, {
         method: 'PUT',
         body: { layout: draft },
-        invalidates: '/api/dashboard/layout',
+        invalidates: endpoint,
       });
       setPersisted(draft);
       setDraft(null);
@@ -93,14 +100,14 @@ export function useDashboardLayout({ defaultLayout, knownIds }) {
     } finally {
       setSaving(false);
     }
-  }, [draft]);
+  }, [draft, endpoint]);
 
   const reset = useCallback(async () => {
     setSaving(true); setError(null);
     try {
-      await apiWrite('/api/dashboard/layout', {
+      await apiWrite(endpoint, {
         method: 'DELETE',
-        invalidates: '/api/dashboard/layout',
+        invalidates: endpoint,
       });
       setPersisted(defaultLayout);
       setDraft(null);
@@ -110,7 +117,7 @@ export function useDashboardLayout({ defaultLayout, knownIds }) {
     } finally {
       setSaving(false);
     }
-  }, [defaultLayout]);
+  }, [defaultLayout, endpoint]);
 
   return {
     layout,

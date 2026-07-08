@@ -12,7 +12,7 @@ import InsightsStyles from '../components/dashboard/insights/insightsStyles';
 import { ShimmerPageBody, Shimmer } from '../components/ui/Shimmer';
 import { dialog } from '../lib/dialog';
 import { useUrlState } from '../components/dashboard/insights/useUrlState';
-import { mergeWithMock, MOCK_KPIS, MOCK_EVENTS_PER_MONTH, MOCK_REGS_PER_MONTH, MOCK_BY_COMMITTEE, MOCK_RECENT_EVENTS, MOCK_PENDING_APPROVALS } from '../components/dashboard/insights/branchMetricsMock';
+import { mergeWithMock } from '../components/dashboard/insights/branchMetricsMock';
 import {
   WIDGET_REGISTRY, WIDGET_BY_ID, DEFAULT_LAYOUT,
 } from '../components/dashboard/insights/widgets/registry';
@@ -113,31 +113,7 @@ export default function BranchMetricsPage() {
   });
   const { data: committeesData } = usePublicCommittees();
 
-  // TEMP — dev/preview toggle. 'demo' = pure mock dataset (great for QA-ing
-  // widget visuals); 'live' = real API data with mock falling back per-field
-  // where the API hasn't filled in yet. Persisted to localStorage so it
-  // survives reloads. Remove this block + the DataModeToggle button when
-  // the real backend is fully wired.
-  const [dataMode, setDataMode] = useState(
-    () => (typeof window !== 'undefined' && localStorage.getItem('dashDataMode')) || 'live'
-  );
-  useEffect(() => {
-    try { localStorage.setItem('dashDataMode', dataMode); } catch { /* private mode */ }
-  }, [dataMode]);
-
-  const data = useMemo(() => {
-    if (dataMode === 'demo') {
-      return {
-        kpis: MOCK_KPIS,
-        events_per_month: MOCK_EVENTS_PER_MONTH,
-        registrations_per_month: MOCK_REGS_PER_MONTH,
-        by_committee: MOCK_BY_COMMITTEE,
-        recent_events: MOCK_RECENT_EVENTS,
-        pending_approvals: MOCK_PENDING_APPROVALS,
-      };
-    }
-    return mergeWithMock(liveData);
-  }, [dataMode, liveData]);
+  const data = useMemo(() => mergeWithMock(liveData), [liveData]);
 
   // Layout state — per-user, persisted in DB.
   const {
@@ -269,7 +245,6 @@ export default function BranchMetricsPage() {
           </div>
           <div className="insights-topbar-actions">
             <LivePill fetching={fetching} ageSec={ageSec} />
-            <DataModeToggle mode={dataMode} onChange={setDataMode} />
             {!isEditing && <CustomizeButton onClick={startEditing} disabled={layoutLoading} />}
             <ShareButton />
             <button className="d-btn" onClick={refresh} disabled={fetching}>
@@ -448,30 +423,6 @@ function FilterRail({ url, setUrl, committees, onPreset, onReset }) {
 
       <button className="filter-reset" onClick={onReset}>Reset filters</button>
     </aside>
-  );
-}
-
-// ─── TEMP: Demo / Live data toggle for QA. Remove with the dataMode block. ─
-function DataModeToggle({ mode, onChange }) {
-  const isDemo = mode === 'demo';
-  return (
-    <button
-      className="d-btn"
-      onClick={() => onChange(isDemo ? 'live' : 'demo')}
-      title={isDemo ? 'Showing sample data — click to switch to live API' : 'Showing live API data — click to switch to sample'}
-      style={{
-        background: isDemo ? 'oklch(0.78 0.15 75 / .15)' : undefined,
-        borderColor: isDemo ? 'oklch(0.78 0.15 75 / .35)' : undefined,
-        color: isDemo ? 'oklch(0.45 0.12 75)' : undefined,
-        fontWeight: 700,
-      }}
-    >
-      <span style={{
-        display: 'inline-block', width: 6, height: 6, borderRadius: 999,
-        background: isDemo ? 'oklch(0.78 0.15 75)' : 'var(--secondary)',
-      }} />
-      {isDemo ? 'Demo data' : 'Live data'}
-    </button>
   );
 }
 

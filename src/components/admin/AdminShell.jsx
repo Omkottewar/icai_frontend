@@ -60,6 +60,7 @@ const NAV_GROUPS = [
       { to: '/admin/mock-tests',            label: 'Mock tests',    Icon: IconGraduationCap, roles: [ROLE_WICASA] },
       { to: '/admin/mentorship',            label: 'Mentorship',    Icon: IconHandshake,     roles: [ROLE_WICASA] },
       { to: '/admin/articleship-matches',   label: 'Articleship matching', Icon: IconHandshake, roles: [ROLE_WICASA] },
+      { to: '/admin/scholarships',          label: 'Scholarships',  Icon: IconAward,         roles: [ROLE_WICASA, ROLE_CHAIRMAN] },
       { to: '/admin/student-suggestions',         label: 'Suggestions',        Icon: IconMessageSquare, roles: [ROLE_WICASA, ROLE_CHAIRMAN] },
       { to: '/admin/student-suggestion-topics',   label: 'Suggestion topics',  Icon: IconSettings,      roles: [ROLE_WICASA, ROLE_CHAIRMAN] },
     ],
@@ -72,6 +73,8 @@ const NAV_GROUPS = [
       { to: '/admin/iut-transfers',  label: 'IUT transfers',   Icon: IconFileText, roles: [ROLE_TREASURER] },
       { to: '/admin/payments',       label: 'Payments',        Icon: IconFileText, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
       { to: '/admin/cabf',           label: 'CABF requests',   Icon: IconHeart,    roles: [ROLE_TREASURER] },
+      { to: '/admin/vendors',        label: 'Vendors',         Icon: IconBriefcase, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
+      { to: '/admin/budgets',        label: 'Budgets',         Icon: IconAward,     roles: [ROLE_TREASURER, ROLE_CHAIRMAN] },
     ],
   },
   {

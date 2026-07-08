@@ -58,6 +58,7 @@ const SearchPage             = lazy(() => import('../pages/SearchPage'));
 const DashboardPage          = lazy(() => import('../pages/DashboardPage'));
 const ChecklistInstancesPage = lazy(() => import('../pages/ChecklistInstancesPage'));
 const BranchMetricsPage      = lazy(() => import('../pages/BranchMetricsPage'));
+const TreasurerInsightsPage  = lazy(() => import('../pages/TreasurerInsightsPage'));
 
 const OnboardingPage     = lazy(() => import('../pages/auth/OnboardingPage'));
 const AnnouncementsPage  = lazy(() => import('../pages/AnnouncementsPage'));
@@ -67,6 +68,14 @@ const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'))
 const RoomBookingPage    = lazy(() => import('../pages/RoomBookingPage'));
 const TrackGrievancePage = lazy(() => import('../pages/TrackGrievancePage'));
 const StudentSuggestionsPage = lazy(() => import('../pages/StudentSuggestionsPage'));
+const StudentForumPage       = lazy(() => import('../pages/StudentForumPage'));
+const ScholarshipsPage       = lazy(() => import('../pages/ScholarshipsPage'));
+const ScholarshipsAdminPage  = lazy(() => import('../pages/admin/ScholarshipsAdminPage'));
+const BillsAdminPage         = lazy(() => import('../pages/admin/BillsAdminPage'));
+const RefundsAdminPage       = lazy(() => import('../pages/admin/RefundsAdminPage'));
+const IutTransfersAdminPage  = lazy(() => import('../pages/admin/IutTransfersAdminPage'));
+const VendorsAdminPage       = lazy(() => import('../pages/admin/VendorsAndCategoriesAdminPage'));
+const BudgetsAdminPage       = lazy(() => import('../pages/admin/BudgetsAdminPage'));
 const PrayGyaanWidget    = lazy(() => import('../components/ui/PrayGyaanWidget'));
 
 const RequireAdmin               = lazy(() => import('../components/admin/RequireAdmin'));
@@ -141,6 +150,7 @@ const ROUTES = {
   '/dashboard': DashboardPage,
   '/my-checklists': ChecklistInstancesPage,
   '/branch-insights': BranchMetricsPage,
+  '/treasurer-insights': TreasurerInsightsPage,
   '/login': LoginPage,
   '/signup': SignupPage,
   '/forgot': ForgotPage,
@@ -152,6 +162,8 @@ const ROUTES = {
   '/book-room': RoomBookingPage,
   '/track-grievance': TrackGrievancePage,
   '/student-suggestions': StudentSuggestionsPage,
+  '/student-forum':       StudentForumPage,
+  '/scholarships':        ScholarshipsPage,
   '/my-library': MyLibraryPage,
   '/resources/submit': ResourceSubmitPage,
   '/mock-tests': MockTestsPage,
@@ -206,13 +218,14 @@ const ADMIN_ROUTES = {
   '/admin/icai-directory':      IcaiDirectoryAdminPage,
   '/admin/student-suggestions':       StudentSuggestionsAdminPage,
   '/admin/student-suggestion-topics': StudentSuggestionTopicsAdminPage,
-  // Sidebar entries exist but the admin UIs are not yet built. Backend
-  // endpoints (bills, refunds, iut-transfers, mentorship, articleship-
-  // matches) are already wired — these stubs ship the navigation without
-  // 404s while the views land in follow-up releases.
-  '/admin/bills':                () => <ComingSoonPage title="Bills" description="Vendor bill submissions, approvals, and payment tracking. Backend wiring is ready; the admin view ships in a follow-up." />,
-  '/admin/refunds':              () => <ComingSoonPage title="Refunds" description="Event-fee refund requests with approvals and payout tracking. Backend wiring is ready; the admin view ships in a follow-up." />,
-  '/admin/iut-transfers':        () => <ComingSoonPage title="IUT transfers" description="Inter-unit transfer ledger between the branch and other ICAI units. Backend wiring is ready; the admin view ships in a follow-up." />,
+  '/admin/scholarships':              ScholarshipsAdminPage,
+  '/admin/bills':                BillsAdminPage,
+  '/admin/refunds':              RefundsAdminPage,
+  '/admin/iut-transfers':        IutTransfersAdminPage,
+  '/admin/vendors':              VendorsAdminPage,
+  '/admin/budgets':              BudgetsAdminPage,
+  // Mentorship + articleship-matches admin views still ship as stubs — WICASA
+  // has been reviewing those in the /admin/home inbox for now.
   '/admin/mentorship':           () => <ComingSoonPage title="Mentorship" description="Member-mentor pairings and meeting logs. Backend wiring is ready; the admin view ships in a follow-up." />,
   '/admin/articleship-matches':  () => <ComingSoonPage title="Articleship matching" description="Match students to firms offering articleship vacancies. Backend wiring is ready; the admin view ships in a follow-up." />,
 };

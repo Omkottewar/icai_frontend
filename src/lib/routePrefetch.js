@@ -39,6 +39,7 @@ const ROUTE_LOADERS = {
   '/dashboard':          () => import('../pages/DashboardPage'),
   '/my-checklists':      () => import('../pages/ChecklistInstancesPage'),
   '/branch-insights':    () => import('../pages/BranchMetricsPage'),
+  '/treasurer-insights': () => import('../pages/TreasurerInsightsPage'),
   '/onboarding':         () => import('../pages/auth/OnboardingPage'),
   '/gallery':            () => import('../pages/PhotoGalleryPage'),
   '/job-vacancies':      () => import('../pages/JobVacanciesPage'),
@@ -48,6 +49,8 @@ const ROUTE_LOADERS = {
   '/my-library':         () => import('../pages/MyLibraryPage'),
   '/resources/submit':   () => import('../pages/ResourceSubmitPage'),
   '/mock-tests':         () => import('../pages/MockTestsPage'),
+  '/student-forum':      () => import('../pages/StudentForumPage'),
+  '/scholarships':       () => import('../pages/ScholarshipsPage'),
 };
 
 // Every /admin/* visit needs the RequireAdmin gate, the AdminShell
@@ -80,6 +83,10 @@ const ADMIN_LOADERS = {
   '/admin/grievance-routes':    () => import('../pages/admin/GrievanceRoutesAdminPage'),
   '/admin/resources':           () => import('../pages/admin/ResourcesAdminPage'),
   '/admin/mock-tests':          () => import('../pages/admin/MockTestsAdminPage'),
+  '/admin/scholarships':        () => import('../pages/admin/ScholarshipsAdminPage'),
+  '/admin/bills':               () => import('../pages/admin/BillsAdminPage'),
+  '/admin/refunds':             () => import('../pages/admin/RefundsAdminPage'),
+  '/admin/iut-transfers':       () => import('../pages/admin/IutTransfersAdminPage'),
 };
 
 const EMPLOYER_GATE_LOADER = () => import('../components/employer/RequireEmployer');

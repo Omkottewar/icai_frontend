@@ -57,6 +57,7 @@ export default function TreasurerHome({ data, user }) {
       <QuickActions
         title="Finance tools"
         actions={[
+          { label: 'View treasurer insights', description: 'Detailed KPIs, trends, drill-downs', href: '/treasurer-insights' },
           { label: 'Refunds',            description: 'Approve, reject, mark processed',     href: '/admin/refunds' },
           { label: 'Bills',              description: 'Approve post-event bills',            href: '/admin/bills' },
           { label: 'IUT transfers',      description: 'Inter-account movements',             href: '/admin/iut-transfers' },

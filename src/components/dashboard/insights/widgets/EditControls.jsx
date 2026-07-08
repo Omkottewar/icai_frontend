@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { WIDGET_REGISTRY } from './registry';
+import { WIDGET_REGISTRY as CHAIRMAN_REGISTRY } from './registry';
 
 // Floating customize controls. Two surfaces:
 //   1. The "Customize" button that lives in the page topbar (renders when NOT editing).
@@ -19,16 +19,20 @@ export function CustomizeButton({ onClick, disabled }) {
   );
 }
 
+// `registry` is optional — defaults to the chairman widget catalog. Other
+// dashboards (treasurer, …) pass in their own array so the "Add widget"
+// picker only offers widgets relevant to that surface.
 export function EditToolbar({
   layout, isDirty, saving,
   onAddWidget, onSave, onCancel, onReset,
+  registry = CHAIRMAN_REGISTRY,
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const inLayout = useMemo(() => new Set(layout.map((l) => l.id)), [layout]);
   const available = useMemo(
-    () => WIDGET_REGISTRY.filter((w) => !inLayout.has(w.id)),
-    [inLayout]
+    () => registry.filter((w) => !inLayout.has(w.id)),
+    [inLayout, registry]
   );
 
   return (
