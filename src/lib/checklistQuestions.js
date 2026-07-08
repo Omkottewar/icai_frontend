@@ -22,6 +22,7 @@ export const QUESTION_TYPES = [
   { type: 'file',            label: 'File upload',    hint: 'Attach a document or image',         group: 'Other' },
   { type: 'task_list',       label: 'Task list',      hint: 'Assign tasks to people with due dates', group: 'Other' },
   { type: 'budget_table',    label: 'Budget table',   hint: 'Event budget with revenue + categorised expenses', group: 'Other' },
+  { type: 'checklist_table', label: 'Checklist table',hint: 'Excel-style table — fixed rows, configurable columns (Qty / Person / Status)', group: 'Other' },
   { type: 'section_heading', label: 'Section heading',hint: 'Visual separator — not a question', group: 'Other' },
 ];
 
@@ -313,6 +314,18 @@ export function defaultConfig(type) {
       return {};
     case 'budget_table':
       return { faculty_count: 6 };
+    case 'checklist_table':
+      return {
+        columns: [
+          { key: 'quantity', label: 'Qty / Detail', type: 'text' },
+          { key: 'person',   label: 'Person',       type: 'text' },
+          { key: 'status',   label: 'Status',       type: 'status' },
+        ],
+        rows: [
+          { id: 'r1', label: 'Item 1', kind: 'data' },
+          { id: 'r2', label: 'Item 2', kind: 'data' },
+        ],
+      };
     default:
       return {};
   }
@@ -356,6 +369,21 @@ export function hasAnswer(type, value) {
   // For time_range, both start and end must be set.
   if (type === 'time_range') {
     return !!(value && typeof value === 'object' && value.start && value.end);
+  }
+  // For checklist_table, "answered" means at least one data row has any
+  // non-empty cell across the configured columns.
+  if (type === 'checklist_table') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+    for (const rowId of Object.keys(value)) {
+      const cell = value[rowId];
+      if (cell && typeof cell === 'object') {
+        for (const k of Object.keys(cell)) {
+          const v = cell[k];
+          if (v !== null && v !== undefined && v !== '') return true;
+        }
+      }
+    }
+    return false;
   }
   // For budget_table, at least one revenue or expense amount must be > 0.
   if (type === 'budget_table') {

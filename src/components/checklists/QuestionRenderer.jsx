@@ -281,9 +281,275 @@ function Field({ question, cfg, value, onChange, readonly, tasks, onTaskAction }
           cfg={cfg}
         />
       );
+    case 'checklist_table':
+      return (
+        <ChecklistTableField
+          value={value}
+          onChange={set}
+          readonly={readonly}
+          cfg={cfg}
+        />
+      );
     default:
       return <em className="muted-text">Unsupported type: {question.type}</em>;
   }
+}
+
+// ─── ChecklistTableField ─────────────────────────────────────────────────
+// Excel-style table with fixed rows and configurable columns. Config comes
+// from the template:
+//   columns[] — array of { key, label, type }  (text | number | money | status)
+//   rows[]    — array of { id, label, kind?, hint?, total_of?, formula? }
+//               kind ∈ 'data' | 'total' | 'computed'
+//               'total' rows auto-sum the total_of column's money cells above
+//               'computed' rows evaluate a simple formula against other row ids
+//
+// Value shape (persisted): { [rowId]: { [colKey]: string | number } }
+// Only 'data' rows carry stored values — total/computed rows are derived
+// at render time.
+function ChecklistTableField({ value, onChange, readonly, cfg }) {
+  const columns = Array.isArray(cfg?.columns) ? cfg.columns : [];
+  const rows    = Array.isArray(cfg?.rows)    ? cfg.rows    : [];
+  const v = (value && typeof value === 'object' && !Array.isArray(value)) ? value : {};
+
+  const setCell = (rowId, colKey, newVal) => {
+    if (readonly) return;
+    const nextRow = { ...(v[rowId] || {}) };
+    if (newVal === '' || newVal === null || newVal === undefined) {
+      delete nextRow[colKey];
+    } else {
+      nextRow[colKey] = newVal;
+    }
+    const next = { ...v };
+    if (Object.keys(nextRow).length === 0) delete next[rowId];
+    else next[rowId] = nextRow;
+    onChange(next);
+  };
+
+  // ─── Compute derived cells for total / computed rows ──────────────────
+  // For each 'total' row, sum the total_of column across all 'data' rows
+  // above the total row. For each 'computed' row, evaluate the formula
+  // (simple id-based math like "income - total_expenses").
+  const computedByRowCol = {};
+  const totalByRowCol = {};
+
+  rows.forEach((row, rowIdx) => {
+    if (row.kind === 'total' && row.total_of) {
+      let sum = 0;
+      for (let i = 0; i < rowIdx; i++) {
+        const prev = rows[i];
+        if ((prev.kind ?? 'data') !== 'data') continue;
+        const cell = v[prev.id]?.[row.total_of];
+        const n = Number(cell);
+        if (Number.isFinite(n)) sum += n;
+      }
+      totalByRowCol[row.id] = totalByRowCol[row.id] || {};
+      totalByRowCol[row.id][row.total_of] = sum;
+    }
+    if (row.kind === 'computed' && row.formula && row.total_of) {
+      // Formula is a whitespace-separated expression of row ids and
+      // + / - operators, e.g., "income - total_expenses". We evaluate
+      // against numeric values of the same column (row.total_of).
+      const tokens = String(row.formula).split(/\s+/).filter(Boolean);
+      let acc = 0;
+      let op = '+';
+      let ok = true;
+      for (const tok of tokens) {
+        if (tok === '+' || tok === '-') { op = tok; continue; }
+        // Lookup in stored values first, else in total row
+        const raw = v[tok]?.[row.total_of] ?? totalByRowCol[tok]?.[row.total_of];
+        const n = Number(raw);
+        if (!Number.isFinite(n)) { ok = false; break; }
+        acc = op === '+' ? acc + n : acc - n;
+      }
+      if (ok) {
+        computedByRowCol[row.id] = computedByRowCol[row.id] || {};
+        computedByRowCol[row.id][row.total_of] = acc;
+      }
+    }
+  });
+
+  return (
+    <div className="ct-wrap">
+      <table className="ct">
+        <colgroup>
+          <col style={{ width: '40%' }} />
+          {columns.map((c) => <col key={c.key} />)}
+        </colgroup>
+        <thead>
+          <tr>
+            <th className="ct-th-item">Item</th>
+            {columns.map((c) => (
+              <th key={c.key} className={`ct-th-col ct-th-${c.type}`}>{c.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const kind = row.kind ?? 'data';
+            const rowClass =
+              kind === 'total' ? 'ct-row-total' :
+              kind === 'computed' ? 'ct-row-computed' : 'ct-row-data';
+            return (
+              <tr key={row.id} className={rowClass}>
+                <td className="ct-item">{row.label}</td>
+                {columns.map((col) => {
+                  // Total / computed rows show derived values in the
+                  // configured column and blanks elsewhere.
+                  if (kind === 'total') {
+                    if (col.key !== row.total_of) return <td key={col.key} className="ct-cell ct-cell-derived" />;
+                    const n = totalByRowCol[row.id]?.[col.key] ?? 0;
+                    return <td key={col.key} className="ct-cell ct-cell-derived">{formatCell(n, col.type)}</td>;
+                  }
+                  if (kind === 'computed') {
+                    if (col.key !== row.total_of) return <td key={col.key} className="ct-cell ct-cell-derived" />;
+                    const n = computedByRowCol[row.id]?.[col.key];
+                    return (
+                      <td key={col.key} className={`ct-cell ct-cell-derived ${Number(n) < 0 ? 'ct-negative' : ''}`}>
+                        {n === undefined ? '—' : formatCell(n, col.type)}
+                      </td>
+                    );
+                  }
+                  // Data row — editable cell (or readonly display)
+                  const stored = v[row.id]?.[col.key];
+                  return (
+                    <td key={col.key} className="ct-cell">
+                      <CellInput
+                        type={col.type}
+                        value={stored}
+                        hint={col.key === firstEmptyHintKey(row, columns) ? row.hint : undefined}
+                        readonly={readonly}
+                        onChange={(nv) => setCell(row.id, col.key, nv)}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <style>{`
+        .ct-wrap { overflow-x: auto; }
+        .ct {
+          width: 100%; border-collapse: collapse; background: white;
+          border: 1px solid #94a3b8; font-size: .875rem;
+        }
+        .ct th, .ct td {
+          border: 1px solid #94a3b8; padding: .4rem .55rem;
+          vertical-align: middle;
+        }
+        .ct thead th {
+          background: #e2e8f0; font-weight: 700; text-align: left;
+          font-size: .8125rem;
+        }
+        .ct-th-money, .ct-th-number { text-align: right; }
+        .ct-item { font-weight: 500; color: var(--foreground); }
+        .ct-cell { padding: .25rem; }
+        .ct-cell-derived {
+          background: #fef9c3; text-align: right; font-weight: 700;
+          padding: .5rem .55rem;
+        }
+        .ct-row-total { background: #fef3c7; }
+        .ct-row-total .ct-item { font-weight: 800; text-transform: uppercase; letter-spacing: .02em; font-size: .8125rem; }
+        .ct-row-computed { background: #dbeafe; }
+        .ct-row-computed .ct-item { font-weight: 800; }
+        .ct-negative { color: #b91c1c !important; }
+        .ct-input {
+          width: 100%; padding: .3rem .4rem; border: 1px solid transparent;
+          background: transparent; font: inherit; color: inherit;
+          border-radius: .25rem;
+        }
+        .ct-input:focus { outline: 0; border-color: var(--primary, #1e40af); background: white; }
+        .ct-input[type="number"] { text-align: right; }
+        .ct-input-money { text-align: right; }
+        .ct-select {
+          width: 100%; padding: .3rem .4rem; border: 1px solid transparent;
+          background: transparent; font: inherit; color: inherit;
+          border-radius: .25rem;
+        }
+        .ct-select:focus { outline: 0; border-color: var(--primary, #1e40af); background: white; }
+        .ct-hint { color: #94a3b8; font-style: italic; padding-left: .4rem; }
+        .ct-ro { display: inline-block; padding: .3rem .4rem; }
+      `}</style>
+    </div>
+  );
+}
+
+// Format a derived cell value (from total / computed rows) for display.
+function formatCell(n, type) {
+  if (type === 'money') {
+    const val = Number(n) || 0;
+    return `₹ ${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
+  if (type === 'number') return String(Math.round(Number(n) || 0));
+  return String(n ?? '');
+}
+
+// Editable cell input — routes to text / number / money / status per type.
+function CellInput({ type, value, hint, readonly, onChange }) {
+  if (readonly) {
+    if (value === undefined || value === null || value === '') return <span className="ct-hint">—</span>;
+    if (type === 'money') return <span className="ct-ro">{formatCell(value, 'money')}</span>;
+    if (type === 'status') {
+      const label = { done: 'Done', pending: 'Pending', na: 'N/A' }[value] || String(value);
+      return <span className="ct-ro">{label}</span>;
+    }
+    return <span className="ct-ro">{String(value)}</span>;
+  }
+
+  if (type === 'status') {
+    return (
+      <select
+        className="ct-select"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || null)}
+      >
+        <option value="">—</option>
+        <option value="done">Done</option>
+        <option value="pending">Pending</option>
+        <option value="na">N/A</option>
+      </select>
+    );
+  }
+
+  if (type === 'money' || type === 'number') {
+    return (
+      <input
+        type="number"
+        step={type === 'money' ? '0.01' : '1'}
+        className={`ct-input ${type === 'money' ? 'ct-input-money' : ''}`}
+        value={value ?? ''}
+        placeholder={hint || ''}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (raw === '') onChange(null);
+          else onChange(Number(raw));
+        }}
+      />
+    );
+  }
+
+  // text
+  return (
+    <input
+      type="text"
+      className="ct-input"
+      value={value ?? ''}
+      placeholder={hint || ''}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  );
+}
+
+// Return the column key whose empty cell should show the row's hint. We
+// pick the first empty column so the hint isn't rendered twice; if the
+// row has no hint, the check simply returns undefined.
+function firstEmptyHintKey(row, columns) {
+  if (!row.hint) return undefined;
+  const firstText = columns.find((c) => c.type === 'text');
+  return firstText?.key;
 }
 
 function FileField({ cfg, value, onChange }) {
