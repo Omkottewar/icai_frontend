@@ -103,8 +103,13 @@ export default function QuestionRenderer({ question, value, onChange, mode = 'fi
 function Field({ question, cfg, value, onChange, readonly, tasks, onTaskAction }) {
   const set = (v) => onChange?.(v);
 
-  // Readonly display: simple text for most, chips for arrays.
-  if (readonly) {
+  // Complex composite types (table/list) render their own rich readonly
+  // view — using ReadonlyValue for them would produce "[object Object]".
+  const COMPLEX_TYPES = new Set(['checklist_table', 'task_list', 'budget_table']);
+
+  // Readonly display: simple text for most, chips for arrays. Composite
+  // types fall through so their own component can render a table view.
+  if (readonly && !COMPLEX_TYPES.has(question.type)) {
     return <ReadonlyValue type={question.type} value={value} cfg={cfg} />;
   }
 
@@ -326,46 +331,56 @@ function ChecklistTableField({ value, onChange, readonly, cfg }) {
     onChange(next);
   };
 
+  // Resolve which column a total/computed row acts on. Prefer the row's
+  // explicit `total_of`; if absent (older cloned instance configs miss it),
+  // fall back to the first money column, then the first number column.
+  // This is a self-healing shim — new templates have total_of set, but
+  // instances cloned from pre-fix templates don't.
+  const firstMoneyCol   = columns.find((c) => c.type === 'money')?.key;
+  const firstNumberCol  = columns.find((c) => c.type === 'number')?.key;
+  const effectiveTotalOf = (row) => row.total_of || firstMoneyCol || firstNumberCol || null;
+
   // ─── Compute derived cells for total / computed rows ──────────────────
-  // For each 'total' row, sum the total_of column across all 'data' rows
+  // For each 'total' row, sum its target column across all 'data' rows
   // above the total row. For each 'computed' row, evaluate the formula
   // (simple id-based math like "income - total_expenses").
   const computedByRowCol = {};
   const totalByRowCol = {};
 
   rows.forEach((row, rowIdx) => {
-    if (row.kind === 'total' && row.total_of) {
+    if (row.kind === 'total') {
+      const col = effectiveTotalOf(row);
+      if (!col) return;
       let sum = 0;
       for (let i = 0; i < rowIdx; i++) {
         const prev = rows[i];
         if ((prev.kind ?? 'data') !== 'data') continue;
-        const cell = v[prev.id]?.[row.total_of];
+        const cell = v[prev.id]?.[col];
         const n = Number(cell);
         if (Number.isFinite(n)) sum += n;
       }
       totalByRowCol[row.id] = totalByRowCol[row.id] || {};
-      totalByRowCol[row.id][row.total_of] = sum;
+      totalByRowCol[row.id][col] = sum;
     }
-    if (row.kind === 'computed' && row.formula && row.total_of) {
+    if (row.kind === 'computed' && row.formula) {
+      const col = effectiveTotalOf(row);
+      if (!col) return;
       // Formula is a whitespace-separated expression of row ids and
-      // + / - operators, e.g., "income - total_expenses". We evaluate
-      // against numeric values of the same column (row.total_of).
+      // + / - operators, e.g., "income - total_expenses". Missing / empty
+      // referenced cells default to 0 so the derived value still renders
+      // when some inputs haven't been filled yet.
       const tokens = String(row.formula).split(/\s+/).filter(Boolean);
       let acc = 0;
       let op = '+';
-      let ok = true;
       for (const tok of tokens) {
         if (tok === '+' || tok === '-') { op = tok; continue; }
-        // Lookup in stored values first, else in total row
-        const raw = v[tok]?.[row.total_of] ?? totalByRowCol[tok]?.[row.total_of];
+        const raw = v[tok]?.[col] ?? totalByRowCol[tok]?.[col];
         const n = Number(raw);
-        if (!Number.isFinite(n)) { ok = false; break; }
-        acc = op === '+' ? acc + n : acc - n;
+        const val = Number.isFinite(n) ? n : 0;
+        acc = op === '+' ? acc + val : acc - val;
       }
-      if (ok) {
-        computedByRowCol[row.id] = computedByRowCol[row.id] || {};
-        computedByRowCol[row.id][row.total_of] = acc;
-      }
+      computedByRowCol[row.id] = computedByRowCol[row.id] || {};
+      computedByRowCol[row.id][col] = acc;
     }
   });
 
@@ -395,14 +410,17 @@ function ChecklistTableField({ value, onChange, readonly, cfg }) {
                 <td className="ct-item">{row.label}</td>
                 {columns.map((col) => {
                   // Total / computed rows show derived values in the
-                  // configured column and blanks elsewhere.
+                  // configured column and blanks elsewhere. `effectiveTotalOf`
+                  // falls back to the first money column when the row's
+                  // total_of field is missing (older cloned instance configs).
+                  const activeCol = effectiveTotalOf(row);
                   if (kind === 'total') {
-                    if (col.key !== row.total_of) return <td key={col.key} className="ct-cell ct-cell-derived" />;
+                    if (col.key !== activeCol) return <td key={col.key} className="ct-cell ct-cell-derived" />;
                     const n = totalByRowCol[row.id]?.[col.key] ?? 0;
                     return <td key={col.key} className="ct-cell ct-cell-derived">{formatCell(n, col.type)}</td>;
                   }
                   if (kind === 'computed') {
-                    if (col.key !== row.total_of) return <td key={col.key} className="ct-cell ct-cell-derived" />;
+                    if (col.key !== activeCol) return <td key={col.key} className="ct-cell ct-cell-derived" />;
                     const n = computedByRowCol[row.id]?.[col.key];
                     return (
                       <td key={col.key} className={`ct-cell ct-cell-derived ${Number(n) < 0 ? 'ct-negative' : ''}`}>
@@ -462,8 +480,7 @@ function ChecklistTableField({ value, onChange, readonly, cfg }) {
           border-radius: .25rem;
         }
         .ct-input:focus { outline: 0; border-color: var(--primary, #1e40af); background: white; }
-        .ct-input[type="number"] { text-align: right; }
-        .ct-input-money { text-align: right; }
+        .ct-input[inputmode="numeric"], .ct-input-money { text-align: right; }
         .ct-select {
           width: 100%; padding: .3rem .4rem; border: 1px solid transparent;
           background: transparent; font: inherit; color: inherit;
@@ -515,17 +532,40 @@ function CellInput({ type, value, hint, readonly, onChange }) {
   }
 
   if (type === 'money' || type === 'number') {
+    // type="text" with an input filter — no browser spinner arrows on
+    // any platform. inputMode brings up the numeric keypad on mobile.
+    // Money allows a single decimal point; number is integer-only.
+    const isMoney = type === 'money';
+    const stripChars = (raw) => {
+      // Keep digits and one leading minus. Money also keeps ONE decimal
+      // point. Anything else is dropped as the user types.
+      let s = raw.replace(isMoney ? /[^\d.\-]/g : /[^\d\-]/g, '');
+      // Only ONE minus, only at position 0.
+      s = s.replace(/(?!^)-/g, '');
+      if (isMoney) {
+        // Only ONE decimal point.
+        const firstDot = s.indexOf('.');
+        if (firstDot !== -1) s = s.slice(0, firstDot + 1) + s.slice(firstDot + 1).replace(/\./g, '');
+      }
+      return s;
+    };
     return (
       <input
-        type="number"
-        step={type === 'money' ? '0.01' : '1'}
-        className={`ct-input ${type === 'money' ? 'ct-input-money' : ''}`}
+        type="text"
+        inputMode={isMoney ? 'decimal' : 'numeric'}
+        className={`ct-input ${isMoney ? 'ct-input-money' : ''}`}
         value={value ?? ''}
         placeholder={hint || ''}
         onChange={(e) => {
-          const raw = e.target.value;
-          if (raw === '') onChange(null);
-          else onChange(Number(raw));
+          const raw = stripChars(e.target.value);
+          if (raw === '' || raw === '-' || raw === '.') {
+            // Keep the transient character on-screen but don't persist
+            // an un-parseable value.
+            onChange(raw === '' ? null : raw);
+            return;
+          }
+          const n = Number(raw);
+          onChange(Number.isFinite(n) ? n : null);
         }}
       />
     );

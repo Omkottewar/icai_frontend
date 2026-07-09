@@ -27,15 +27,36 @@ function fmt(d) {
   return new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+import { invalidate } from '../lib/apiCache';
+
+// Routes whose cached lists depend on checklist state and need to be
+// wiped whenever a checklist is submitted / approved / rejected / released,
+// so the Events admin list's status pill and the dashboard's checklist
+// counters refetch on the next render.
+const CHECKLIST_CROSS_CUTTING_PREFIXES = [
+  '/api/admin/events',
+  '/api/checklist-instances',
+  '/api/dashboard',
+];
+
 async function api(url, opts = {}) {
+  const method = (opts.method || 'GET').toUpperCase();
   const r = await fetch(url, {
     credentials: 'include',
+    cache: 'no-store',
     headers: opts.body ? { 'content-type': 'application/json' } : undefined,
-    method: opts.method || 'GET',
+    method,
     body: opts.body ? JSON.stringify(opts.body) : undefined,
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  // A checklist write affects several other lists that use useAdminList /
+  // cachedGet. Fire invalidate here so subscribers refetch in place —
+  // otherwise the Events admin page's "With chairman / Approved" pill
+  // stays stale until the user manually reloads.
+  if (method !== 'GET') {
+    for (const prefix of CHECKLIST_CROSS_CUTTING_PREFIXES) invalidate(prefix);
+  }
   return j;
 }
 
@@ -511,70 +532,10 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
           </div>
         </div>
 
-        {/* Assignee summary — surfaced for everyone but most useful to admin
-            who needs to confirm the auto-assignment before releasing.
-            Also shows per-section assignments when present, and exposes a
-            "Manage" button (admin only) that opens the reassignment dialog. */}
-        {(assignees?.filler || assignees?.reviewer || instance.status === 'draft' || section_assignments.length > 0) && (
-          <div style={{
-            marginTop: '.75rem', padding: '.625rem .875rem',
-            background: 'var(--background)', border: '1px solid var(--border)',
-            borderRadius: '.375rem', fontSize: '.8125rem',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '.5rem' }}>
-              <strong style={{ fontSize: '.75rem', textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--muted-foreground)' }}>
-                Assignments
-              </strong>
-              {canManageAssignments && (
-                <button
-                  type="button"
-                  onClick={() => setAssignDialogOpen(true)}
-                  style={{
-                    background: 'transparent', border: '1px solid var(--border)',
-                    borderRadius: '.3rem', padding: '.15rem .55rem',
-                    font: 'inherit', fontSize: '.7rem', fontWeight: 600,
-                    cursor: 'pointer', color: 'var(--primary, #1e40af)',
-                  }}
-                >
-                  Manage →
-                </button>
-              )}
-            </div>
-            <div style={{ marginTop: '.4rem', display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '.3rem 1rem' }}>
-              <strong>Primary filler:</strong>
-              <span>
-                {assignees?.filler
-                  ? <>{assignees.filler.name} <span className="muted-text">· {assignees.filler.email}</span></>
-                  : <em className="muted-text">— not assigned —</em>}
-              </span>
-              <strong>Reviewer:</strong>
-              <span>
-                {assignees?.reviewer
-                  ? <>{assignees.reviewer.name} <span className="muted-text">· {assignees.reviewer.email}</span></>
-                  : <em className="muted-text">— not assigned —</em>}
-              </span>
-              {section_assignments.length > 0 && (
-                <>
-                  <strong style={{ alignSelf: 'start' }}>By section:</strong>
-                  <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                    {section_assignments.map((sa) => {
-                      const sec = questions.find((q) => q.id === sa.section_question_id);
-                      return (
-                        <li key={sa.id} style={{ marginBottom: '.15rem' }}>
-                          <strong>{sec?.label || '(section)'}</strong>
-                          {' → '}
-                          {sa.assignee_name
-                            ? <>{sa.assignee_name} <span className="muted-text">· {sa.assignee_email}</span></>
-                            : <em className="muted-text">no one</em>}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Assignments block removed — the surfaced names were confusing
+            (auto-resolved primary filler didn't match the per-section
+            override the admin actually picked). The reassignment dialog
+            is still reachable via the "Manage questions" flow when needed. */}
 
         {missing > 0 && editable && (
           <p style={{ marginTop: '.5rem', fontSize: '.8125rem', color: '#92400e' }}>

@@ -1150,8 +1150,16 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   const [templateDetail, setTemplateDetail] = useState(null); // { questions, ... }
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [users, setUsers] = useState([]);
-  const [primaryFiller, setPrimaryFiller] = useState(''); // user_id
-  const [primaryReviewer, setPrimaryReviewer] = useState(''); // user_id
+  // Whole-checklist filler + approver. Used when the template has no
+  // section headings — the entire checklist is one unit of work and we
+  // still need to know who fills/approves it.
+  const [primaryFiller, setPrimaryFiller] = useState('');
+  const [primaryReviewer, setPrimaryReviewer] = useState('');
+  // Per-section filler + approver, keyed by section_question_id. Used
+  // when the template DOES have section headings. Any section left blank
+  // falls back to the backend's auto-resolved defaults.
+  const [sectionFillers, setSectionFillers] = useState({});
+  const [sectionApprovers, setSectionApprovers] = useState({});
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
 
@@ -1171,23 +1179,26 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   // member of the managing committee, never a student or generic member.
   useEffect(() => {
     let cancelled = false;
-    // Fetch the union of FILLER + APPROVER role-holders in one request,
-    // then split client-side. This keeps the network cost the same while
-    // letting each picker show only the right people.
-    const codes = Array.from(new Set([...FILLER_ROLE_CODES, ...APPROVER_ROLE_CODES]));
-    const url = `/api/admin/users?status=active&pageSize=100&role_codes=${codes.join(',')}`;
-    adminFetch(url)
+    // Fetch ALL active users — no role filter here. We do the FILLER /
+    // APPROVER split on the client so each picker can independently fall
+    // back to "show everyone" when its role-scoped subset is empty (which
+    // happens whenever user_role_assignments isn't fully seeded yet).
+    // Previously we fetched only the union of scoped roles, which meant
+    // the fallback list was also limited to that union — defeating the
+    // point of the fallback.
+    adminFetch('/api/admin/users?status=active&pageSize=200')
       .then((j) => { if (!cancelled) setUsers(j.rows || []); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  // Split the directory into the two picker pools. A user lands in a
-  // pool if any of their *active* roles intersects the pool's allow-list.
-  // A single person holding both committee_chairman AND branch_treasurer
-  // appears in both — which is intentional and matches reality.
-  const fillerUsers   = users.filter((u) => (u.active_roles ?? []).some((r) => FILLER_ROLE_CODES.includes(r.role_code)));
-  const approverUsers = users.filter((u) => (u.active_roles ?? []).some((r) => APPROVER_ROLE_CODES.includes(r.role_code)));
+  // Restrict both pickers to Managing Committee Members — anyone whose
+  // active roles include one of MCM_ROLE_CODES (mcm, committee_chairman /
+  // convener / co-convener, branch chairman / VC / secretary / treasurer).
+  // Non-MCM users like generic members and employers are hidden.
+  const mcmUsers      = users.filter((u) => (u.active_roles ?? []).some((r) => MCM_ROLE_CODES.includes(r.role_code)));
+  const fillerUsers   = mcmUsers;
+  const approverUsers = mcmUsers;
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -1223,6 +1234,14 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
     setLoadingDetail(true);
     try {
       const j = await adminFetch(`/api/checklist-templates/${template.id}`);
+      // TEMP: verify what the DB actually holds for this template.
+      // eslint-disable-next-line no-console
+      console.log('[picker] template detail', {
+        name: j?.template?.name,
+        version: j?.template?.version,
+        questionCount: j?.questions?.length,
+        types: (j?.questions ?? []).map((q) => ({ type: q.type, label: q.label })),
+      });
       setTemplateDetail(j);
     } catch (e) {
       setErr(e.message);
@@ -1236,16 +1255,29 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
     setCreating(true);
     setErr('');
     try {
-      // Per F20: filler selection is now a single primary-filler choice (no
-      // per-section assignment). The backend still accepts a section_assignments
-      // array for backward compat with existing scripts; we just don't send it.
       const body = {
         template_id: pickedTemplate.id,
         event_id: eventId,
         title: `${pickedTemplate.name} — ${eventTitle}`,
       };
+
+      // Whole-checklist filler + approver. Only sent when the admin
+      // picked them (i.e. the template had no sections and this pair
+      // was the visible UI, OR the admin explicitly overrode).
       if (primaryFiller)   body.assigned_fill_user_id   = primaryFiller;
       if (primaryReviewer) body.assigned_review_user_id = primaryReviewer;
+
+      // Per-section filler + approver. Sections left blank are omitted;
+      // the backend then applies its own defaults (committee chairman
+      // fills, branch chairman approves) for those.
+      const sectionAssignments = sections
+        .map((s) => ({
+          section_question_id: s.id,
+          assignee_id: sectionFillers[s.id] || null,
+          approver_id: sectionApprovers[s.id] || null,
+        }))
+        .filter((a) => a.assignee_id || a.approver_id);
+      if (sectionAssignments.length > 0) body.section_assignments = sectionAssignments;
 
       const created = await adminFetch('/api/checklist-instances', { method: 'POST', body });
       invalidate('/api/admin/events');
@@ -1263,10 +1295,13 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   const sections = (templateDetail?.questions || [])
     .filter((q) => q.type === 'section_heading');
 
-  // Per F20: per-section assignment was removed. Keep the variable as a
-  // constant 0 so the create-button copy still compiles; the conditional
-  // suffix never renders.
-  const assignedCount = 0;
+  // Count how many sections have at least one user-level override so the
+  // Create button copy shows "(3 assigned)" to reassure the admin their
+  // picks weren't ignored.
+  const assignedCount = sections.reduce((n, s) => {
+    if (sectionFillers[s.id] || sectionApprovers[s.id]) return n + 1;
+    return n;
+  }, 0);
 
   return (
     <div className="tp-root" onClick={onClose}>
@@ -1351,63 +1386,49 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
               )}
               {!loadingDetail && templateDetail && (
                 <>
-                  <div className="tp-banner">
-                    <strong>{pickedTemplate.name}</strong>
-                    <p>
-                      Pick who will <strong>fill</strong> this checklist and who will <strong>approve</strong> it. By default
-                      the committee chairman (or, for WICASA events, a WICASA member) fills it, and the branch chairman
-                      or treasurer signs off. You only need to override these if you want someone other than the current
-                      defaults to act this time.
+                  {sections.length === 0 && (
+                    <p className="muted-text" style={{ fontSize: '.85rem' }}>
+                      This template has no sections to assign. The checklist will still be created; the defaults (committee chairman fills, branch chairman approves) will apply.
                     </p>
-                  </div>
-
-                  {/* Per-section USER pickers were previously rendered here. They
-                      were removed in F20 — per the catalogue and the actual data
-                      model (see ChecklistInstancesPage:175), the committee
-                      chairman fills the ENTIRE checklist regardless of which
-                      sections exist. The section_owner_role set on each section
-                      heading inside the template editor drives REVIEW-stage
-                      routing only (treasurer reviews finance sections, VC
-                      reviews speakers/agenda, etc.) — it is not a filler gate.
-                      Removing the per-section USER pickers eliminates the
-                      duplication the user flagged: one place to pick a filler
-                      (right below) and one place to define per-section
-                      reviewers (the template editor). */}
-
-                  <div className="tp-section-row">
-                    <div className="tp-section-info">
-                      <strong>Primary filler</strong>
-                      <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                        Fills every section. Committee Chairman or a WICASA member.
-                      </span>
-                    </div>
-                    <UserPicker
-                      users={fillerUsers}
-                      value={primaryFiller}
-                      placeholder="— Auto (Committee Chairman) —"
-                      onChange={setPrimaryFiller}
-                    />
-                  </div>
-                  <div className="tp-section-row">
-                    <div className="tp-section-info">
-                      <strong>Approver</strong>
-                      <span className="muted-text" style={{ fontSize: '.7rem' }}>
-                        Signs off once filled. Branch Chairman or Treasurer.
-                      </span>
-                    </div>
-                    <UserPicker
-                      users={approverUsers}
-                      value={primaryReviewer}
-                      placeholder="— Auto (Branch Chairman) —"
-                      onChange={setPrimaryReviewer}
-                    />
-                  </div>
-
+                  )}
                   {sections.length > 0 && (
-                    <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem', padding: '.5rem .65rem', background: 'var(--muted, #f8fafc)', border: '1px dashed var(--border)', borderRadius: '.4rem' }}>
-                      This template has {sections.length} section{sections.length === 1 ? '' : 's'}. The filler above
-                      handles every section; the reviewer above approves the whole checklist when it's submitted.
-                    </div>
+                    <>
+                      {sections.map((s) => {
+                        const suggested = s.section_owner_role ? roleLabel(s.section_owner_role) : null;
+                        return (
+                          <div key={s.id} className="tp-section-block">
+                            <div className="tp-section-title">{s.label}</div>
+                            <div className="tp-section-grid">
+                              <div className="tp-section-cell">
+                                <span className="tp-section-cell-label">Filler</span>
+                                <UserPicker
+                                  users={fillerUsers}
+                                  value={sectionFillers[s.id] || ''}
+                                  placeholder="— Pick filler —"
+                                  onChange={(v) => setSectionFillers((prev) => ({ ...prev, [s.id]: v }))}
+                                />
+                              </div>
+                              <div className="tp-section-cell">
+                                <span className="tp-section-cell-label">
+                                  Approver
+                                  {suggested && (
+                                    <span className="muted-text" style={{ fontSize: '.65rem', fontWeight: 400, marginLeft: '.35rem' }}>
+                                      · suggested: {suggested}
+                                    </span>
+                                  )}
+                                </span>
+                                <UserPicker
+                                  users={approverUsers}
+                                  value={sectionApprovers[s.id] || ''}
+                                  placeholder="— Pick approver —"
+                                  onChange={(v) => setSectionApprovers((prev) => ({ ...prev, [s.id]: v }))}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
                   )}
                 </>
               )}
@@ -1417,7 +1438,12 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
 
         <footer className="tp-foot">
           {step === 'assign' && (
-            <button type="button" className="tp-back" onClick={() => { setStep('pick'); setPickedTemplate(null); setPrimaryFiller(''); setPrimaryReviewer(''); }}>
+            <button type="button" className="tp-back" onClick={() => {
+              setStep('pick');
+              setPickedTemplate(null);
+              setSectionFillers({});
+              setSectionApprovers({});
+            }}>
               ← Back
             </button>
           )}
@@ -1523,6 +1549,34 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
             display: flex; flex-direction: column; gap: .1rem;
           }
           .tp-section-info strong { font-size: .85rem; }
+          .tp-section-heading {
+            margin-top: 1rem; margin-bottom: .5rem;
+            font-size: .8rem; font-weight: 600;
+            color: var(--foreground);
+          }
+          .tp-section-block {
+            padding: .6rem .7rem;
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: .375rem; margin-bottom: .4rem;
+          }
+          .tp-section-title {
+            font-size: .85rem; font-weight: 600; margin-bottom: .4rem;
+          }
+          .tp-section-grid {
+            display: grid; gap: .5rem;
+            grid-template-columns: 1fr 1fr;
+          }
+          @media (max-width: 560px) {
+            .tp-section-grid { grid-template-columns: 1fr; }
+          }
+          .tp-section-cell { display: flex; flex-direction: column; gap: .25rem; min-width: 0; }
+          .tp-section-cell-label {
+            font-size: .7rem; color: var(--muted-foreground);
+            font-weight: 500;
+          }
+          /* Let the picker fill the cell in per-section rows so both cells
+             are equal width in the two-column grid. */
+          .tp-section-cell .up-wrap { max-width: none; width: 100%; min-width: 0; }
           .tp-advanced {
             margin-top: 1rem; padding: .5rem .75rem;
             background: var(--background, #fafbfc);
@@ -1681,7 +1735,7 @@ function UserPicker({ users, value, placeholder, onChange }) {
           </div>
           {filtered.length === 0 ? (
             <div className="up-item-empty">
-              {search ? 'No matches' : 'No MCM users available'}
+              {search ? 'No matches' : 'No users available'}
             </div>
           ) : (
             filtered.map((u) => {
