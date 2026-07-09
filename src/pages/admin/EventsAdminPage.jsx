@@ -1153,12 +1153,15 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   // Whole-checklist filler + approver. Used when the template has no
   // section headings — the entire checklist is one unit of work and we
   // still need to know who fills/approves it.
+  // ONE filler for the whole checklist (branch model: one committee
+  // chairman fills, multiple approvers may review different sections).
   const [primaryFiller, setPrimaryFiller] = useState('');
+  // Optional whole-checklist fallback reviewer. Used when a section has
+  // no per-section approver assigned — that section's sign-off falls
+  // back to this person.
   const [primaryReviewer, setPrimaryReviewer] = useState('');
-  // Per-section filler + approver, keyed by section_question_id. Used
-  // when the template DOES have section headings. Any section left blank
-  // falls back to the backend's auto-resolved defaults.
-  const [sectionFillers, setSectionFillers] = useState({});
+  // Per-section approver, keyed by section_question_id. Non-blank entries
+  // override the fallback reviewer for that section.
   const [sectionApprovers, setSectionApprovers] = useState({});
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
@@ -1261,22 +1264,21 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
         title: `${pickedTemplate.name} — ${eventTitle}`,
       };
 
-      // Whole-checklist filler + approver. Only sent when the admin
-      // picked them (i.e. the template had no sections and this pair
-      // was the visible UI, OR the admin explicitly overrode).
+      // One primary filler for the entire checklist. The fallback
+      // reviewer applies to any section that doesn't have its own per-
+      // section approver picked.
       if (primaryFiller)   body.assigned_fill_user_id   = primaryFiller;
       if (primaryReviewer) body.assigned_review_user_id = primaryReviewer;
 
-      // Per-section filler + approver. Sections left blank are omitted;
-      // the backend then applies its own defaults (committee chairman
-      // fills, branch chairman approves) for those.
+      // Per-section approvers only — filler is unified now. Sections left
+      // blank fall through to the fallback reviewer (or the auto-resolved
+      // default when that's also blank).
       const sectionAssignments = sections
         .map((s) => ({
           section_question_id: s.id,
-          assignee_id: sectionFillers[s.id] || null,
           approver_id: sectionApprovers[s.id] || null,
         }))
-        .filter((a) => a.assignee_id || a.approver_id);
+        .filter((a) => a.approver_id);
       if (sectionAssignments.length > 0) body.section_assignments = sectionAssignments;
 
       const created = await adminFetch('/api/checklist-instances', { method: 'POST', body });
@@ -1295,13 +1297,12 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
   const sections = (templateDetail?.questions || [])
     .filter((q) => q.type === 'section_heading');
 
-  // Count how many sections have at least one user-level override so the
-  // Create button copy shows "(3 assigned)" to reassure the admin their
-  // picks weren't ignored.
-  const assignedCount = sections.reduce((n, s) => {
-    if (sectionFillers[s.id] || sectionApprovers[s.id]) return n + 1;
-    return n;
-  }, 0);
+  // Count how many section-level approver overrides are set — shown in
+  // the button copy so the admin can confirm their picks landed.
+  const assignedCount = sections.reduce(
+    (n, s) => n + (sectionApprovers[s.id] ? 1 : 0),
+    0,
+  );
 
   return (
     <div className="tp-root" onClick={onClose}>
@@ -1386,48 +1387,82 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
               )}
               {!loadingDetail && templateDetail && (
                 <>
-                  {sections.length === 0 && (
-                    <p className="muted-text" style={{ fontSize: '.85rem' }}>
-                      This template has no sections to assign. The checklist will still be created; the defaults (committee chairman fills, branch chairman approves) will apply.
+                  {/* ─── Single filler for the whole checklist ─── */}
+                  <div className="tp-section-block">
+                    <div className="tp-section-title">Filler</div>
+                    <p className="muted-text" style={{ fontSize: '.72rem', margin: '0 0 .35rem' }}>
+                      One person fills the entire checklist.
                     </p>
+                    <UserPicker
+                      users={fillerUsers}
+                      value={primaryFiller}
+                      placeholder="— Pick filler —"
+                      onChange={setPrimaryFiller}
+                    />
+                  </div>
+
+                  {sections.length === 0 && (
+                    <div className="tp-section-block">
+                      <div className="tp-section-title">Approver</div>
+                      <p className="muted-text" style={{ fontSize: '.72rem', margin: '0 0 .35rem' }}>
+                        Approves the whole checklist once filled.
+                      </p>
+                      <UserPicker
+                        users={approverUsers}
+                        value={primaryReviewer}
+                        placeholder="— Pick approver —"
+                        onChange={setPrimaryReviewer}
+                      />
+                    </div>
                   )}
+
                   {sections.length > 0 && (
                     <>
+                      <div className="tp-section-title" style={{ marginTop: '.75rem' }}>
+                        Approvers by section
+                      </div>
+                      <p className="muted-text" style={{ fontSize: '.72rem', margin: '0 0 .35rem' }}>
+                        Pick who approves each section. Leave blank to use the fallback approver at the bottom.
+                      </p>
                       {sections.map((s) => {
                         const suggested = s.section_owner_role ? roleLabel(s.section_owner_role) : null;
                         return (
                           <div key={s.id} className="tp-section-block">
                             <div className="tp-section-title">{s.label}</div>
-                            <div className="tp-section-grid">
-                              <div className="tp-section-cell">
-                                <span className="tp-section-cell-label">Filler</span>
-                                <UserPicker
-                                  users={fillerUsers}
-                                  value={sectionFillers[s.id] || ''}
-                                  placeholder="— Pick filler —"
-                                  onChange={(v) => setSectionFillers((prev) => ({ ...prev, [s.id]: v }))}
-                                />
-                              </div>
-                              <div className="tp-section-cell">
-                                <span className="tp-section-cell-label">
-                                  Approver
-                                  {suggested && (
-                                    <span className="muted-text" style={{ fontSize: '.65rem', fontWeight: 400, marginLeft: '.35rem' }}>
-                                      · suggested: {suggested}
-                                    </span>
-                                  )}
-                                </span>
-                                <UserPicker
-                                  users={approverUsers}
-                                  value={sectionApprovers[s.id] || ''}
-                                  placeholder="— Pick approver —"
-                                  onChange={(v) => setSectionApprovers((prev) => ({ ...prev, [s.id]: v }))}
-                                />
-                              </div>
+                            <div className="tp-section-cell">
+                              <span className="tp-section-cell-label">
+                                Approver
+                                {suggested && (
+                                  <span className="muted-text" style={{ fontSize: '.65rem', fontWeight: 400, marginLeft: '.35rem' }}>
+                                    · suggested: {suggested}
+                                  </span>
+                                )}
+                              </span>
+                              <UserPicker
+                                users={approverUsers}
+                                value={sectionApprovers[s.id] || ''}
+                                placeholder="— Fallback approver —"
+                                onChange={(v) => setSectionApprovers((prev) => ({ ...prev, [s.id]: v }))}
+                              />
                             </div>
                           </div>
                         );
                       })}
+
+                      {/* Fallback whole-checklist approver — kicks in for any
+                          section that doesn't have its own approver above. */}
+                      <div className="tp-section-block">
+                        <div className="tp-section-title">Fallback approver</div>
+                        <p className="muted-text" style={{ fontSize: '.72rem', margin: '0 0 .35rem' }}>
+                          Approves any section left blank above. Optional — the branch chairman is used automatically if you skip this.
+                        </p>
+                        <UserPicker
+                          users={approverUsers}
+                          value={primaryReviewer}
+                          placeholder="— Auto (Branch Chairman) —"
+                          onChange={setPrimaryReviewer}
+                        />
+                      </div>
                     </>
                   )}
                 </>
@@ -1441,7 +1476,8 @@ function TemplatePickerModal({ eventId, eventTitle, onClose, onCreated, showToas
             <button type="button" className="tp-back" onClick={() => {
               setStep('pick');
               setPickedTemplate(null);
-              setSectionFillers({});
+              setPrimaryFiller('');
+              setPrimaryReviewer('');
               setSectionApprovers({});
             }}>
               ← Back
@@ -1669,10 +1705,17 @@ function UserPicker({ users, value, placeholder, onChange }) {
   useEffect(() => {
     if (open) {
       setSearch('');
+      // TEMP diagnostic — verify each picker has the same users array.
+      // eslint-disable-next-line no-console
+      console.log('[UserPicker] opened', {
+        placeholder,
+        usersLen: Array.isArray(users) ? users.length : 'not-array',
+        sampleName: users?.[0]?.name,
+      });
       // Defer to give the input a chance to mount.
       setTimeout(() => searchRef.current?.focus(), 0);
     }
-  }, [open]);
+  }, [open, users, placeholder]);
 
   const picked = value ? users.find((u) => u.id === value) : null;
   const label = picked ? `${picked.name}` : placeholder;
@@ -1711,6 +1754,7 @@ function UserPicker({ users, value, placeholder, onChange }) {
         align="stretch"
         minWidth={280}
         maxHeight={320}
+        zIndex={2500}
         className="up-menu"
       >
         <div role="menu">

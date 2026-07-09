@@ -500,7 +500,34 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
     finally { setBusy(false); }
   };
 
-  const missing = questions.filter((q) => q.required && q.type !== 'section_heading' && !hasAnswer(q.type, draft[q.id])).length;
+  // Scope the "N required still missing" counter to what THIS user can
+  // actually fill — so a section-only filler doesn't see other people's
+  // sections in their reminder header. Mirrors the backend's submit gate.
+  const missingSectionOf = (() => {
+    const m = new Map();
+    let cur = null;
+    for (const q of sortedQuestions) {
+      if (q.type === 'section_heading') { cur = q.id; m.set(q.id, q.id); }
+      else m.set(q.id, cur);
+    }
+    return m;
+  })();
+  const myFillSet = new Set(perms.mySectionIds || []);
+  const lockedSet = new Set(perms.lockedSectionIds || []);
+  const questionCountsForMe = (q) => {
+    if (q.type === 'section_heading') return false;
+    if (!q.required) return false;
+    const sec = missingSectionOf.get(q.id);
+    if (perms.canFill) {
+      // Primary — everything except sections locked to someone else.
+      if (sec && lockedSet.has(sec) && !myFillSet.has(sec)) return false;
+      return true;
+    }
+    // Section-only filler — only their sections.
+    if (!sec) return false;
+    return myFillSet.has(sec);
+  };
+  const missing = questions.filter((q) => questionCountsForMe(q) && !hasAnswer(q.type, draft[q.id])).length;
 
   return (
     <FullDrawer onClose={onClose}>
@@ -609,11 +636,26 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
                    && (myRoles.has('admin') || myRoles.has(s.required_role_code)),
           );
 
+          // Determine whether THIS section is fill-locked for the current
+          // user. Backend now enforces per-section ownership:
+          //   • sectionId is in mySectionIds → the current user OWNS it
+          //   • sectionId is in lockedSectionIds and NOT in mySectionIds →
+          //     it's been assigned to somebody else; read-only for me
+          //   • sectionId is in neither → free-for-all; primary can fill
+          const sectionId = group.heading?.id ?? null;
+          const myFillerSections = new Set(perms.mySectionIds || []);
+          const lockedSections   = new Set(perms.lockedSectionIds || []);
+          const lockedForMe = !!sectionId
+            && lockedSections.has(sectionId)
+            && !myFillerSections.has(sectionId);
+          // Section-only fillers can only edit their own sections; anything
+          // else in the doc reads read-only for them.
+          const sectionOnly = perms.canFillSections && !perms.canFill;
+          const sectionAllowed = !sectionOnly
+            || (sectionId && myFillerSections.has(sectionId));
+
           const body = group.questions.map((q) => {
-            // Fill rights now belong wholly to the filler — no per-section
-            // gate. Read-only only when the page is in non-fill mode at all
-            // (e.g. status='awaiting_review' or 'approved').
-            const showAsReadonly = !editable;
+            const showAsReadonly = !editable || lockedForMe || !sectionAllowed;
             return (
               <QuestionRenderer
                 key={q.id}

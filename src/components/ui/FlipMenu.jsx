@@ -53,11 +53,18 @@ export default function FlipMenu({
   const recompute = useCallback(() => {
     const trigger = triggerRef?.current;
     const menu    = menuRef.current;
-    if (!trigger || !menu) return;
+    if (!trigger || !menu) {
+      // eslint-disable-next-line no-console
+      if (typeof window !== 'undefined' && window.__FLIPMENU_DEBUG__) console.log('[FlipMenu] recompute early-return', { hasTrigger: !!trigger, hasMenu: !!menu });
+      return;
+    }
 
     const t  = trigger.getBoundingClientRect();
-    const mh = menu.offsetHeight;
-    const mw = menu.offsetWidth;
+    // Raw DOM height — the menu may render taller than the effective
+    // maxHeight until we cap it. Use the RAW height only for the flip
+    // decision; use the CAPPED height for the actual top-position math.
+    const rawMh = menu.offsetHeight;
+    const mw    = menu.offsetWidth;
 
     const vh = window.innerHeight;
     const vw = window.innerWidth;
@@ -66,11 +73,20 @@ export default function FlipMenu({
     const roomAbove = t.top - VIEWPORT_PADDING;
     // Open below by default. Flip above only when there isn't enough
     // room below AND above has more.
-    const placement = (mh + offset > roomBelow && roomAbove > roomBelow) ? 'top' : 'bottom';
+    const placement = (rawMh + offset > roomBelow && roomAbove > roomBelow) ? 'top' : 'bottom';
+
+    // Height we'll actually give the menu after clamping (the caller's
+    // maxHeight cap AND the available room on the chosen side). We must
+    // position AS IF the menu is this tall — otherwise a very long unclipped
+    // menu (e.g. 30+ items) pushes `top` far above the viewport.
+    const clampCap = placement === 'bottom'
+      ? Math.max(120, roomBelow)
+      : Math.max(120, roomAbove);
+    const effectiveMh = Math.min(rawMh, maxHeight ?? Infinity, clampCap);
 
     const top = placement === 'bottom'
       ? t.bottom + offset
-      : t.top    - offset - mh;
+      : t.top    - offset - effectiveMh;
 
     let left;
     let width;
@@ -88,10 +104,21 @@ export default function FlipMenu({
     if (left + mw > vw - VIEWPORT_PADDING) left = vw - mw - VIEWPORT_PADDING;
     if (left < VIEWPORT_PADDING)            left = VIEWPORT_PADDING;
 
-    const cap = placement === 'bottom'
-      ? Math.max(120, roomBelow)
-      : Math.max(120, roomAbove);
-    const effectiveMaxHeight = Math.min(maxHeight ?? Infinity, cap);
+    // Effective max-height that gets applied to the menu's style. Reuses the
+    // same clampCap we computed above so positioning and visible height stay
+    // in sync.
+    const effectiveMaxHeight = Math.min(maxHeight ?? Infinity, clampCap);
+
+    // TEMP diagnostic — flip on with `window.__FLIPMENU_DEBUG__ = true`.
+    // eslint-disable-next-line no-console
+    if (typeof window !== 'undefined' && window.__FLIPMENU_DEBUG__) console.log('[FlipMenu] positioned', {
+      triggerRect: { top: t.top, bottom: t.bottom, left: t.left, width: t.width },
+      menuSize: { mh, mw },
+      viewport: { vh, vw },
+      rooms: { roomBelow, roomAbove },
+      placement,
+      finalPos: { top, left, width, maxHeight: effectiveMaxHeight },
+    });
 
     setPos({ top, left, width, placement, maxHeight: effectiveMaxHeight });
   }, [triggerRef, align, offset, maxHeight]);

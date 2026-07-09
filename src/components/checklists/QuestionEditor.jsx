@@ -440,11 +440,19 @@ function OptionsEditor({ cfg, onPatchConfig }) {
 }
 
 // ─── ChecklistTableEditor ────────────────────────────────────────────────
-// Inline editor for the checklist_table question type. Two lists:
-//   1) Columns — key + label + type (text | number | money | status)
-//   2) Rows    — id + label + kind (data | total | computed) + hint / formula
-// Both support add / delete / reorder / edit. IDs / keys are auto-slugged
-// from labels the same way OptionsEditor derives its option values.
+// Spreadsheet-style editor. The whole table is visible at once: column
+// headers along the top (label + Text/Number toggle + delete), row labels
+// down the left, empty cells in the middle (values are entered when the
+// checklist is USED, not when it's designed).
+//
+// Two column types only — Text and Number. Any existing 'money' or 'status'
+// column in a legacy config is treated as Number (for the editor UI); the
+// underlying stored type is preserved unless the admin changes it, so
+// pre-seeded templates like Draft Budget don't lose their ₹ formatting.
+//
+// Total / computed rows from legacy seeds are displayed with a small
+// "auto" badge; their label can still be renamed but the derivation
+// (kind / total_of / formula) is preserved as-is.
 function ChecklistTableEditor({ cfg, onPatchConfig }) {
   const columns = Array.isArray(cfg.columns) ? cfg.columns : [];
   const rows    = Array.isArray(cfg.rows)    ? cfg.rows    : [];
@@ -457,12 +465,11 @@ function ChecklistTableEditor({ cfg, onPatchConfig }) {
     return `${base}_${i}`;
   };
 
-  // ─── Column mutations ─────
+  // Column mutations
   const patchColumn = (i, patch) => {
     const next = columns.map((c, idx) => {
       if (idx !== i) return c;
       const merged = { ...c, ...patch };
-      // Auto-derive key if label changed and key wasn't hand-edited.
       if ('label' in patch) {
         const others = columns.filter((_, j) => j !== i).map((c2) => c2.key);
         merged.key = slug(merged.label, others);
@@ -477,15 +484,8 @@ function ChecklistTableEditor({ cfg, onPatchConfig }) {
     const others = columns.map((c) => c.key);
     onPatchConfig({ columns: [...columns, { key: slug(label, others), label, type: 'text' }] });
   };
-  const moveColumn = (i, dir) => {
-    const j = i + dir;
-    if (j < 0 || j >= columns.length) return;
-    const next = columns.slice();
-    [next[i], next[j]] = [next[j], next[i]];
-    onPatchConfig({ columns: next });
-  };
 
-  // ─── Row mutations ─────
+  // Row mutations
   const patchRow = (i, patch) => {
     const next = rows.map((r, idx) => {
       if (idx !== i) return r;
@@ -504,219 +504,237 @@ function ChecklistTableEditor({ cfg, onPatchConfig }) {
     const others = rows.map((r) => r.id);
     onPatchConfig({ rows: [...rows, { id: slug(label, others), label, kind: 'data' }] });
   };
-  const moveRow = (i, dir) => {
-    const j = i + dir;
-    if (j < 0 || j >= rows.length) return;
-    const next = rows.slice();
-    [next[i], next[j]] = [next[j], next[i]];
-    onPatchConfig({ rows: next });
-  };
 
-  // Money / number columns available as `total_of` targets for total /
-  // computed rows. Text / status columns don't make sense to sum.
-  const summableCols = columns.filter((c) => c.type === 'money' || c.type === 'number');
+  // Editor collapses legacy money/status to "number" for the type dropdown.
+  const editorType = (c) => (c.type === 'text' ? 'text' : 'number');
+
+  if (columns.length === 0 && rows.length === 0) {
+    return (
+      <div className="ct-ed-empty-wrap">
+        <p className="ct-ed-empty-hint">
+          Start by adding your first column and row. Column headers are like Excel: type "Item", "Quantity", "Person". Rows are the items to check off.
+        </p>
+        <div style={{ display: 'flex', gap: '.5rem' }}>
+          <button type="button" onClick={addColumn} className="ct-ed-add">+ First column</button>
+          <button type="button" onClick={addRow} className="ct-ed-add" disabled={columns.length === 0}>+ First row</button>
+        </div>
+        <style>{`
+          .ct-ed-empty-wrap {
+            margin-top: .5rem; padding: 1rem;
+            background: var(--muted, #f8fafc); border: 1px dashed var(--border);
+            border-radius: .4rem; display: flex; flex-direction: column; gap: .75rem;
+          }
+          .ct-ed-empty-hint { font-size: .85rem; color: var(--muted-foreground); margin: 0; }
+          .ct-ed-add {
+            padding: .35rem .7rem; font-size: .8rem; font-weight: 600;
+            border: 1px solid var(--border); border-radius: .3rem;
+            background: var(--card); cursor: pointer;
+          }
+          .ct-ed-add:disabled { opacity: .5; cursor: not-allowed; }
+        `}</style>
+      </div>
+    );
+  }
 
   return (
-    <div className="ct-ed">
-      {/* ─── Columns ─── */}
-      <div className="ct-ed-section">
-        <label className="ct-ed-head">Columns</label>
-        {columns.length === 0 && (
-          <div className="ct-ed-empty">No columns yet — add one below.</div>
-        )}
-        {columns.map((c, i) => (
-          <div key={i} className="ct-ed-row">
-            <span className="ct-ed-bullet">{i + 1}.</span>
-            <input
-              type="text" className="qe-input ct-ed-label"
-              value={c.label || ''}
-              placeholder="Column label"
-              onChange={(e) => patchColumn(i, { label: e.target.value })}
-            />
-            <select
-              className="qe-input ct-ed-select"
-              value={c.type || 'text'}
-              onChange={(e) => patchColumn(i, { type: e.target.value })}
-            >
-              <option value="text">Text</option>
-              <option value="number">Number</option>
-              <option value="money">Money (₹)</option>
-              <option value="status">Status (Done / Pending / N/A)</option>
-            </select>
-            <button type="button" className="ct-ed-move" onClick={() => moveColumn(i, -1)} disabled={i === 0} title="Move up">↑</button>
-            <button type="button" className="ct-ed-move" onClick={() => moveColumn(i, 1)} disabled={i === columns.length - 1} title="Move down">↓</button>
-            <button type="button" className="ct-ed-remove" onClick={() => removeColumn(i)} title="Remove column">
-              <IconTrash size="sm" />
-            </button>
-          </div>
-        ))}
-        <button type="button" onClick={addColumn} className="ct-ed-add">+ Add column</button>
-      </div>
-
-      {/* ─── Rows ─── */}
-      <div className="ct-ed-section">
-        <label className="ct-ed-head">Rows</label>
-        {rows.length === 0 && (
-          <div className="ct-ed-empty">No rows yet — add one below.</div>
-        )}
-        {rows.map((r, i) => {
-          const kind = r.kind || 'data';
-          return (
-            <div key={i} className="ct-ed-row-block">
-              <div className="ct-ed-row">
-                <span className="ct-ed-bullet">{i + 1}.</span>
-                <input
-                  type="text" className="qe-input ct-ed-label"
-                  value={r.label || ''}
-                  placeholder="Row label"
-                  onChange={(e) => patchRow(i, { label: e.target.value })}
-                />
-                <select
-                  className="qe-input ct-ed-select"
-                  value={kind}
-                  onChange={(e) => patchRow(i, { kind: e.target.value })}
-                >
-                  <option value="data">Data</option>
-                  <option value="total">Total (auto-sum)</option>
-                  <option value="computed">Computed (formula)</option>
-                </select>
-                <button type="button" className="ct-ed-move" onClick={() => moveRow(i, -1)} disabled={i === 0} title="Move up">↑</button>
-                <button type="button" className="ct-ed-move" onClick={() => moveRow(i, 1)} disabled={i === rows.length - 1} title="Move down">↓</button>
-                <button type="button" className="ct-ed-remove" onClick={() => removeRow(i)} title="Remove row">
-                  <IconTrash size="sm" />
-                </button>
-              </div>
-              {kind === 'data' && (
-                <input
-                  type="text" className="qe-input ct-ed-hint"
-                  value={r.hint || ''}
-                  placeholder="Optional hint (e.g. '6 Box', '50', '2 cordless + 1 collar mike')"
-                  onChange={(e) => patchRow(i, { hint: e.target.value })}
-                />
-              )}
-              {kind === 'total' && (
-                <div className="ct-ed-detail">
-                  <label className="ct-ed-detail-lbl">Sum column:</label>
-                  <select
-                    className="qe-input ct-ed-select-narrow"
-                    value={r.total_of || ''}
-                    onChange={(e) => patchRow(i, { total_of: e.target.value })}
-                  >
-                    <option value="">— pick a column —</option>
-                    {summableCols.map((c) => (
-                      <option key={c.key} value={c.key}>{c.label}</option>
-                    ))}
-                  </select>
-                  {summableCols.length === 0 && (
-                    <span className="ct-ed-warn">Add a Money or Number column first.</span>
-                  )}
-                </div>
-              )}
-              {kind === 'computed' && (
-                <>
-                  <div className="ct-ed-detail">
-                    <label className="ct-ed-detail-lbl">Result column:</label>
-                    <select
-                      className="qe-input ct-ed-select-narrow"
-                      value={r.total_of || ''}
-                      onChange={(e) => patchRow(i, { total_of: e.target.value })}
-                    >
-                      <option value="">— pick a column —</option>
-                      {summableCols.map((c) => (
-                        <option key={c.key} value={c.key}>{c.label}</option>
-                      ))}
-                    </select>
-                  </div>
+    <div className="ct-ed-grid-wrap">
+      <table className="ct-ed-grid">
+        <thead>
+          <tr>
+            {/* Empty top-left corner cell */}
+            <th className="ct-ed-corner"></th>
+            {columns.map((c, i) => (
+              <th key={i} className="ct-ed-colhead">
+                <div className="ct-ed-colhead-inner">
                   <input
-                    type="text" className="qe-input ct-ed-formula"
-                    value={r.formula || ''}
-                    placeholder="Formula (e.g. 'income_fee - total_expenses')"
-                    onChange={(e) => patchRow(i, { formula: e.target.value })}
+                    type="text"
+                    className="ct-ed-colhead-label"
+                    value={c.label || ''}
+                    placeholder={`Column ${i + 1}`}
+                    onChange={(e) => patchColumn(i, { label: e.target.value })}
                   />
-                  <div className="ct-ed-help">
-                    Reference other row IDs with + / − operators. IDs auto-generate from labels — see each row's label to know the ID (lowercased with underscores).
+                  <div className="ct-ed-colhead-controls">
+                    <select
+                      className="ct-ed-type"
+                      value={editorType(c)}
+                      onChange={(e) => patchColumn(i, { type: e.target.value })}
+                      title="Cell type"
+                    >
+                      <option value="text">Text</option>
+                      <option value="number">Number</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="ct-ed-delcol"
+                      onClick={() => removeColumn(i)}
+                      title="Delete this column"
+                      aria-label={`Delete column ${c.label || i + 1}`}
+                    >
+                      ×
+                    </button>
                   </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-        <button type="button" onClick={addRow} className="ct-ed-add">+ Add row</button>
-      </div>
+                </div>
+              </th>
+            ))}
+            <th className="ct-ed-addcol">
+              <button type="button" className="ct-ed-plus" onClick={addColumn} title="Add column">+</button>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => {
+            const kind = r.kind || 'data';
+            const isAuto = kind !== 'data';
+            return (
+              <tr key={i} className={isAuto ? 'ct-ed-row-auto' : ''}>
+                <th className="ct-ed-rowhead">
+                  <div className="ct-ed-rowhead-inner">
+                    <input
+                      type="text"
+                      className="ct-ed-rowhead-label"
+                      value={r.label || ''}
+                      placeholder={`Row ${i + 1}`}
+                      onChange={(e) => patchRow(i, { label: e.target.value })}
+                    />
+                    {isAuto && <span className="ct-ed-auto-badge" title={`Auto ${kind}`}>auto</span>}
+                    <button
+                      type="button"
+                      className="ct-ed-delrow"
+                      onClick={() => removeRow(i)}
+                      title="Delete this row"
+                      aria-label={`Delete row ${r.label || i + 1}`}
+                    >
+                      ×
+                    </button>
+                  </div>
+                </th>
+                {columns.map((_, ci) => (
+                  <td key={ci} className="ct-ed-cell">—</td>
+                ))}
+                <td className="ct-ed-cell-fill" />
+              </tr>
+            );
+          })}
+          <tr>
+            <th className="ct-ed-addrow">
+              <button type="button" className="ct-ed-plus-row" onClick={addRow}>+ Add row</button>
+            </th>
+            {columns.map((_, ci) => <td key={ci} className="ct-ed-cell-empty" />)}
+            <td className="ct-ed-cell-empty" />
+          </tr>
+        </tbody>
+      </table>
+      <p className="ct-ed-note">
+        Cells are empty here because values are entered when the checklist is used, not now. Just decide the columns and rows.
+      </p>
 
       <style>{`
-        .ct-ed { margin-top: .5rem; display: flex; flex-direction: column; gap: 1rem; }
-        .ct-ed-section { display: flex; flex-direction: column; gap: .3rem; }
-        .ct-ed-head {
-          display: block; font-size: .7rem; font-weight: 700;
-          color: var(--foreground); margin-bottom: .1rem;
+        .ct-ed-grid-wrap { margin-top: .5rem; overflow-x: auto; }
+        .ct-ed-grid {
+          border-collapse: separate; border-spacing: 0;
+          width: 100%; table-layout: fixed;
+          background: var(--card);
+        }
+        .ct-ed-grid th, .ct-ed-grid td {
+          border: 1px solid var(--border);
+          padding: 0; vertical-align: middle;
+        }
+        .ct-ed-corner {
+          background: var(--muted, #f8fafc); width: 200px;
+        }
+        .ct-ed-colhead {
+          background: #eff6ff; min-width: 140px;
+        }
+        .ct-ed-colhead-inner {
+          display: flex; align-items: center; gap: .25rem;
+          padding: .35rem .4rem;
+        }
+        .ct-ed-colhead-label {
+          flex: 1; min-width: 0;
+          border: 1px solid transparent; background: transparent;
+          font: inherit; font-weight: 700; font-size: .82rem;
+          padding: .2rem .3rem; border-radius: .25rem;
+          color: var(--foreground);
+        }
+        .ct-ed-colhead-label:focus {
+          outline: 0; border-color: var(--primary, #1e40af); background: white;
+        }
+        .ct-ed-colhead-controls {
+          display: flex; align-items: center; gap: .2rem; flex-shrink: 0;
+        }
+        .ct-ed-type {
+          font-size: .7rem; padding: .12rem .3rem;
+          border: 1px solid var(--border); border-radius: .25rem;
+          background: white; cursor: pointer;
+        }
+        .ct-ed-delcol, .ct-ed-delrow {
+          background: transparent; border: 0; cursor: pointer;
+          font-size: 1.05rem; font-weight: 700; line-height: 1;
+          padding: 0 .3rem; color: var(--muted-foreground);
+          border-radius: .2rem;
+        }
+        .ct-ed-delcol:hover, .ct-ed-delrow:hover {
+          background: rgba(220, 38, 38, .1); color: var(--destructive, #dc2626);
+        }
+        .ct-ed-addcol { width: 42px; background: var(--muted, #f8fafc); }
+        .ct-ed-plus {
+          width: 100%; height: 100%; min-height: 2rem;
+          background: transparent; border: 0; cursor: pointer;
+          font-size: 1.1rem; font-weight: 700;
+          color: var(--primary, #1e40af);
+        }
+        .ct-ed-plus:hover { background: rgba(37, 99, 235, .08); }
+        .ct-ed-rowhead {
+          background: #f8fafc; text-align: left; font-weight: 500;
+        }
+        .ct-ed-rowhead-inner {
+          display: flex; align-items: center; gap: .25rem;
+          padding: .3rem .4rem;
+        }
+        .ct-ed-rowhead-label {
+          flex: 1; min-width: 0;
+          border: 1px solid transparent; background: transparent;
+          font: inherit; font-size: .85rem;
+          padding: .2rem .3rem; border-radius: .25rem;
+          color: var(--foreground);
+        }
+        .ct-ed-rowhead-label:focus {
+          outline: 0; border-color: var(--primary, #1e40af); background: white;
+        }
+        .ct-ed-auto-badge {
+          font-size: .6rem; font-weight: 700;
+          padding: .1rem .35rem; border-radius: 999px;
+          background: rgba(37, 99, 235, .12); color: var(--primary, #1e40af);
           text-transform: uppercase; letter-spacing: .04em;
         }
-        .ct-ed-empty {
-          font-size: .75rem; color: var(--muted-foreground);
-          padding: .4rem .5rem; background: var(--muted, #f8fafc);
-          border-radius: .25rem;
+        .ct-ed-row-auto .ct-ed-rowhead { background: #eff6ff; font-weight: 700; }
+        .ct-ed-cell {
+          text-align: center; color: #cbd5e1; font-size: .8rem;
+          padding: .55rem .4rem;
+          background: white;
         }
-        .ct-ed-row-block {
-          display: flex; flex-direction: column; gap: .25rem;
-          padding: .25rem 0;
-          border-bottom: 1px solid var(--border);
+        .ct-ed-cell-fill, .ct-ed-cell-empty {
+          background: var(--muted, #f8fafc); border: 0 !important;
         }
-        .ct-ed-row-block:last-of-type { border-bottom: 0; }
-        .ct-ed-row {
-          display: flex; align-items: center; gap: .35rem;
+        .ct-ed-addrow { padding: 0; }
+        .ct-ed-plus-row {
+          width: 100%; padding: .4rem .5rem;
+          background: transparent; border: 0; cursor: pointer;
+          font-size: .8rem; font-weight: 600;
+          color: var(--primary, #1e40af); text-align: left;
         }
-        .ct-ed-bullet {
-          font-size: .75rem; color: var(--muted-foreground);
-          min-width: 1.5rem; font-weight: 600;
+        .ct-ed-plus-row:hover { background: rgba(37, 99, 235, .08); }
+        .ct-ed-note {
+          margin: .5rem 0 0; font-size: .72rem;
+          color: var(--muted-foreground); font-style: italic;
         }
-        .ct-ed-label { flex: 1; }
-        .ct-ed-select { max-width: 200px; }
-        .ct-ed-select-narrow { max-width: 180px; }
-        .ct-ed-move, .ct-ed-remove {
-          background: transparent; border: 1px solid transparent;
-          border-radius: .25rem; padding: .25rem .35rem;
-          cursor: pointer; color: var(--muted-foreground);
-          font-size: .8125rem; line-height: 1;
-        }
-        .ct-ed-move:hover:not(:disabled), .ct-ed-remove:hover:not(:disabled) {
-          background: var(--muted, #f1f5f9); color: var(--foreground);
-          border-color: var(--border);
-        }
-        .ct-ed-remove:hover:not(:disabled) { color: var(--destructive, #dc2626); }
-        .ct-ed-move:disabled, .ct-ed-remove:disabled { opacity: .3; cursor: not-allowed; }
         .ct-ed-add {
-          align-self: flex-start;
-          margin-top: .25rem; padding: .3rem .625rem;
-          font-size: .75rem; font-weight: 600;
-          background: transparent; color: var(--primary, #1e40af);
-          border: 1px dashed var(--primary, #1e40af); border-radius: .25rem;
-          cursor: pointer;
+          padding: .35rem .7rem; font-size: .8rem; font-weight: 600;
+          background: var(--primary, #1e40af); color: white;
+          border: 0; border-radius: .3rem; cursor: pointer;
         }
-        .ct-ed-add:hover { background: rgba(37, 99, 235, .06); }
-        .ct-ed-hint {
-          font-size: .8125rem; margin-left: 1.85rem;
-        }
-        .ct-ed-detail {
-          display: flex; align-items: center; gap: .35rem;
-          margin-left: 1.85rem;
-        }
-        .ct-ed-detail-lbl {
-          font-size: .75rem; color: var(--muted-foreground);
-          font-weight: 600;
-        }
-        .ct-ed-formula {
-          font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-          font-size: .8125rem; margin-left: 1.85rem;
-        }
-        .ct-ed-help {
-          font-size: .7rem; color: var(--muted-foreground);
-          margin-left: 1.85rem; font-style: italic;
-        }
-        .ct-ed-warn {
-          font-size: .7rem; color: var(--destructive, #dc2626);
-          font-style: italic;
-        }
+        .ct-ed-add:disabled { opacity: .5; cursor: not-allowed; }
+        .ct-ed-add:hover:not(:disabled) { background: #1e3a8a; }
       `}</style>
     </div>
   );
