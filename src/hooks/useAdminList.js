@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { cachedGet, revalidate, apiWrite, invalidate, subscribe } from '../lib/apiCache';
+import { cachedGet, revalidate, apiWrite, invalidate, subscribe, primeCache } from '../lib/apiCache';
 
 // Toggle in the browser console: `window.__ICAI_CACHE_DEBUG__ = true`. Same
 // flag apiCache.js reads — a single switch turns on the whole trace.
@@ -108,9 +108,17 @@ export function useAdminList(endpoint, params, enabled = true, ttl) {
         return r;
       });
       if (!found) rows.push(row);
-      return { ...prev, rows };
+      const next = { ...prev, rows };
+      // Seed the shared cache with the mutation result too. The write that
+      // just fired invalidate() wiped this URL's cache; without this reseed
+      // the subscribe → tick → effect chain would immediately re-fetch and
+      // could land a stale read (e.g. before a DB replica caught up), which
+      // reverts the row we just spliced. Priming with the local mutation
+      // guarantees the follow-up GET returns exactly what we just showed.
+      try { primeCache(endpoint, JSON.parse(key), next); } catch { /* ignore */ }
+      return next;
     });
-  }, []);
+  }, [endpoint, key]);
 
   return { data, loading, error, refresh, mutateRow };
 }

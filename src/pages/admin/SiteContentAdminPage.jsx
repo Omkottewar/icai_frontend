@@ -230,9 +230,9 @@ export default function SiteContentAdminPage() {
           slug={editingSlug}
           initial={rowsBySlug.get(editingSlug)?.data || {}}
           onClose={() => setEditingSlug(null)}
-          // Optimistic merge — the API returns the freshly-saved row,
-          // we splice it into local state, React reconciles just the
-          // card that depends on it. No refetch, no reload.
+          // Optimistic splice using the server's own PUT response as the
+          // source of truth. No refetch here — a follow-up GET would race
+          // against the write and can revert the row.
           onSaved={mutateRow}
           showToast={showToast}
         />

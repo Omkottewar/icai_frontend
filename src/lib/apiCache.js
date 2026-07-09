@@ -37,13 +37,26 @@ function debug(...args) {
   }
 }
 
-function buildUrl(path, qs) {
+export function buildUrl(path, qs) {
   if (!qs) return path;
   const params = Object.entries(qs)
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
     .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
     .join('&');
   return params ? `${path}?${params}` : path;
+}
+
+// Seed the cache with a value we already know is authoritative — used by
+// `useAdminList.mutateRow` right after a write, so the subscribe-triggered
+// re-fetch that follows returns from cache (fresh mutation result) instead
+// of racing against DB replication or a slow read-after-write path.
+export function primeCache(path, qs, data, ttl = DEFAULT_TTL) {
+  const url = buildUrl(path, qs);
+  CACHE.set(url, { data, ts: Date.now(), ttl });
+  // Any in-flight request for this URL is now stale relative to what we
+  // just wrote — drop it so its late-arriving response can't overwrite.
+  INFLIGHT.delete(url);
+  debug('primeCache', url);
 }
 
 // Fires when any cached/written request comes back with a forbidden
@@ -57,7 +70,13 @@ function signalRoleChange() {
 }
 
 async function rawFetch(url, opts = {}) {
-  const r = await fetch(url, { credentials: 'include', ...opts });
+  // `cache: 'no-store'` — the browser HTTP cache is a layer below this
+  // module's own JS cache. Without it, a same-URL GET fired right after
+  // a write can still return the pre-write body because the browser
+  // served its cached copy on an ETag revalidation. We control freshness
+  // via our own invalidate() bus, so opting out of the browser cache
+  // guarantees that when we say "revalidate," the network is actually hit.
+  const r = await fetch(url, { credentials: 'include', cache: 'no-store', ...opts });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
     // 403 from any endpoint is a strong "your roles changed" signal —
@@ -227,6 +246,10 @@ export async function apiWrite(path, opts = {}) {
   const r = await fetch(path, {
     method,
     credentials: 'include',
+    // Match rawFetch — writes shouldn't touch the browser HTTP cache
+    // either, so the response ETag can't be used to satisfy a follow-up
+    // GET from the browser's own cache.
+    cache: 'no-store',
     headers: { 'content-type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
