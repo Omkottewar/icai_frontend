@@ -357,27 +357,33 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
     finally { setBusy(false); }
   };
 
-  const approve = async () => {
+  // Approve either a specific section or every section the current user is
+  // authorised for (sectionId=null → send all-my-sections).
+  const approve = async (sectionId = null, sectionLabel = null) => {
+    const label = sectionLabel ? `section "${sectionLabel}"` : 'everything you can approve on this checklist';
     const ok = await dialog.confirm({
-      title: 'Approve checklist?',
-      message: 'Approve this checklist?',
+      title: sectionLabel ? `Approve ${sectionLabel}?` : 'Approve checklist?',
+      message: `Approve ${label}?`,
       confirmText: 'Approve',
     });
     if (!ok) return;
     setBusy(true);
     try {
-      await api(`/api/checklist-instances/${id}/approve`, { method: 'POST' });
-      showToast?.('Approved', 'success');
+      const body = sectionId ? { section_ids: [sectionId] } : {};
+      await api(`/api/checklist-instances/${id}/approve`, { method: 'POST', body });
+      showToast?.(sectionLabel ? `${sectionLabel} approved` : 'Approved', 'success');
       await load();
       onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
     finally { setBusy(false); }
   };
 
-  const reject = async () => {
+  const reject = async (sectionId = null, sectionLabel = null) => {
     const note = await dialog.prompt({
-      title: 'Reject checklist',
-      message: 'Reason for rejection?',
+      title: sectionLabel ? `Reject ${sectionLabel}` : 'Reject checklist',
+      message: sectionLabel
+        ? `Reason for rejecting ${sectionLabel}? The whole checklist goes back to the filler.`
+        : 'Reason for rejection?',
       placeholder: 'Tell the submitter what needs to change',
       multiline: true,
       required: true,
@@ -387,8 +393,9 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
     if (!note?.trim()) return;
     setBusy(true);
     try {
-      await api(`/api/checklist-instances/${id}/reject`, { method: 'POST', body: { note } });
-      showToast?.('Rejected', 'success');
+      const body = sectionId ? { section_ids: [sectionId], note } : { note };
+      await api(`/api/checklist-instances/${id}/reject`, { method: 'POST', body });
+      showToast?.(sectionLabel ? `${sectionLabel} rejected` : 'Rejected', 'success');
       await load();
       onListChanged?.();
     } catch (e) { showToast?.(e.message, 'error'); }
@@ -675,8 +682,40 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
             return group.questions.length > 0 ? <div key={`pre-${gi}`}>{body}</div> : null;
           }
 
+          // Per-section approval state (from section_assignments, joined
+          // by the GET endpoint). approval_status defaults to 'pending' for
+          // any row created at submit time.
+          const secApproval = section_assignments.find(
+            (sa) => sa.section_question_id === heading.id,
+          );
+          const secStatus = secApproval?.approval_status ?? 'pending';
+          const secDecidedByName = secApproval?.decided_by_name;
+          // Can THIS user act on THIS section?
+          //   • per-section approver of this section — yes
+          //   • or checklist-level reviewer + this section has NO per-
+          //     section approver — yes (they cover unassigned sections)
+          const myApproverSet = new Set(perms.myApproverSectionIds || []);
+          const isChecklistReviewer = !!perms.canReview;
+          const iCanActOnSection = reviewable && (
+            myApproverSet.has(heading.id)
+            || (!secApproval?.approver_id && isChecklistReviewer)
+          ) && secStatus === 'pending';
+
+          const statusBadge = (() => {
+            if (secStatus === 'approved') {
+              return <span className="acc-sec-badge acc-sec-approved">✓ Approved{secDecidedByName ? ` · ${secDecidedByName}` : ''}</span>;
+            }
+            if (secStatus === 'rejected') {
+              return <span className="acc-sec-badge acc-sec-rejected">✕ Rejected{secDecidedByName ? ` · ${secDecidedByName}` : ''}</span>;
+            }
+            if (reviewable) {
+              return <span className="acc-sec-badge acc-sec-pending">Awaiting approval</span>;
+            }
+            return null;
+          })();
+
           return (
-            <section key={heading.id} className={'acc-section' + (isMyApprovalTarget ? ' acc-target' : '')}>
+            <section key={heading.id} className={'acc-section' + (iCanActOnSection ? ' acc-target' : '')}>
               <button
                 type="button"
                 className="acc-head"
@@ -685,13 +724,11 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
               >
                 <span className={'acc-chev' + (open ? ' open' : '')}>▸</span>
                 <span className="acc-title">{heading.label || 'Untitled section'}</span>
-                {reviewerRole && (
+                {statusBadge}
+                {reviewerRole && !statusBadge && (
                   <span className="acc-owner readonly">
                     Reviewed by {roleLabel(reviewerRole)}
                   </span>
-                )}
-                {isMyApprovalTarget && (
-                  <span className="acc-target-pill">Awaiting your approval</span>
                 )}
                 {prog.requiredTotal > 0 && (
                   <span className={'acc-prog' + (prog.complete ? ' complete' : '')}>
@@ -704,6 +741,27 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
               {open && (
                 <div className="acc-body">
                   {body}
+                  {iCanActOnSection && (
+                    <div className="acc-sec-actions">
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => reject(heading.id, heading.label || 'Untitled section')}
+                        disabled={busy}
+                        style={{ color: '#991b1b', borderColor: '#fecaca' }}
+                      >
+                        Reject section
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => approve(heading.id, heading.label || 'Untitled section')}
+                        disabled={busy}
+                      >
+                        Approve section
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </section>
@@ -783,6 +841,19 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
           }
           .acc-prog.complete { color: #15803d; }
           .acc-body { padding: .25rem 1rem 1rem; }
+          .acc-sec-badge {
+            padding: .12rem .55rem; border-radius: 999px;
+            font-size: .68rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .04em;
+          }
+          .acc-sec-approved { background: #dcfce7; color: #14532d; }
+          .acc-sec-rejected { background: #fee2e2; color: #7f1d1d; }
+          .acc-sec-pending  { background: #fef3c7; color: #92400e; }
+          .acc-sec-actions {
+            display: flex; justify-content: flex-end; gap: .5rem;
+            padding-top: .75rem; margin-top: 1rem;
+            border-top: 1px dashed var(--border);
+          }
 
           /* Multi-stage approval action buttons — compact variant of .btn
              so three buttons fit neatly inside one stage row without
@@ -828,10 +899,15 @@ function InstanceDrawer({ id, onClose, onListChanged }) {
             <Button className="btn btn-primary" onClick={submit} disabled={busy || missing > 0}>Submit for review</Button>
           </>
         )}
-        {reviewable && !isMultiStage && (
+        {/* Whole-checklist Approve/Reject buttons only make sense for legacy
+            checklists without section headings. When the checklist has
+            sections, approvers use the per-section buttons inside each
+            section — a whole-checklist approve would side-step the per-
+            section decisions and defeat the multi-approver model. */}
+        {reviewable && !isMultiStage && section_assignments.length === 0 && (
           <>
-            <Button className="btn btn-outline-danger" onClick={reject} disabled={busy}>Reject</Button>
-            <Button className="btn btn-primary" onClick={approve} disabled={busy}>Approve</Button>
+            <Button className="btn btn-outline-danger" onClick={() => reject()} disabled={busy}>Reject</Button>
+            <Button className="btn btn-primary" onClick={() => approve()} disabled={busy}>Approve</Button>
           </>
         )}
       </footer>
