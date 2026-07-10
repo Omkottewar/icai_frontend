@@ -682,7 +682,7 @@ export function isValidSlug(s: string): s is SlotSlug {
 export interface SettingDef {
   key:    string;
   label:  string;
-  group:  "Contact" | "Footer" | "Social";
+  group:  "Contact" | "Footer" | "Social" | "Payments";
   hint?:  string;
 }
 
@@ -698,6 +698,9 @@ export const SITE_SETTINGS: SettingDef[] = [
   { key: "social_linkedin",   label: "LinkedIn URL",     group: "Social" },
   { key: "social_youtube",    label: "YouTube URL",      group: "Social" },
   { key: "social_instagram",  label: "Instagram URL",    group: "Social" },
+  // Payments — UPI VPA every paid event QR encodes.
+  { key: "payment_upi_id",         label: "UPI ID (VPA)",       group: "Payments", hint: "e.g. icainagpur@sbi — every paid event's QR encodes this address." },
+  { key: "payment_upi_payee_name", label: "Payee display name", group: "Payments", hint: "Name shown to the payer inside their UPI app." },
 ];
 
 export const SETTING_KEYS = SITE_SETTINGS.map((s) => s.key);

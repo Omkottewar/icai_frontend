@@ -245,7 +245,7 @@ function RefundDrawer({ refund, onClose, onChanged }) {
             )}
             {refund.razorpay_refund_id && (
               <>
-                <dt style={{ color: 'var(--muted-foreground)' }}>Razorpay ref</dt>
+                <dt style={{ color: 'var(--muted-foreground)' }}>Refund ref</dt>
                 <dd style={{ margin: 0, fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '.75rem' }}>{refund.razorpay_refund_id}</dd>
               </>
             )}
@@ -275,9 +275,9 @@ function RefundDrawer({ refund, onClose, onChanged }) {
           {action === 'processed' && (
             <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '.75rem' }}>
               <label style={{ display: 'block' }}>
-                <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.25rem' }}>Razorpay refund ID <span className="muted-text" style={{ fontWeight: 400 }}>(optional)</span></div>
-                <input className="input-base" value={razorpayId} onChange={(e) => setRazorpayId(e.target.value.slice(0, 120))} placeholder="e.g. rfnd_ABCD1234" />
-                <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.2rem' }}>Once the gateway integration is live this fires from the webhook automatically.</div>
+                <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.25rem' }}>Refund reference <span className="muted-text" style={{ fontWeight: 400 }}>(optional)</span></div>
+                <input className="input-base" value={razorpayId} onChange={(e) => setRazorpayId(e.target.value.slice(0, 120))} placeholder="Bank UTR or transaction ID" />
+                <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.2rem' }}>UTR / txn ID from the manual UPI reversal — kept for the audit trail.</div>
               </label>
             </div>
           )}

@@ -3,12 +3,19 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { ShimmerLines } from '../../components/ui/Shimmer';
 import { IconX } from '../../icons';
+import { dialog } from '../../lib/dialog';
 
 // ─── /admin/payments ───────────────────────────────────────────────────────
-// Read-only payments listing. Razorpay refs surface so admin can match
-// rows against the Razorpay dashboard. Detail drawer shows refund history.
+// Two surfaces on one page:
+//   1. Pending UPI verifications — action queue at the top. Every row is a
+//      user waiting for the branch to confirm their UTR against the bank
+//      statement. Approve → creates the event registration + fires the
+//      confirmation email. Reject → notifies the user with a reason.
+//   2. All payments — historical listing with filters, unchanged.
+// Razorpay refs still surface in the history for old rows; new rows show
+// UPI UTR instead.
 
-const STATUSES = ['', 'success', 'failed', 'created', 'pending', 'refunded', 'partially_refunded'];
+const STATUSES = ['', 'success', 'failed', 'created', 'pending', 'pending_verification', 'refunded', 'partially_refunded'];
 const PURPOSES = ['', 'event_registration', 'cop_renewal', 'firm_registration', 'job_posting',
   'assignment_posting', 'cabf_donation', 'consultation', 'room_booking', 'other'];
 
@@ -20,6 +27,62 @@ export default function PaymentsAdminPage() {
   const [filters, setFilters] = useState({ status: '', purpose: '', q: '' });
   const [summary, setSummary] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [pendingBusyId, setPendingBusyId] = useState(null);
+
+  async function loadPending() {
+    try {
+      const r = await fetch('/api/admin/payments/pending-verification', { credentials: 'include' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed');
+      setPending(j.rows || []);
+    } catch (e) {
+      showToast?.(e.message, 'error');
+      setPending([]);
+    }
+  }
+
+  async function approve(row) {
+    const ok = await dialog.confirm({
+      title: 'Approve payment?',
+      message: `Confirm that ₹${(row.amount_paise / 100).toLocaleString('en-IN')} from ${row.payer_name || row.payer_email} (UTR ${row.upi_utr}) has landed in the bank account. This creates the event registration and emails the confirmation.`,
+      confirmText: 'Approve',
+    });
+    if (!ok) return;
+    setPendingBusyId(row.payment_id);
+    try {
+      const r = await fetch(`/api/admin/payments/${row.payment_id}/approve`, { method: 'POST', credentials: 'include' });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed');
+      showToast?.(j.waitlisted ? 'Approved — event was full, user is on waitlist.' : 'Payment approved. Registration confirmed.', 'success');
+      await Promise.all([loadPending(), load(), loadSummary()]);
+    } catch (e) { showToast?.(e.message, 'error'); }
+    finally { setPendingBusyId(null); }
+  }
+
+  async function reject(row) {
+    const reason = await dialog.prompt({
+      title: 'Reject payment',
+      message: `Why is this being rejected? The user will be emailed the reason and can retry.`,
+      placeholder: 'e.g. UTR not found in bank statement',
+      okText: 'Reject',
+      required: true,
+    });
+    if (!reason) return;
+    setPendingBusyId(row.payment_id);
+    try {
+      const r = await fetch(`/api/admin/payments/${row.payment_id}/reject`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed');
+      showToast?.('Payment rejected. User has been notified.', 'success');
+      await Promise.all([loadPending(), load(), loadSummary()]);
+    } catch (e) { showToast?.(e.message, 'error'); }
+    finally { setPendingBusyId(null); }
+  }
 
   async function load() {
     setRows(null);
@@ -47,13 +110,20 @@ export default function PaymentsAdminPage() {
   }
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [page, filters.status, filters.purpose]);
-  useEffect(() => { loadSummary(); }, []);
+  useEffect(() => { loadSummary(); loadPending(); /* eslint-disable-next-line */ }, []);
 
   return (
     <AdminLayout
       title="Payments"
-      subtitle="Razorpay reconciliation — all payments captured by the portal"
+      subtitle="UPI verifications up top — approve or reject each submitted UTR. Full history below."
     >
+      <PendingVerificationSection
+        rows={pending}
+        busyId={pendingBusyId}
+        onApprove={approve}
+        onReject={reject}
+      />
+
       {summary && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '.75rem', marginBottom: '1.25rem' }}>
           <StatCard label={`Success (${summary.window_days}d)`} value={`₹${(summary.success_paise / 100).toLocaleString('en-IN')}`} sub={`${summary.success_count} txns`} />
@@ -86,7 +156,7 @@ export default function PaymentsAdminPage() {
               <th style={th}>Purpose</th>
               <th style={th}>Amount</th>
               <th style={th}>Status</th>
-              <th style={th}>Razorpay</th>
+              <th style={th}>Reference</th>
               <th style={th}></th>
             </tr>
           </thead>
@@ -117,13 +187,16 @@ export default function PaymentsAdminPage() {
                 </td>
                 <td style={td}><StatusPill status={p.status} /></td>
                 <td style={td}>
-                  {p.razorpay_payment_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{p.razorpay_payment_id}</div>
+                  {p.upi_utr && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="UPI UTR">{p.upi_utr}</div>
                   )}
-                  {!p.razorpay_payment_id && p.razorpay_order_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text">{p.razorpay_order_id}</div>
+                  {!p.upi_utr && p.razorpay_payment_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="Razorpay payment">{p.razorpay_payment_id}</div>
                   )}
-                  {!p.razorpay_order_id && <span className="muted-text">—</span>}
+                  {!p.upi_utr && !p.razorpay_payment_id && p.razorpay_order_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Razorpay order">{p.razorpay_order_id}</div>
+                  )}
+                  {!p.upi_utr && !p.razorpay_order_id && <span className="muted-text">—</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
                   <button className="btn btn-ghost" style={btnSm} onClick={() => setDetail(p)}>Detail</button>
@@ -138,6 +211,81 @@ export default function PaymentsAdminPage() {
 
       {detail && <DetailDrawer payment={detail} onClose={() => setDetail(null)} />}
     </AdminLayout>
+  );
+}
+
+// Action queue for UPI payments awaiting verification. Renders zero rows
+// as a friendly empty state rather than being hidden — admins should see
+// at a glance that the queue is clear (or that there's nothing to do).
+function PendingVerificationSection({ rows, busyId, onApprove, onReject }) {
+  return (
+    <section style={{ marginBottom: '1.5rem' }}>
+      <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '.5rem' }}>
+        Pending UPI verifications {rows && rows.length > 0 && <span style={{
+          background: '#fef3c7', color: '#92400e', padding: '.1rem .5rem',
+          borderRadius: 999, fontSize: '.72rem', marginLeft: '.4rem',
+        }}>{rows.length}</span>}
+      </h2>
+      {rows === null && <ShimmerLines count={2} />}
+      {rows !== null && rows.length === 0 && (
+        <p className="muted-text" style={{ fontSize: '.85rem', margin: 0 }}>
+          No payments waiting for verification.
+        </p>
+      )}
+      {(rows ?? []).map((r) => {
+        const busy = busyId === r.payment_id;
+        return (
+          <div key={r.payment_id} className="card" style={{
+            padding: '.85rem 1rem', marginBottom: '.5rem',
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1fr) auto',
+            gap: '.75rem', alignItems: 'center',
+          }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', gap: '.6rem', flexWrap: 'wrap', alignItems: 'baseline' }}>
+                <strong style={{ fontSize: '.95rem' }}>{r.payer_name || r.payer_email}</strong>
+                <span className="muted-text" style={{ fontSize: '.72rem' }}>{r.payer_email}</span>
+                <span style={{ fontWeight: 700, color: '#0f172a' }}>₹{(r.amount_paise / 100).toLocaleString('en-IN')}</span>
+              </div>
+              <div className="muted-text" style={{ fontSize: '.78rem', marginTop: '.15rem' }}>
+                {r.event_title || <em>Unknown event</em>}
+                {r.event_starts_at && ` · ${formatDate(r.event_starts_at)}`}
+              </div>
+              <div style={{ fontSize: '.78rem', marginTop: '.35rem', display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span className="muted-text">UTR</span>
+                <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>{r.upi_utr}</span>
+                {r.screenshot_url && (
+                  <a href={r.screenshot_url} target="_blank" rel="noopener noreferrer" style={{
+                    fontSize: '.72rem', color: '#0b3d91', textDecoration: 'underline',
+                  }}>View screenshot</a>
+                )}
+                <span className="muted-text">· submitted {formatDate(r.submitted_at)}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '.4rem' }}>
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={busy}
+                onClick={() => onApprove(r)}
+                style={{ padding: '.35rem .8rem', fontSize: '.8rem' }}
+              >
+                {busy ? '…' : 'Approve'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                disabled={busy}
+                onClick={() => onReject(r)}
+                style={{ padding: '.35rem .8rem', fontSize: '.8rem', color: '#dc2626' }}
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 

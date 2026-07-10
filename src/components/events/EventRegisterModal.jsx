@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import QRCode from 'qrcode';
 import { useAuth } from '../../context/AuthContext';
 import { useEventRegistration } from '../../hooks/useEventRegistration';
 import { navigate } from '../../hooks/useRoute';
-import { IconX, IconCheckCircle, IconLock, IconCalendar, IconMapPin } from '../../icons';
+import { IconX, IconCheckCircle, IconCalendar, IconMapPin, IconCopy } from '../../icons';
 import Button from '../ui/Button';
 
 function rupees(paise) {
@@ -18,22 +19,22 @@ function formatDateTime(starts_at) {
   });
 }
 
-// Modal launched from EventRow when a user clicks Register. Two flows:
-//   • fee_paise === 0 → "Confirm Registration"
-//   • fee_paise  >  0 → "Pay ₹X & Register" → opens Razorpay Checkout
-// The hook owns the network + Razorpay dance; this component owns the UI state.
+// Two-step registration modal:
+//   Free events: single "Confirm" click.
+//   Paid events: fill phone → server returns UPI URI → render QR + amount →
+//     user pays in their UPI app → user pastes UTR + optional screenshot →
+//     server marks payment 'pending_verification' → admin approves off-band.
 export default function EventRegisterModal({ event, onClose, onRegistered }) {
   const { user, showToast } = useAuth();
-  const { register, loading } = useEventRegistration();
+  const { startRegister, submitUtr, loading } = useEventRegistration();
 
   const [phone, setPhone] = useState(user?.phone ?? '');
-  const [done, setDone] = useState(false);
+  const [step, setStep] = useState('form');  // 'form' | 'pay' | 'submitted'
+  const [payment, setPayment] = useState(null);  // response from /register when paid
   const [err, setErr] = useState(null);
 
   useEffect(() => { setPhone(user?.phone ?? ''); }, [user]);
 
-  // Esc to close. Skip while a payment is in flight — closing the modal
-  // mid-checkout would orphan the Razorpay popup.
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape' && !loading) onClose?.(); };
     window.addEventListener('keydown', onKey);
@@ -43,7 +44,7 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
   const isPaid = Number(event?.fee_paise || 0) > 0;
   const capacityFull = event?.capacity != null && Number(event.registered_count || 0) >= Number(event.capacity);
 
-  const handleSubmit = async (e) => {
+  const handleStart = async (e) => {
     e.preventDefault();
     setErr(null);
 
@@ -53,14 +54,29 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
       return;
     }
 
-    const result = await register({ slug: event.slug, phone: phone.trim() });
-    if (result.ok) {
-      setDone(true);
-      onRegistered?.();
-      showToast?.(isPaid ? 'Payment successful — you are registered!' : 'You are registered!', 'success');
-    } else {
+    const result = await startRegister({ slug: event.slug, phone: phone.trim() });
+    if (!result.ok) {
       setErr(result.error?.message || 'Something went wrong. Please try again.');
+      return;
     }
+
+    if (!result.paid) {
+      // Free event — already registered.
+      setStep('submitted');
+      onRegistered?.();
+      showToast?.('You are registered!', 'success');
+      return;
+    }
+
+    // Paid event — show QR panel.
+    setPayment(result);
+    setStep('pay');
+  };
+
+  const handleUtrSubmitted = () => {
+    setStep('submitted');
+    onRegistered?.();
+    showToast?.('Payment details submitted — we\'ll email you once verified.', 'success');
   };
 
   return (
@@ -123,12 +139,21 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
         <div style={{ padding: '1.5rem' }}>
           {!user ? (
             <SignInPrompt onClose={onClose} />
-          ) : done ? (
+          ) : step === 'submitted' ? (
             <SuccessState isPaid={isPaid} onClose={onClose} />
+          ) : step === 'pay' && payment ? (
+            <QrPayPanel
+              payment={payment}
+              slug={event.slug}
+              loading={loading}
+              submitUtr={submitUtr}
+              onSubmitted={handleUtrSubmitted}
+              onCancel={() => setStep('form')}
+            />
           ) : capacityFull ? (
             <CapacityFullState onClose={onClose} />
           ) : (
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleStart}>
               <ReadOnlyField label="Name"  value={user.name}  />
               <ReadOnlyField label="Email" value={user.email} />
 
@@ -154,7 +179,6 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
                 </div>
               </label>
 
-              {/* Fee summary box */}
               <div style={{
                 background: 'var(--muted)', borderRadius: '.5rem',
                 padding: '.85rem 1rem', marginBottom: '1rem',
@@ -185,21 +209,165 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
                 style={{ width: '100%', padding: '.7rem 1rem', fontWeight: 600 }}
               >
                 {loading
-                  ? (isPaid ? 'Opening payment…' : 'Registering…')
-                  : (isPaid ? `Pay ${rupees(event.fee_paise)} & Register` : 'Confirm Registration')}
+                  ? (isPaid ? 'Preparing payment…' : 'Registering…')
+                  : (isPaid ? `Continue to pay ${rupees(event.fee_paise)}` : 'Confirm Registration')}
               </Button>
 
               {isPaid && (
                 <div className="muted-text" style={{ fontSize: '.7125rem', marginTop: '.6rem', textAlign: 'center' }}>
-                  <span className="row gap-1" style={{ justifyContent: 'center' }}>
-                    <IconLock size="sm" /> Secured by Razorpay
-                  </span>
+                  You'll pay via UPI QR on the next step.
                 </div>
               )}
             </form>
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── QR payment + UTR submission panel ───────────────────────────────────
+function QrPayPanel({ payment, slug, loading, submitUtr, onSubmitted, onCancel }) {
+  const [utr, setUtr] = useState('');
+  const [err, setErr] = useState(null);
+  const canvasRef = useRef(null);
+
+  // Render the UPI intent URI as a scannable QR onto the <canvas>. Redrawn
+  // if the URI changes (shouldn't in practice but safe).
+  useEffect(() => {
+    if (!canvasRef.current || !payment?.upi_uri) return;
+    QRCode.toCanvas(canvasRef.current, payment.upi_uri, {
+      width: 220,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0b3d91', light: '#ffffff' },
+    }).catch(() => { /* browser can't render — user still has UPI ID as text */ });
+  }, [payment?.upi_uri]);
+
+  const copy = async (text, label) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setErr(null);
+    } catch {
+      // Fallthrough — user can select manually. No toast wired in this component.
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErr(null);
+    const cleaned = utr.replace(/\s+/g, '');
+    if (!/^[A-Za-z0-9]{8,30}$/.test(cleaned)) {
+      setErr('Enter the 12-digit UPI reference (UTR) from your payment app.');
+      return;
+    }
+    const r = await submitUtr({
+      slug,
+      payment_id: payment.payment_id,
+      utr: cleaned,
+    });
+    if (!r.ok) {
+      setErr(r.error?.message || 'Could not submit UTR. Please try again.');
+      return;
+    }
+    onSubmitted?.();
+  };
+
+  return (
+    <div>
+      <div style={{
+        background: 'oklch(0.97 0.02 250)', border: '1px solid var(--border)',
+        borderRadius: '.5rem', padding: '1rem', marginBottom: '1rem',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.5rem',
+      }}>
+        <canvas ref={canvasRef} style={{ borderRadius: '.35rem', background: '#fff' }} aria-label="UPI payment QR" />
+        <div style={{ fontSize: '.75rem', color: 'var(--muted-foreground)' }}>
+          Scan with any UPI app (GPay, PhonePe, Paytm, BHIM…)
+        </div>
+      </div>
+
+      <div style={{
+        background: 'var(--muted)', borderRadius: '.5rem', padding: '.75rem 1rem', marginBottom: '.75rem',
+        display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '.5rem', alignItems: 'center',
+        fontSize: '.85rem',
+      }}>
+        <span style={{ color: 'var(--muted-foreground)' }}>Amount</span>
+        <span style={{ fontWeight: 700 }}>{rupees(payment.amount_paise)}</span>
+        <span />
+
+        <span style={{ color: 'var(--muted-foreground)' }}>Pay to</span>
+        <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>
+          {payment.upi_id}
+        </span>
+        <button
+          type="button"
+          onClick={() => copy(payment.upi_id, 'UPI ID')}
+          className="btn btn-ghost"
+          style={{ padding: '.2rem .5rem', fontSize: '.75rem' }}
+          aria-label="Copy UPI ID"
+        >
+          <IconCopy size="sm" /> Copy
+        </button>
+      </div>
+
+      <p className="muted-text" style={{ fontSize: '.8rem', marginTop: 0, marginBottom: '1rem' }}>
+        After paying, enter the UTR (transaction reference) below. Your registration is confirmed once the branch verifies the payment (usually within 24 hours).
+      </p>
+
+      <form onSubmit={handleSubmit}>
+        <label style={{ display: 'block', marginBottom: '.75rem' }}>
+          <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.375rem' }}>
+            UTR / UPI transaction reference
+          </div>
+          <input
+            type="text"
+            value={utr}
+            onChange={(e) => setUtr(e.target.value)}
+            placeholder="e.g. 431223948712"
+            maxLength={30}
+            required
+            style={{
+              width: '100%', padding: '.55rem .75rem',
+              border: '1px solid var(--border)', borderRadius: '.375rem',
+              fontSize: '.9375rem', background: 'var(--background)', color: 'var(--foreground)',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+            }}
+          />
+          <div className="muted-text" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
+            Find it in your UPI app's transaction history — labelled "UPI Ref No" or "UTR".
+          </div>
+        </label>
+
+        {err && (
+          <div style={{
+            background: 'oklch(0.96 0.04 25)', color: 'oklch(0.35 0.18 25)',
+            border: '1px solid oklch(0.85 0.1 25)', padding: '.6rem .8rem',
+            borderRadius: '.375rem', fontSize: '.8125rem', marginBottom: '.875rem',
+          }}>
+            {err}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '.5rem' }}>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onCancel}
+            disabled={loading}
+            style={{ flex: 1 }}
+          >
+            Back
+          </button>
+          <Button
+            type="submit"
+            className="btn btn-primary"
+            loading={loading}
+            style={{ flex: 2, padding: '.6rem 1rem', fontWeight: 600 }}
+          >
+            {loading ? 'Submitting…' : 'I\'ve paid — submit UTR'}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -261,11 +429,11 @@ function SuccessState({ isPaid, onClose }) {
         <IconCheckCircle />
       </div>
       <h4 style={{ fontSize: '1.0625rem', fontWeight: 700, marginBottom: '.35rem' }}>
-        You're registered!
+        {isPaid ? 'Payment submitted' : 'You\'re registered!'}
       </h4>
       <div className="muted-text" style={{ fontSize: '.875rem', marginBottom: '1.25rem' }}>
         {isPaid
-          ? 'Payment confirmed. We\'ll send the joining details to your email.'
+          ? 'We\'ll verify your payment against the bank statement and email you the joining details — usually within 24 hours.'
           : 'We\'ll send the joining details to your email.'}
       </div>
       <button
