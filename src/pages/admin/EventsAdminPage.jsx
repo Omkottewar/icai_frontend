@@ -866,6 +866,9 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
               />
             </FormField>
           </Section>
+          {!isNew && (
+            <SpeakersPanel eventId={id} showToast={showToast} />
+          )}
           </>)}
 
           {stepIdx === 3 && (
@@ -1032,6 +1035,148 @@ function Section({ title, children }) {
 
 function Grid({ children }) {
   return <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.75rem' }}>{children}</div>;
+}
+
+// ─── SpeakersPanel ────────────────────────────────────────────────────────
+// Admin surface for adding guest speakers to an event. A speaker is a
+// real users row (primary_role='guest' or any existing account) linked
+// via event_speakers. Two modes:
+//   • Invite new — enter name + email; backend creates a shell account
+//     and emails the login instructions. The speaker sets their password
+//     via the Auth0 signup flow on first login.
+//   • Add existing — quick-pick by email; useful when the speaker is
+//     already a portal member.
+// Removing a speaker deletes the event_speakers row but keeps the user
+// account intact (they may speak at other events, or exist as a member).
+function SpeakersPanel({ eventId, showToast }) {
+  const [rows, setRows] = useState(null);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+
+  const load = async () => {
+    try {
+      const j = await adminFetch(`/api/admin/events/${eventId}/speakers`);
+      setRows(j.rows || []);
+      setErr('');
+    } catch (e) { setErr(e.message); setRows([]); }
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [eventId]);
+
+  const add = async () => {
+    const n = name.trim();
+    const e = email.trim();
+    if (!n || !e) { showToast?.('Enter both name and email', 'error'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) { showToast?.('Email looks invalid', 'error'); return; }
+    setBusy(true);
+    try {
+      const j = await adminFetch(`/api/admin/events/${eventId}/speakers`, {
+        method: 'POST',
+        body: { name: n, email: e },
+      });
+      const emailOk = j.email?.status === 'sent';
+      const emailSkipped = j.email?.status === 'skipped';
+      const emailFailed = j.email?.status === 'failed';
+      let msg;
+      if (j.invited) {
+        if (emailOk) msg = `Invite sent to ${e}`;
+        else if (emailSkipped) msg = `${j.name || e} added — email NOT sent (${j.email.reason})`;
+        else if (emailFailed) msg = `${j.name || e} added — email FAILED (${j.email.error})`;
+        else msg = `${j.name || e} added — email status unknown`;
+      } else {
+        msg = `${j.name || e} added as a speaker`;
+      }
+      showToast?.(msg, (emailSkipped || emailFailed) ? 'error' : 'success');
+      setName('');
+      setEmail('');
+      await load();
+    } catch (ex) { showToast?.(ex.message, 'error'); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async (row) => {
+    const ok = await dialog.confirm({
+      title: 'Remove speaker?',
+      message: `Remove ${row.name} from this event? Their portal account stays active — this only removes them from this event's speaker list.`,
+      confirmText: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await adminFetch(`/api/admin/events/${eventId}/speakers/${row.id}`, { method: 'DELETE' });
+      showToast?.('Speaker removed', 'success');
+      await load();
+    } catch (e) { showToast?.(e.message, 'error'); }
+  };
+
+  return (
+    <Section title="Guest speakers">
+      <p className="muted-text" style={{ fontSize: '.8rem', margin: '0 0 .75rem' }}>
+        Add external speakers so they can post in this event's chat, receive event notifications, and address participants. If they don't have a portal account yet, one will be created for them and an invite email sent with sign-in instructions.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '.5rem', marginBottom: '.75rem' }}>
+        <input
+          type="text"
+          className="input-base"
+          placeholder="Speaker name (e.g. CA Smith)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          maxLength={120}
+        />
+        <input
+          type="email"
+          className="input-base"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          maxLength={200}
+        />
+        <Button className="btn btn-primary" onClick={add} disabled={busy || !name.trim() || !email.trim()}>
+          {busy ? 'Adding…' : 'Add speaker'}
+        </Button>
+      </div>
+
+      {err && <div className="admin-error">{err}</div>}
+
+      {rows === null && <ShimmerLines count={2} />}
+
+      {rows !== null && rows.length === 0 && (
+        <p className="muted-text" style={{ fontSize: '.8rem', margin: 0 }}>
+          No speakers added yet.
+        </p>
+      )}
+
+      {(rows ?? []).map((r) => (
+        <div key={r.id} style={{
+          display: 'flex', alignItems: 'center', gap: '.75rem',
+          padding: '.6rem .75rem',
+          background: 'var(--card)', border: '1px solid var(--border)',
+          borderRadius: '.4rem', marginBottom: '.4rem',
+        }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{r.name}</div>
+            <div className="muted-text" style={{ fontSize: '.72rem' }}>
+              {r.email}
+              {r.status !== 'active' && ` · ${r.status}`}
+              {r.last_login_at
+                ? ` · last sign-in ${new Date(r.last_login_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}`
+                : ' · never signed in'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => remove(r)}
+            style={{ padding: '.35rem .7rem', color: '#dc2626', fontSize: '.8rem' }}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+    </Section>
+  );
 }
 
 // Shimmer placeholder shown while the event detail loads. Mirrors the real

@@ -67,6 +67,7 @@ const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
 const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'));
 const RoomBookingPage    = lazy(() => import('../pages/RoomBookingPage'));
 const TrackGrievancePage = lazy(() => import('../pages/TrackGrievancePage'));
+const MySpeakerEventsPage = lazy(() => import('../pages/MySpeakerEventsPage'));
 const StudentSuggestionsPage = lazy(() => import('../pages/StudentSuggestionsPage'));
 const StudentForumPage       = lazy(() => import('../pages/StudentForumPage'));
 const ScholarshipsPage       = lazy(() => import('../pages/ScholarshipsPage'));
@@ -161,6 +162,7 @@ const ROUTES = {
   '/members-directory': MembersDirectoryPage,
   '/book-room': RoomBookingPage,
   '/track-grievance': TrackGrievancePage,
+  '/my-speaker-events': MySpeakerEventsPage,
   '/student-suggestions': StudentSuggestionsPage,
   '/student-forum':       StudentForumPage,
   '/scholarships':        ScholarshipsPage,

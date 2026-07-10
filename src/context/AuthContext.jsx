@@ -45,7 +45,7 @@ function writeCachedUser(user) {
 function toUiUser(apiUser) {
   if (!apiUser) return null;
   const roleMap = { member: 'Member', student: 'Student', employer: 'Employer', employee: 'Staff',
-                    mcm: 'MCM', chairman: 'Chairman', admin: 'Admin' };
+                    mcm: 'MCM', chairman: 'Chairman', admin: 'Admin', guest: 'Guest' };
   return {
     id:       apiUser.id,
     name:     apiUser.name,
