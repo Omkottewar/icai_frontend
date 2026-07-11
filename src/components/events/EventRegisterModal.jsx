@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { useAuth } from '../../context/AuthContext';
 import { useEventRegistration } from '../../hooks/useEventRegistration';
@@ -32,6 +32,9 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
   const [step, setStep] = useState('form');  // 'form' | 'pay' | 'submitted'
   const [payment, setPayment] = useState(null);  // response from /register when paid
   const [err, setErr] = useState(null);
+  // Group booking: attendees the booker wants to pay for. Each is
+  // { id, name, email }. Booker is always seat 1 and does NOT appear here.
+  const [attendees, setAttendees] = useState([]);
 
   useEffect(() => { setPhone(user?.phone ?? ''); }, [user]);
 
@@ -54,7 +57,11 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
       return;
     }
 
-    const result = await startRegister({ slug: event.slug, phone: phone.trim() });
+    const result = await startRegister({
+      slug: event.slug,
+      phone: phone.trim(),
+      attendee_user_ids: attendees.map((a) => a.id),
+    });
     if (!result.ok) {
       setErr(result.error?.message || 'Something went wrong. Please try again.');
       return;
@@ -179,16 +186,28 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
                 </div>
               </label>
 
+              {isPaid && (
+                <AttendeePicker
+                  attendees={attendees}
+                  onChange={setAttendees}
+                  disabled={loading}
+                />
+              )}
+
               <div style={{
                 background: 'var(--muted)', borderRadius: '.5rem',
                 padding: '.85rem 1rem', marginBottom: '1rem',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <div style={{ fontSize: '.8125rem', color: 'var(--muted-foreground)' }}>
-                  {isPaid ? 'Registration fee' : 'Registration'}
+                  {isPaid
+                    ? attendees.length > 0
+                      ? `${1 + attendees.length} seats × ${rupees(event.fee_paise)}`
+                      : 'Registration fee'
+                    : 'Registration'}
                 </div>
                 <div style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--foreground)' }}>
-                  {isPaid ? rupees(event.fee_paise) : 'Free'}
+                  {isPaid ? rupees(event.fee_paise * (1 + attendees.length)) : 'Free'}
                 </div>
               </div>
 
@@ -210,7 +229,7 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
               >
                 {loading
                   ? (isPaid ? 'Preparing payment…' : 'Registering…')
-                  : (isPaid ? `Continue to pay ${rupees(event.fee_paise)}` : 'Confirm Registration')}
+                  : (isPaid ? `Continue to pay ${rupees(event.fee_paise * (1 + attendees.length))}` : 'Confirm Registration')}
               </Button>
 
               {isPaid && (
@@ -230,18 +249,24 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
 function QrPayPanel({ payment, slug, loading, submitUtr, onSubmitted, onCancel }) {
   const [utr, setUtr] = useState('');
   const [err, setErr] = useState(null);
-  const canvasRef = useRef(null);
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
-  // Render the UPI intent URI as a scannable QR onto the <canvas>. Redrawn
-  // if the URI changes (shouldn't in practice but safe).
+  // Render the UPI intent URI as a data-URL PNG, then render it via <img>.
+  // This is more robust than QRCode.toCanvas — the img keeps its src across
+  // re-renders even if the parent invalidates a cache. Async but resolves
+  // in tens of milliseconds so the visual lag is imperceptible.
   useEffect(() => {
-    if (!canvasRef.current || !payment?.upi_uri) return;
-    QRCode.toCanvas(canvasRef.current, payment.upi_uri, {
-      width: 220,
+    if (!payment?.upi_uri) { setQrDataUrl(''); return; }
+    let cancelled = false;
+    QRCode.toDataURL(payment.upi_uri, {
+      width: 240,
       margin: 1,
       errorCorrectionLevel: 'M',
       color: { dark: '#0b3d91', light: '#ffffff' },
-    }).catch(() => { /* browser can't render — user still has UPI ID as text */ });
+    })
+      .then((url) => { if (!cancelled) setQrDataUrl(url); })
+      .catch(() => { /* browser can't render — user still has UPI ID as text */ });
+    return () => { cancelled = true; };
   }, [payment?.upi_uri]);
 
   const copy = async (text, label) => {
@@ -280,7 +305,17 @@ function QrPayPanel({ payment, slug, loading, submitUtr, onSubmitted, onCancel }
         borderRadius: '.5rem', padding: '1rem', marginBottom: '1rem',
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.5rem',
       }}>
-        <canvas ref={canvasRef} style={{ borderRadius: '.35rem', background: '#fff' }} aria-label="UPI payment QR" />
+        {qrDataUrl ? (
+          <img
+            src={qrDataUrl}
+            alt="UPI payment QR"
+            width={240}
+            height={240}
+            style={{ borderRadius: '.35rem', background: '#fff', display: 'block' }}
+          />
+        ) : (
+          <div style={{ width: 240, height: 240, background: '#fff', borderRadius: '.35rem' }} aria-label="Loading QR" />
+        )}
         <div style={{ fontSize: '.75rem', color: 'var(--muted-foreground)' }}>
           Scan with any UPI app (GPay, PhonePe, Paytm, BHIM…)
         </div>
@@ -292,8 +327,25 @@ function QrPayPanel({ payment, slug, loading, submitUtr, onSubmitted, onCancel }
         fontSize: '.85rem',
       }}>
         <span style={{ color: 'var(--muted-foreground)' }}>Amount</span>
-        <span style={{ fontWeight: 700 }}>{rupees(payment.amount_paise)}</span>
+        <span style={{ fontWeight: 700 }}>
+          {rupees(payment.amount_paise)}
+          {payment.seat_count > 1 && (
+            <span className="muted-text" style={{ fontWeight: 400, marginLeft: '.4rem' }}>
+              ({payment.seat_count} seats × {rupees(payment.per_seat_paise)})
+            </span>
+          )}
+        </span>
         <span />
+
+        {Array.isArray(payment.attendees) && payment.attendees.length > 0 && (
+          <>
+            <span style={{ color: 'var(--muted-foreground)', alignSelf: 'start', paddingTop: '.2rem' }}>Also booking for</span>
+            <span style={{ fontSize: '.8rem' }}>
+              {payment.attendees.map((a) => a.name).join(', ')}
+            </span>
+            <span />
+          </>
+        )}
 
         <span style={{ color: 'var(--muted-foreground)' }}>Pay to</span>
         <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>
@@ -444,6 +496,134 @@ function SuccessState({ isPaid, onClose }) {
       >
         Done
       </button>
+    </div>
+  );
+}
+
+// ─── AttendeePicker ──────────────────────────────────────────────────────
+// Search-and-pick UI for group bookings. Booker types 2+ characters, we
+// hit /api/members/search (portal users only, capped at 15 results), they
+// click a result to add it as an attendee. Selected attendees appear as
+// removable chips above the search input. The picker never lets the
+// booker add themselves — the API also enforces that guard server-side.
+function AttendeePicker({ attendees, onChange, disabled }) {
+  const [q, setQ] = useState('');
+  const [results, setResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  // Debounced search — waits 250ms after typing stops before hitting the
+  // API so hammering the keyboard doesn't spawn a request per keystroke.
+  useEffect(() => {
+    const cleaned = q.trim();
+    if (cleaned.length < 2) { setResults([]); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/members/search?q=${encodeURIComponent(cleaned)}`, { credentials: 'include' });
+        const j = await r.json();
+        if (!cancelled && r.ok) setResults(j.rows || []);
+      } catch { /* swallow */ }
+      finally { if (!cancelled) setSearching(false); }
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [q]);
+
+  const alreadyPicked = new Set(attendees.map((a) => a.id));
+  const filteredResults = results.filter((r) => !alreadyPicked.has(r.id));
+
+  const add = (row) => {
+    onChange([...attendees, row]);
+    setQ('');
+    setResults([]);
+    setOpen(false);
+  };
+  const remove = (id) => onChange(attendees.filter((a) => a.id !== id));
+
+  return (
+    <div style={{ marginBottom: '1rem' }}>
+      <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.375rem' }}>
+        Book seats for others (optional)
+      </div>
+      <div className="muted-text" style={{ fontSize: '.72rem', marginBottom: '.5rem' }}>
+        Search by name or email to add fellow members. Each additional seat is charged separately and the person will see the event on their own dashboard once your payment is verified.
+      </div>
+
+      {attendees.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginBottom: '.5rem' }}>
+          {attendees.map((a) => (
+            <span key={a.id} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+              background: 'oklch(0.94 0.03 250)', color: 'oklch(0.28 0.09 250)',
+              padding: '.25rem .55rem', borderRadius: 999, fontSize: '.78rem',
+            }}>
+              {a.name}
+              <button
+                type="button"
+                onClick={() => remove(a.id)}
+                disabled={disabled}
+                aria-label={`Remove ${a.name}`}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  padding: 0, marginLeft: '.15rem', color: 'inherit', lineHeight: 1,
+                }}
+              >×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div style={{ position: 'relative' }}>
+        <input
+          type="text"
+          value={q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          placeholder="Search by name or email…"
+          disabled={disabled}
+          style={{
+            width: '100%', padding: '.5rem .7rem',
+            border: '1px solid var(--border)', borderRadius: '.375rem',
+            fontSize: '.875rem', background: 'var(--background)', color: 'var(--foreground)',
+          }}
+        />
+        {open && q.trim().length >= 2 && (
+          <div style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: '.2rem',
+            background: 'var(--card)', border: '1px solid var(--border)',
+            borderRadius: '.375rem', boxShadow: '0 10px 20px oklch(0.2 0.05 250 / 0.15)',
+            maxHeight: 240, overflowY: 'auto', zIndex: 10,
+          }}>
+            {searching && (
+              <div className="muted-text" style={{ padding: '.5rem .7rem', fontSize: '.78rem' }}>Searching…</div>
+            )}
+            {!searching && filteredResults.length === 0 && (
+              <div className="muted-text" style={{ padding: '.5rem .7rem', fontSize: '.78rem' }}>
+                No matching members. They need a portal account to be added as an attendee.
+              </div>
+            )}
+            {!searching && filteredResults.map((r) => (
+              <button
+                key={r.id}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}  /* keep focus so add() runs before blur */
+                onClick={() => add(r)}
+                style={{
+                  display: 'block', width: '100%', textAlign: 'left',
+                  padding: '.5rem .7rem', background: 'transparent', border: 'none',
+                  borderTop: '1px solid var(--border)', cursor: 'pointer',
+                  fontSize: '.85rem',
+                }}
+              >
+                <div style={{ fontWeight: 600 }}>{r.name}</div>
+                <div className="muted-text" style={{ fontSize: '.72rem' }}>{r.email}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

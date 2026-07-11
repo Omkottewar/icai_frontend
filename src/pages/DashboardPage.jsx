@@ -77,8 +77,6 @@ export default function DashboardPage() {
 
   const profile        = data?.profile ?? null;
   const upcomingEvents = data?.upcomingEvents ?? [];
-  const cpe            = data?.cpe ?? null;
-  const cpeProgress    = cpe ? Math.min(100, Math.round((cpe.total_hours / cpe.target) * 100)) : 0;
   const memberNo       = isMember ? profile?.mrn : (isStudent ? profile?.srn : null);
   const memberSince    = isMember ? profile?.member_since : (isStudent ? profile?.articleship_start : null);
   const memberNoLabel  = isMember ? 'Membership No.' : 'SRO No.';
@@ -223,34 +221,6 @@ export default function DashboardPage() {
       <div style={{ marginTop: '1.25rem', display: 'grid', gap: '1rem', gridTemplateColumns: '1fr' }} data-dash-body>
         {/* Main column */}
         <div className="col gap-3">
-          {isMember && cpe && (
-            <div className="card">
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>CPE compliance</h2>
-                <span className="badge badge-secondary">{cpe.fy_label}</span>
-              </div>
-              <div className="row gap-3" style={{ marginTop: '1rem', justifyContent: 'space-between' }}>
-                <span className="muted-text" style={{ fontSize: '.875rem' }}>
-                  {cpe.total_hours} of {cpe.target} hours completed
-                </span>
-                <span style={{
-                  fontWeight: 600, fontSize: '.875rem',
-                  color: cpeProgress >= 75 ? 'var(--secondary)' : 'var(--primary)',
-                }}>{cpeProgress}%</span>
-              </div>
-              <div className="progress-track" style={{ marginTop: '.5rem' }}>
-                <div className="progress-fill" style={{ width: cpeProgress + '%' }} />
-              </div>
-              <div className="row gap-3" style={{ marginTop: '1rem', flexWrap: 'wrap', color: 'var(--muted-foreground)', fontSize: '.75rem' }}>
-                <span>Structured: {cpe.structured_hours} hrs</span>
-                <span>·</span>
-                <span>Unstructured: {cpe.unstructured_hours} hrs</span>
-                <span>·</span>
-                <span>3-yr block target: {cpe.three_year_block_target} hrs</span>
-              </div>
-            </div>
-          )}
-
           <div className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <h2 style={{ fontSize: '1.125rem', fontWeight: 600 }}>My upcoming events</h2>
@@ -270,7 +240,9 @@ export default function DashboardPage() {
                         <div style={{ fontWeight: 600, fontSize: '.875rem' }}>{e.title}</div>
                         <div className="row gap-3 muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
                           <span className="row gap-1"><IconCalendar size="sm" /> {formatDate(e.starts_at)}</span>
-                          <span className="row gap-1"><IconAward size="sm" /> {Number(e.cpe_hours)} CPE</span>
+                          {Number(e.cpe_hours) > 0 && (
+                            <span className="row gap-1"><IconAward size="sm" /> {Number(e.cpe_hours)} CPE</span>
+                          )}
                         </div>
                       </div>
                       <span className="badge" style={{ background: palette.bg, color: palette.fg }}>
@@ -289,7 +261,6 @@ export default function DashboardPage() {
             <div style={{ marginTop: '.75rem', display: 'grid', gap: '.625rem', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
               {(isMember ? [
                 { Icon: IconShield,    t: 'Generate UDIN',          to: 'https://udin.icai.org/',        external: true },
-                { Icon: IconAward,     t: 'View CPE certificates',  to: 'https://cpeapp.icai.org/',      external: true },
                 { Icon: IconBriefcase, t: 'Update firm details',    to: 'https://eservices.icai.org/',   external: true },
                 { Icon: IconHandshake, t: 'Contribute to CABF',     to: '/benevolent-fund' },
               ] : [

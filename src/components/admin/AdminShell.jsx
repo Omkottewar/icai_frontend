@@ -51,7 +51,6 @@ const NAV_GROUPS = [
     items: [
       { to: '/admin/events',        label: 'Events',        Icon: IconCalendar,     roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
       { to: '/admin/registrations', label: 'Registrations', Icon: IconCheckCircle,  roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_TREASURER, ROLE_WICASA] },
-      { to: '/admin/cpe',           label: 'CPE credits',   Icon: IconAward, roles: [ROLE_CHAIRMAN] },
     ],
   },
   {
@@ -75,6 +74,7 @@ const NAV_GROUPS = [
       { to: '/admin/cabf',           label: 'CABF requests',   Icon: IconHeart,    roles: [ROLE_TREASURER] },
       { to: '/admin/vendors',        label: 'Vendors',         Icon: IconBriefcase, roles: [ROLE_TREASURER, ROLE_ACCOUNTANT] },
       { to: '/admin/budgets',        label: 'Budgets',         Icon: IconAward,     roles: [ROLE_TREASURER, ROLE_CHAIRMAN] },
+      { to: '/admin/reports',        label: 'Reports (Excel)', Icon: IconFileText,  roles: [ROLE_TREASURER, ROLE_ACCOUNTANT, ROLE_CHAIRMAN] },
     ],
   },
   {

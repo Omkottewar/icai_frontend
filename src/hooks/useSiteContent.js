@@ -103,6 +103,12 @@ export const SITE_CONTENT_DEFAULTS = {
     title:          'Circulars, standards & e-Journal',
     view_all_label: 'All resources →',
   },
+  home_best_paper: {
+    eyebrow:   'AWARD SPOTLIGHT',
+    title:     'Best Paper Presentation',
+    intro:     'Recognising outstanding student research at the Nagpur Branch.',
+    cta_label: 'Read the winning paper →',
+  },
   home_wicasa_card: {
     eyebrow:             'STUDENT WING',
     title:               'WICASA — Nagpur Branch',
@@ -191,10 +197,10 @@ export const SITE_CONTENT_DEFAULTS = {
     card_1_desc:  'Self-service Certificate of Practice workflows on ICAI eServices.',
     card_2_title: 'UDIN Generation & Verification',
     card_2_desc:  'Generate and verify Unique Document Identification Numbers on the ICAI UDIN portal.',
-    card_3_title: 'CPE Hours Tracker',
-    card_3_desc:  'Track structured / unstructured CPE hours against the 120-hours-in-3-years requirement.',
-    card_4_title: 'Newsletter Archive & Article Submission',
-    card_4_desc:  'Read past issues of the Nagpur Branch monthly newsletter — and submit your own article to be featured in an upcoming issue.',
+    card_3_title: 'Newsletter Archive & Article Submission',
+    card_3_desc:  'Read past issues of the Nagpur Branch monthly newsletter — and submit your own article to be featured in an upcoming issue.',
+    card_4_title: 'Event Attendance Certificates',
+    card_4_desc:  'Download attendance certificates for events you have participated in.',
   },
   // ── Contact page defaults ───────────────────────────────────────────
   contact_page_header: {
@@ -442,14 +448,14 @@ The most recent issue is on the **Newsletter** page. Past issues are linked from
 ### How do I contact the branch office?
 The **Contact** page lists the branch address, phone, email and Google Maps location. Office hours are Mon–Sat 10:30–18:00. For event-specific queries, the event page lists the committee owner; for grievances, use the **Grievance form** on the Contact page (48-hour SLA).
 
-### How do I claim CPE hours for an attended event?
-CPE hours auto-credit to your ICAI member ID once the branch closes attendance for the event (usually within 5 working days). Log in to the portal and open **My CPE** to see the running total, certificates and individual event breakdown. If hours are missing 7 days after the event, raise a grievance from the Contact page.`,
+### How do I download my event attendance certificate?
+Once the branch closes attendance for an event, an attendance certificate becomes available on your dashboard. Open the **My upcoming events** section on your dashboard for the download link.`,
   },
   faq_for_members: {
     body:
 `### What member benefits does the branch provide?
 Every Nagpur Branch member gets:
-- **Member-only CPE rates** on branch programmes (typically 30–50% off the public fee)
+- **Member-only rates** on branch programmes (typically 30–50% off the public fee)
 - **Free access** to the branch library (4,200+ titles) and reading room
 - **Networking events** — annual members' meet, Sports day, family events
 - **Empanelment opportunities** circulated when assignments come in
@@ -458,13 +464,13 @@ Every Nagpur Branch member gets:
 - **Curated knowledge digests** on tax, audit and regulatory updates emailed monthly
 
 ### How do I update my membership details?
-Personal details (address, phone, email, firm) are maintained on the **ICAI Self-Service Portal** (eservices.icai.org). Log in with your member ID → *Edit Member Profile*. Changes propagate to the branch within 24 hours. For corrections to records the branch holds locally (e.g., CPE attribution mismatches), email the branch office or raise a grievance.
+Personal details (address, phone, email, firm) are maintained on the **ICAI Self-Service Portal** (eservices.icai.org). Log in with your member ID → *Edit Member Profile*. Changes propagate to the branch within 24 hours. For corrections to records the branch holds locally, email the branch office or raise a grievance.
 
 ### Where are the latest professional standards circulars?
 The **Resources** section on the branch portal mirrors the head-office Professional Standards, Auditing & Accounting, and Direct/Indirect Tax circulars the branch has formally summarised for members. For the authoritative original notification, follow the link to icai.org. The branch newsletter also flags the month's most important regulatory changes on page 1.
 
-### How do I claim CPE hours for an attended event?
-CPE hours auto-credit to your ICAI member ID once the branch closes attendance for the event (usually within 5 working days). Open **My CPE** in the portal to see the running total and certificates. If hours are missing 7 days after the event, raise a grievance from the Contact page.`,
+### How do I download my event attendance certificate?
+Once the branch closes attendance for an event, an attendance certificate becomes available on your dashboard. Open the **My upcoming events** section on your dashboard for the download link.`,
   },
   faq_for_students: {
     body:
@@ -487,8 +493,7 @@ ICAI conducts CA Foundation, Intermediate and Final exams in **May and November*
 - **Articleship matchmaking** — student-employer registry maintained by the branch
 - Past test papers, suggested answers and study materials in the **Resources** section
 
-### How do I get my CPE/ITT details?
-- **CPE hours (members)** — log in to the portal → **My CPE**.
+### How do I get my ITT/Orientation certificate?
 - **ITT/Orientation completion (students)** — certificates are issued by the branch on completion; a digital copy is emailed and a physical one is available at the branch office. Lost certificate? Raise a grievance with your batch dates.`,
   },
   faq_for_employers: {

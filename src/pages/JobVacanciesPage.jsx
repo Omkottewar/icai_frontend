@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
-import { useRoute } from '../hooks/useRoute';
+import { useRoute, navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
+import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { cachedGet } from '../lib/apiCache';
-import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap } from '../icons';
+import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
+import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap, IconHandshake } from '../icons';
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -69,10 +71,29 @@ const MODE_CONFIG = {
 
 export default function JobVacanciesPage() {
   const route = useRoute();
+  const { user } = useAuth();
   const header = useSiteContent('job_vacancies_page_header');
   const mode = MODE_CONFIG[route.query.type] ?? MODE_CONFIG.job;
   const { rows, loading, error } = usePostings(mode.type);
   const [enquiryTarget, setEnquiryTarget] = useState(null);
+  // Preferences modal is only reachable from the articleship view. Students
+  // fill it once to have WICASA match them to firms — separate from clicking
+  // "Apply" on a specific vacancy.
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const isArticleshipView = mode.type === 'articleship';
+
+  const openPreferences = () => {
+    // Guests bounce to login with a return hint so they land back here
+    // after signing in. Everyone else — students, members, admin — can
+    // open the modal. The backend endpoint enforces the role check on
+    // submit, so non-students see a clear "students only" toast rather
+    // than silently getting nothing.
+    if (!user) {
+      navigate('/login?next=' + encodeURIComponent('/job-vacancies?type=articleship'));
+      return;
+    }
+    setPrefsOpen(true);
+  };
 
   const notice = (
     <div style={{
@@ -97,15 +118,61 @@ export default function JobVacanciesPage() {
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
         {notice}
 
-        <div style={{ marginBottom: '1.5rem' }}>
-          <div className="tiny-eyebrow">{mode.eyebrow}</div>
-          <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
-            {mode.defaultHeading}
-          </h2>
-          <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>
-            {mode.defaultLead}
-          </p>
+        <div style={{
+          display: 'flex', gap: '1rem', flexWrap: 'wrap',
+          alignItems: 'flex-end', justifyContent: 'space-between',
+          marginBottom: '1.5rem',
+        }}>
+          <div>
+            <div className="tiny-eyebrow">{mode.eyebrow}</div>
+            <h2 style={{ marginTop: '.25rem', fontSize: 'clamp(1.2rem, 4vw, 1.5rem)', fontWeight: 700, lineHeight: 1.2 }}>
+              {mode.defaultHeading}
+            </h2>
+            <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem', maxWidth: '48rem' }}>
+              {mode.defaultLead}
+            </p>
+          </div>
+
+          {isArticleshipView && (
+            <button
+              type="button"
+              onClick={openPreferences}
+              className="btn btn-primary"
+              style={{ padding: '.6rem 1.1rem', display: 'inline-flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}
+              title="Fill your preferences — WICASA matches you to firms"
+            >
+              <IconHandshake size="sm" /> Submit your preferences
+            </button>
+          )}
         </div>
+
+        {isArticleshipView && (
+          <div
+            style={{
+              background: 'oklch(0.94 0.03 250)',
+              border: '1px solid oklch(0.85 0.05 250)',
+              borderRadius: '.5rem',
+              padding: '.85rem 1rem',
+              marginBottom: '1.5rem',
+              fontSize: '.85rem',
+              color: 'oklch(0.28 0.09 250)',
+              display: 'flex', flexWrap: 'wrap', gap: '.75rem',
+              alignItems: 'center', justifyContent: 'space-between',
+            }}
+          >
+            <span>
+              <strong>Not sure which firm suits you?</strong> Fill out your specialisation, location, and firm-size preferences once — WICASA will match you to member firms and recommend openings that fit.
+            </span>
+            <button
+              type="button"
+              onClick={openPreferences}
+              className="btn btn-outline"
+              style={{ padding: '.35rem .8rem', fontSize: '.8rem', background: 'white' }}
+            >
+              Open preference form →
+            </button>
+          </div>
+        )}
 
         {loading && <LoadingGrid count={3} />}
         {error && <ErrorMessage message={error} />}
@@ -128,6 +195,13 @@ export default function JobVacanciesPage() {
 
       {enquiryTarget && (
         <EnquiryModal posting={enquiryTarget} onClose={() => setEnquiryTarget(null)} />
+      )}
+
+      {prefsOpen && (
+        <RequestArticleshipModal
+          onClose={() => setPrefsOpen(false)}
+          onSubmitted={() => setPrefsOpen(false)}
+        />
       )}
     </>
   );

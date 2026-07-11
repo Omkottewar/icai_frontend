@@ -3,7 +3,7 @@ import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
-import { IconBookOpen, IconAward } from '../icons';
+import { IconBookOpen } from '../icons';
 import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 
 // "My Library" — every paper / e-journal issue this user has bookmarked,
@@ -21,13 +21,11 @@ export default function MyLibraryPage() {
   const { user, loading } = useAuth();
   const header = useSiteContent('my_library_page_header');
   const [items, setItems] = useState(null);
-  const [cpe, setCpe] = useState(null);
 
   useEffect(() => {
     if (loading) return;
     if (!user) { navigate('/login'); return; }
     api('/api/resources/bookmarks/my').then((r) => setItems(r?.items || [])).catch(() => setItems([]));
-    api('/api/resources/cpe/my').then((r) => setCpe(r)).catch(() => setCpe({ total_minutes: 0, items: [] }));
   }, [user?.id, loading]);
 
   if (!user) return null;
@@ -36,19 +34,6 @@ export default function MyLibraryPage() {
     <>
       <PageHeader title={header.title} subtitle={header.subtitle} />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '900px' }}>
-        {/* CPE summary tile */}
-        {cpe && (
-          <div className="ml-cpe-tile">
-            <IconAward />
-            <div>
-              <strong>{Math.round(cpe.total_minutes / 60 * 10) / 10} hours unstructured CPE earned</strong>
-              <p className="muted-text" style={{ fontSize: '.85rem', margin: '.15rem 0 0' }}>
-                Across {cpe.items.length} paper{cpe.items.length === 1 ? '' : 's'} passed.
-              </p>
-            </div>
-          </div>
-        )}
-
         {/* Bookmarks section */}
         <h2 className="ml-section">Saved papers & issues</h2>
         {items === null && (
@@ -76,33 +61,9 @@ export default function MyLibraryPage() {
           </div>
         )}
 
-        {/* CPE detail — passed quizzes */}
-        {cpe && cpe.items.length > 0 && (
-          <>
-            <h2 className="ml-section" style={{ marginTop: '2rem' }}>CPE history</h2>
-            <ul className="ml-cpe-list">
-              {cpe.items.map((c) => (
-                <li key={c.attempt_id}>
-                  <a href={`/resources/papers/${c.paper_slug}`}>
-                    <strong>{c.paper_title}</strong>
-                    <span className="muted-text"> · {c.minutes} min · {new Date(c.completed_at).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
       </section>
 
       <style>{`
-        .ml-cpe-tile {
-          display: flex; align-items: center; gap: 1rem;
-          padding: 1rem 1.25rem;
-          background: linear-gradient(135deg, #fef3c7, #fde68a);
-          border: 1px solid #f59e0b;
-          border-radius: .5rem; margin-bottom: 1.5rem;
-        }
-        .ml-cpe-tile strong { font-size: 1.05rem; }
         .ml-section { font-size: 1.15rem; font-weight: 700; margin: 1rem 0 .65rem; }
         .ml-empty {
           padding: 2rem; text-align: center;
@@ -110,10 +71,6 @@ export default function MyLibraryPage() {
         }
         .ml-empty strong { display: block; margin: .35rem 0 .25rem; }
         .ml-grid { display: grid; gap: .85rem; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
-        .ml-cpe-list { list-style: none; padding: 0; margin: 0; }
-        .ml-cpe-list li { padding: .55rem 0; border-bottom: 1px solid var(--border); }
-        .ml-cpe-list a { color: inherit; text-decoration: none; }
-        .ml-cpe-list a:hover strong { color: var(--primary); }
       `}</style>
     </>
   );

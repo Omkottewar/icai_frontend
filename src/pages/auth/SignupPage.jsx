@@ -87,15 +87,15 @@ export default function SignupPage() {
       <div className="auth-form-wrap">
         <div className="auth-card">
           <div style={{ marginBottom: '1.5rem' }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{header.title}</h1>
-            <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.25rem' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, letterSpacing: '-.015em' }}>{header.title}</h1>
+            <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.35rem', lineHeight: 1.5 }}>
               {header.subtitle}
             </p>
           </div>
 
           <div className="auth-tabs">
-            <a href="/login" className="auth-tab" style={{ textAlign: 'center' }}>Sign in</a>
-            <a href="/signup" className="auth-tab active" style={{ textAlign: 'center' }}>Create account</a>
+            <a href="/login" className="auth-tab">Sign in</a>
+            <a href="/signup" className="auth-tab active">Create account</a>
           </div>
 
           <form onSubmit={onSubmit} className="col gap-4">

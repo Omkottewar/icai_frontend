@@ -44,10 +44,11 @@ const MISSING_LABELS = {
 
 // Single source of truth for the Member dashboard. Owns:
 //   - identity header (name + MRN + FCA/ACA + COP + city)
-//   - CPE deadline alert (top banner, conditional)
-//   - 4 stat tiles (CPE / years member / events attended FY / saved papers)
-//   - main column: CPE card, upcoming events, suggested events, saved library, services
+//   - 3 stat tiles (years member / events attended FY / saved papers)
+//   - main column: upcoming events, suggested events, saved library, services
 //   - side column: profile card, announcements, grievance tile, notification settings
+// CPE tracking was removed in migration 0087 — the ICAI publish API is
+// no longer available so the branch stopped surfacing hour balances.
 //
 // All data comes from /api/dashboard (member branch) — see backend
 // server/routes/dashboard.ts for the response shape. Anything missing
@@ -93,7 +94,6 @@ const REGISTRATION_LABELS = {
 // instead of trying to clone them client-side.
 const ICAI_LINKS = {
   udin:           'https://udin.icai.org/',
-  cpePortal:      'https://cpeapp.icai.org/',
   copServices:    'https://eservices.icai.org/',
   firmRegister:   'https://eservices.icai.org/',
   membersPortal:  'https://www.icai.org/members',
@@ -101,7 +101,6 @@ const ICAI_LINKS = {
 
 export default function MemberDashboard({ user, data, logout, onRefresh, pendingBadge, officeBearerCard }) {
   const profile          = data?.profile ?? null;
-  const cpe              = data?.cpe ?? null;
   const upcomingEvents   = data?.upcomingEvents ?? [];
   const recentCertificates = data?.recentCertificates ?? [];
   const suggestedEvents  = data?.suggestedEvents ?? [];
@@ -141,18 +140,15 @@ export default function MemberDashboard({ user, data, logout, onRefresh, pending
   return (
     <section className="container md-dash" style={{ padding: '1.5rem 1rem' }}>
       {/* ── Always-visible header ─────────────────────────────────
-          Identity, urgent CPE alert, office-bearer admin entry, and the
-          stats row stay above the tabs — they're glanceable on every
-          visit regardless of which tab the user lands on. */}
+          Identity, office-bearer admin entry, and the stats row stay
+          above the tabs — glanceable on every visit regardless of tab. */}
       <MembershipIdentityCard user={user} profile={profile} pendingBadge={pendingBadge} onEdit={openEdit} />
 
       <ProfileCompletenessNudge pct={profilePct} missing={profileMissing} onEdit={openEdit} />
 
-      <CPEDeadlineAlert cpe={cpe} />
-
       {officeBearerCard /* rendered by parent as <a className="admin-cta-card"> */}
 
-      <MemberStatsRow cpe={cpe} profile={profile} eventsAttendedFy={eventsAttendedFy} bookmarksCount={bookmarksCount} />
+      <MemberStatsRow profile={profile} eventsAttendedFy={eventsAttendedFy} bookmarksCount={bookmarksCount} />
 
       {/* ── Tab strip ────────────────────────────────────────────── */}
       <div role="tablist" aria-label="Dashboard sections" className="md-tabs">
@@ -173,7 +169,6 @@ export default function MemberDashboard({ user, data, logout, onRefresh, pending
       {/* ── Tab panels ───────────────────────────────────────────── */}
       {tab === 'overview' && (
         <div id="md-tab-overview" role="tabpanel" className="md-tab-body">
-          {cpe && <CPEComplianceCard cpe={cpe} />}
           {announcements.length > 0 && <AnnouncementsCard items={announcements} />}
         </div>
       )}
@@ -340,44 +335,6 @@ function MembershipIdentityCard({ user, profile, pendingBadge, onEdit }) {
 // than 90 days to FY end. Three tones: amber (within 90d, gap > 0), red (within
 // 30d AND gap > 0), green-success (already met target). We deliberately don't
 // nag people who are on track — too many banners and the page becomes noise.
-function CPEDeadlineAlert({ cpe }) {
-  if (!cpe) return null;
-  const gap = Math.max(0, cpe.target - cpe.total_hours);
-  const fyEnd = new Date(cpe.fy_end);
-  const daysLeft = Math.max(0, Math.ceil((fyEnd.getTime() - Date.now()) / 86_400_000));
-  const onTrack = gap === 0;
-
-  // On track ⇒ a single success line; everything else gets a coloured banner.
-  if (onTrack) {
-    return (
-      <div className="md-alert md-alert-success">
-        <IconCheckCircle size="sm" />
-        <div>
-          <strong>You've cleared this year's CPE target.</strong>
-          <span className="muted-text"> {cpe.total_hours} of {cpe.target} hours done · {cpe.fy_label} closes in {daysLeft} day{daysLeft === 1 ? '' : 's'}.</span>
-        </div>
-      </div>
-    );
-  }
-  if (daysLeft > 90) return null;
-
-  const urgent = daysLeft <= 30;
-  return (
-    <div className={'md-alert ' + (urgent ? 'md-alert-danger' : 'md-alert-warn')}>
-      <IconClock size="sm" />
-      <div>
-        <strong>
-          {gap} hour{gap === 1 ? '' : 's'} of CPE left for {cpe.fy_label}.
-        </strong>
-        <span className="muted-text"> {daysLeft} day{daysLeft === 1 ? '' : 's'} to close. </span>
-        <a href="/events" style={{ color: 'inherit', fontWeight: 700, textDecoration: 'underline' }}>
-          Find a CPE event →
-        </a>
-      </div>
-    </div>
-  );
-}
-
 // ─── Stats row ──────────────────────────────────────────────────────────
 // Compact stats row — we only render tiles that have real data. Tiles
 // with placeholders (dashes, "Profile incomplete") were doing more harm
@@ -386,20 +343,10 @@ function CPEDeadlineAlert({ cpe }) {
 // member_since is missing; "Saved papers" is hidden until the member
 // has actually saved at least one. The result is a tighter row of
 // genuinely-useful numbers.
-function MemberStatsRow({ cpe, profile, eventsAttendedFy, bookmarksCount }) {
-  const cpePct      = cpe ? Math.min(100, Math.round((cpe.total_hours / cpe.target) * 100)) : 0;
+function MemberStatsRow({ profile, eventsAttendedFy, bookmarksCount }) {
   const memberYears = yearsBetween(profile?.member_since);
 
   const tiles = [];
-  // Always show CPE — it's the most important number on the page.
-  tiles.push({
-    key: 'cpe',
-    Icon: IconAward,
-    label: 'CPE this year',
-    value: cpe ? `${cpe.total_hours}` : '0',
-    sub: cpe ? `of ${cpe.target} hours · ${cpePct}% done` : 'Track CPE here',
-    tone: 'primary',
-  });
   // Always show events attended — zero is meaningful information.
   tiles.push({
     key: 'events',
@@ -454,54 +401,6 @@ function StatTile({ Icon, label, value, sub, tone = 'primary' }) {
   );
 }
 
-// ─── CPE compliance card ────────────────────────────────────────────────
-function CPEComplianceCard({ cpe }) {
-  const pct = Math.min(100, Math.round((cpe.total_hours / cpe.target) * 100));
-  const remaining = Math.max(0, cpe.target - cpe.total_hours);
-
-  return (
-    <div className="card md-card">
-      <div className="md-card-head">
-        <div>
-          <h2 className="md-card-title">CPE compliance</h2>
-          <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.15rem' }}>{cpe.fy_label}</p>
-        </div>
-        <a href={ICAI_LINKS.cpePortal} target="_blank" rel="noopener noreferrer" className="md-card-action">
-          ICAI CPE portal <IconArrowRight size="sm" />
-        </a>
-      </div>
-
-      <div className="row gap-3" style={{ marginTop: '.75rem', justifyContent: 'space-between' }}>
-        <span className="muted-text" style={{ fontSize: '.875rem' }}>
-          {cpe.total_hours} of {cpe.target} hours completed
-        </span>
-        <span style={{ fontWeight: 700, fontSize: '.95rem', color: pct >= 75 ? 'var(--secondary)' : 'var(--primary)' }}>
-          {pct}%
-        </span>
-      </div>
-      <div className="progress-track" style={{ marginTop: '.5rem' }}>
-        <div className="progress-fill" style={{ width: pct + '%' }} />
-      </div>
-
-      <div className="md-cpe-breakdown">
-        <CpeChip label="Structured" hours={cpe.structured_hours} />
-        <CpeChip label="Unstructured" hours={cpe.unstructured_hours} />
-        <CpeChip label="Remaining" hours={remaining} tone={remaining === 0 ? 'success' : 'warn'} />
-        <CpeChip label="3-yr block target" hours={cpe.three_year_block_target} />
-      </div>
-    </div>
-  );
-}
-
-function CpeChip({ label, hours, tone }) {
-  return (
-    <div className={'md-cpe-chip' + (tone ? ' md-cpe-chip-' + tone : '')}>
-      <div className="md-cpe-chip-label">{label}</div>
-      <div className="md-cpe-chip-value">{hours}<span> hrs</span></div>
-    </div>
-  );
-}
-
 // ─── My upcoming events ─────────────────────────────────────────────────
 function UpcomingEventsCard({ rows, onCancelled }) {
   const [busy, setBusy] = useState(null); // slug currently being cancelled
@@ -552,7 +451,22 @@ function UpcomingEventsCard({ rows, onCancelled }) {
             return (
               <li key={e.id} className="md-row">
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="md-row-title">{e.title}</div>
+                  <div className="md-row-title">
+                    {e.title}
+                    {e.booked_by_name && (
+                      <span
+                        style={{
+                          marginLeft: '.5rem',
+                          background: 'oklch(0.94 0.03 250)', color: 'oklch(0.28 0.09 250)',
+                          padding: '.1rem .45rem', borderRadius: 999, fontSize: '.7rem', fontWeight: 500,
+                          verticalAlign: 'middle',
+                        }}
+                        title={`This seat was booked and paid for by ${e.booked_by_name}`}
+                      >
+                        Booked by {e.booked_by_name}
+                      </span>
+                    )}
+                  </div>
                   <div className="md-row-meta">
                     <span className="row gap-1"><IconCalendar size="sm" /> {formatDateTime(e.starts_at)}</span>
                     {Number(e.cpe_hours) > 0 && (
@@ -736,7 +650,9 @@ function MyCertificatesCard({ rows }) {
               <div className="md-row-title">{e.title}</div>
               <div className="md-row-meta">
                 <span className="row gap-1"><IconCalendar size="sm" /> {formatDateTime(e.starts_at)}</span>
-                <span className="row gap-1"><IconAward size="sm" /> {Number(e.cpe_hours)} CPE</span>
+                {Number(e.cpe_hours) > 0 && (
+                  <span className="row gap-1"><IconAward size="sm" /> {Number(e.cpe_hours)} CPE</span>
+                )}
               </div>
             </div>
             <a
@@ -856,7 +772,6 @@ function MemberServicesGrid() {
   // on a login screen and assume our portal is broken.
   const items = [
     { Icon: IconShield,    title: 'Generate UDIN',          desc: 'Issue UDIN for signed documents on the official portal.', href: ICAI_LINKS.udin,        external: true, needsIcaiLogin: true },
-    { Icon: IconAward,     title: 'Track CPE certificates', desc: 'Download structured/unstructured CPE certificates.',     href: ICAI_LINKS.cpePortal,   external: true, needsIcaiLogin: true },
     { Icon: IconBriefcase, title: 'COP services',           desc: 'COP renewal, restoration, surrender, firm registration.', href: ICAI_LINKS.copServices, external: true, needsIcaiLogin: true },
     { Icon: IconBriefcase, title: 'Job vacancies',          desc: 'Senior positions and openings posted by member firms.',   href: '/job-vacancies' },
     { Icon: IconHandshake, title: 'Contribute to CABF',     desc: 'Support members and families in distress.',              href: '/benevolent-fund' },
@@ -1281,28 +1196,6 @@ function MemberDashboardStyles() {
       .md-stat-green   { --md-stat-accent: #16a34a;            --md-stat-bg: rgba(22,163,74,.10); }
       .md-stat-amber   { --md-stat-accent: #d97706;            --md-stat-bg: rgba(217,119,6,.12); }
       .md-stat-indigo  { --md-stat-accent: #5b5bd6;            --md-stat-bg: rgba(91,91,214,.12); }
-
-      /* ── CPE breakdown ──────────────────────────────────────────── */
-      .md-cpe-breakdown {
-        margin-top: .75rem;
-        display: grid; gap: .4rem;
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-      }
-      .md-cpe-chip {
-        background: var(--background); border: 1px solid var(--border);
-        border-radius: 8px; padding: .4rem .55rem;
-      }
-      .md-cpe-chip-label {
-        font-size: .62rem; font-weight: 600; color: var(--muted-foreground);
-        text-transform: uppercase; letter-spacing: .05em;
-      }
-      .md-cpe-chip-value {
-        font-size: .98rem; font-weight: 700; margin-top: .1rem;
-        font-variant-numeric: tabular-nums; color: var(--foreground);
-      }
-      .md-cpe-chip-value span { font-size: .7rem; font-weight: 500; color: var(--muted-foreground); margin-left: .15rem; }
-      .md-cpe-chip-warn    { border-color: oklch(0.85 0.16 90 / .55); background: oklch(0.85 0.16 90 / .08); }
-      .md-cpe-chip-success { border-color: oklch(0.55 0.14 155 / .35); background: oklch(0.55 0.14 155 / .07); }
 
       /* ── List rows (events, suggestions) ────────────────────────── */
       .md-list { display: flex; flex-direction: column; }

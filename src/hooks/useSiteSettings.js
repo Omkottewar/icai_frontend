@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { cachedGet, subscribe } from '../lib/apiCache';
-
 // Defaults mirror the values that are hardcoded in Header / Footer /
 // ContactPage today, so a fresh install renders correctly before admin seeds
 // the site_settings table.
@@ -16,6 +15,8 @@ export const SITE_SETTINGS_DEFAULTS = {
   social_linkedin:    '',
   social_youtube:     '',
   social_instagram:   '',
+  payment_upi_id:         '',
+  payment_upi_payee_name: 'ICAI Nagpur Branch',
 };
 
 // Single shared fetch — Header, Footer and ContactPage all consume the same

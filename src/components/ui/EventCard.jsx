@@ -1,4 +1,4 @@
-import { IconCalendar, IconClock, IconMapPin, IconAward } from '../../icons';
+import { IconCalendar, IconClock, IconMapPin } from '../../icons';
 
 export default function EventCard({ event: e, withRegister = false }) {
   return (

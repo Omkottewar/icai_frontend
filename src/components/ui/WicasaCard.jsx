@@ -168,7 +168,13 @@ export default function WicasaCard() {
           onSubmitted={() => {
             setShowSubmit(false);
             toast.success('Submitted — visible once an admin approves it.');
+            // invalidate() only clears the cache; the local state won't refresh
+            // until load() actually re-runs. Fresh submissions are pending and
+            // won't appear here (which is approved-only), but this catches the
+            // case where another suggestion got approved while the modal was
+            // open — the list still updates without a reload.
             invalidate(TOP_ENDPOINT);
+            load();
           }}
         />
       )}

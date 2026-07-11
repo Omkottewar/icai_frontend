@@ -40,7 +40,7 @@ function writeCachedUser(user) {
 }
 
 // Map the server's /api/auth/me shape onto the identity fields the UI uses.
-// Role-specific dashboard data (MRN, SRN, CPE hours, etc.) lives in
+// Role-specific dashboard data (MRN, SRN, etc.) lives in
 // /api/dashboard — see src/hooks/useDashboard.js.
 function toUiUser(apiUser) {
   if (!apiUser) return null;

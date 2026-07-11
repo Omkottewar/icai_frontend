@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { navigate, useRoute } from '../hooks/useRoute';
@@ -363,7 +363,12 @@ function MockTestCard({ test, myReg, openExpanded, canTake, onRegister, onCancel
       </div>
 
       {discussOpen && (
-        <MockTestDiscussion testId={test.id} onCountChange={setDiscussCount} />
+        <MockTestDiscussion
+          testId={test.id}
+          testTitle={test.title}
+          onCountChange={setDiscussCount}
+          onClose={() => setDiscussOpen(false)}
+        />
       )}
 
       <style>{`
@@ -413,18 +418,23 @@ function MockTestCard({ test, myReg, openExpanded, canTake, onRegister, onCancel
   );
 }
 
-// ─── Per-mock-test discussion thread ────────────────────────────────────
-// Lazy-mounts when the user expands "Discuss" on a card. Anyone can read;
-// logged-in users can post (composer hidden for visitors with a sign-in
-// prompt). Lives inline in the same card so peers can scroll between
-// tests without losing context.
-function MockTestDiscussion({ testId, onCountChange }) {
+// ─── Per-mock-test discussion — chat-style modal ────────────────────────
+// Opens as a right-side chat panel (mobile: full-screen sheet) so peers
+// can hold a real conversation about the test without the card scrolling
+// underneath. Anyone can read; logged-in users can post. Auto-scrolls to
+// the newest message on load and after every send. Backdrop click / Esc
+// closes. Messages render as chat bubbles — mine on the right in primary,
+// others on the left in muted.
+function MockTestDiscussion({ testId, testTitle, onCountChange, onClose }) {
   const { user } = useAuth();
   const [posts, setPosts] = useState(null);  // null = loading, [] = empty
   const [busy, setBusy] = useState(false);
   const [body, setBody] = useState('');
   const [error, setError] = useState(null);
+  const scrollRef = useRef(null);
+  const composerRef = useRef(null);
 
+  // Initial load.
   useEffect(() => {
     let cancelled = false;
     setPosts(null); setError(null);
@@ -437,6 +447,34 @@ function MockTestDiscussion({ testId, onCountChange }) {
       .catch((e) => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
   }, [testId]);
+
+  // Esc-to-close + focus the composer once messages are loaded.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKey);
+    // Lock background scroll while the modal is open.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onClose]);
+
+  // Auto-scroll to bottom on load + whenever a new message arrives.
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [posts]);
+
+  // Focus the composer once the modal is mounted and messages are ready
+  // (small delay so the transform-in animation settles before the caret
+  // moves — otherwise Chrome refuses to focus a mid-animation textarea).
+  useEffect(() => {
+    if (!user || !composerRef.current) return;
+    const t = setTimeout(() => composerRef.current?.focus(), 250);
+    return () => clearTimeout(t);
+  }, [user]);
 
   async function submit(e) {
     e.preventDefault();
@@ -461,10 +499,18 @@ function MockTestDiscussion({ testId, onCountChange }) {
     }
   }
 
+  // Enter to send, Shift+Enter for newline — matches every modern chat UX.
+  function onKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      submit(e);
+    }
+  }
+
   async function remove(postId) {
     const ok = await dialog.confirm({
-      title: 'Delete comment?',
-      message: 'Delete this comment?',
+      title: 'Delete message?',
+      message: 'Delete this message from the discussion?',
       confirmText: 'Delete',
       danger: true,
     });
@@ -482,116 +528,326 @@ function MockTestDiscussion({ testId, onCountChange }) {
   }
 
   return (
-    <div className="mt-disc">
-      <div className="mt-disc-head">
-        <IconMessageSquare size="sm" /> <strong>Discussion</strong>
-        <span className="muted-text" style={{ fontSize: '.72rem' }}>
-          · Be respectful and helpful — moderators may remove off-topic or abusive comments.
-        </span>
-      </div>
+    <div
+      className="mt-chat-backdrop"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose?.(); }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Discussion for ${testTitle}`}
+    >
+      <div className="mt-chat-panel">
+        {/* Header */}
+        <div className="mt-chat-head">
+          <div className="mt-chat-head-icon"><IconMessageSquare size="sm" /></div>
+          <div className="mt-chat-head-body">
+            <div className="mt-chat-title">Discussion</div>
+            <div className="mt-chat-subtitle">{testTitle}</div>
+          </div>
+          <button
+            type="button"
+            className="mt-chat-close"
+            onClick={onClose}
+            aria-label="Close discussion"
+          >
+            <IconX size="sm" />
+          </button>
+        </div>
 
-      {posts === null && <ShimmerLines count={2} lastWidth="60%" />}
+        <div className="mt-chat-hint">
+          Be respectful and helpful — moderators may remove off-topic or abusive messages.
+        </div>
 
-      {posts && posts.length === 0 && (
-        <p className="muted-text" style={{ fontSize: '.78rem', margin: '.5rem 0' }}>
-          No comments yet. {user ? 'Start the discussion below.' : 'Sign in to post the first comment.'}
-        </p>
-      )}
+        {/* Messages */}
+        <div className="mt-chat-scroll" ref={scrollRef}>
+          {posts === null && (
+            <div style={{ padding: '1rem' }}>
+              <ShimmerLines count={3} lastWidth="60%" />
+            </div>
+          )}
 
-      {posts && posts.length > 0 && (
-        <ul className="mt-disc-list">
-          {posts.map((p) => {
-            const mine = user && user.id === p.created_by;
-            return (
-              <li key={p.id} className="mt-disc-row">
-                <div className="mt-disc-meta">
-                  <strong className="mt-disc-author">{p.author_name || 'Member'}</strong>
-                  <span className="muted-text">{fmtDt(p.created_at)}</span>
-                  {mine && (
-                    <button
-                      type="button"
-                      className="mt-disc-del"
-                      onClick={() => remove(p.id)}
-                      title="Delete this comment"
-                      aria-label="Delete comment"
-                    >
-                      <IconTrash size="sm" />
-                    </button>
-                  )}
-                </div>
-                <div className="mt-disc-body">{p.body}</div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+          {posts && posts.length === 0 && (
+            <div className="mt-chat-empty">
+              <div className="mt-chat-empty-icon"><IconMessageSquare /></div>
+              <div className="mt-chat-empty-title">No messages yet</div>
+              <div className="mt-chat-empty-sub">
+                {user ? 'Say hello — ask a doubt, share a tip, or start a solution walkthrough.' : 'Sign in to send the first message.'}
+              </div>
+            </div>
+          )}
 
-      {user ? (
-        <form className="mt-disc-form" onSubmit={submit}>
-          <textarea
-            className="input-base"
-            placeholder="Share a tip, ask a question, or compare your solution…"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={2000}
-            rows={2}
-            style={{ width: '100%', fontSize: '.82rem', resize: 'vertical' }}
-            disabled={busy}
-          />
-          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', marginTop: '.4rem', gap: '.5rem' }}>
-            <span className="muted-text" style={{ fontSize: '.7rem' }}>{body.length}/2000</span>
+          {posts && posts.length > 0 && (
+            <ul className="mt-chat-list">
+              {posts.map((p, i) => {
+                const mine = user && user.id === p.created_by;
+                const prev = posts[i - 1];
+                // Squash the avatar/name header when the previous message is
+                // from the same author within 5 min — reads like a natural
+                // burst of messages instead of a boring repeat.
+                const sameAuthorRun = prev
+                  && prev.created_by === p.created_by
+                  && (new Date(p.created_at) - new Date(prev.created_at)) < 5 * 60 * 1000;
+                return (
+                  <li key={p.id} className={'mt-chat-msg ' + (mine ? 'mt-chat-mine' : 'mt-chat-other')}>
+                    {!sameAuthorRun && !mine && (
+                      <div className="mt-chat-avatar" aria-hidden="true">
+                        {(p.author_name || 'M').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                    {sameAuthorRun && !mine && <div className="mt-chat-avatar-spacer" aria-hidden="true" />}
+                    <div className="mt-chat-bubble-wrap">
+                      {!sameAuthorRun && (
+                        <div className="mt-chat-meta">
+                          <span className="mt-chat-author">{mine ? 'You' : (p.author_name || 'Member')}</span>
+                          <span className="mt-chat-time">{fmtDt(p.created_at)}</span>
+                        </div>
+                      )}
+                      <div className="mt-chat-bubble">
+                        {p.body}
+                        {mine && (
+                          <button
+                            type="button"
+                            className="mt-chat-del"
+                            onClick={() => remove(p.id)}
+                            title="Delete message"
+                            aria-label="Delete message"
+                          >
+                            <IconTrash size="sm" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {/* Composer */}
+        {user ? (
+          <form className="mt-chat-composer" onSubmit={submit}>
+            <textarea
+              ref={composerRef}
+              placeholder="Type a message… (Shift+Enter for newline)"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              onKeyDown={onKeyDown}
+              maxLength={2000}
+              rows={1}
+              disabled={busy}
+            />
             <Button
               type="submit"
-              className="btn btn-primary"
-              style={{ padding: '.3rem .8rem', fontSize: '.78rem' }}
+              className="btn btn-primary mt-chat-send"
               disabled={!body.trim()}
               loading={busy}
+              aria-label="Send message"
             >
-              {busy ? 'Posting…' : 'Post comment'}
+              {busy ? '…' : <IconArrowRight size="sm" />}
             </Button>
+          </form>
+        ) : (
+          <div className="mt-chat-signin">
+            <a href="/login">Sign in</a> to join the discussion.
           </div>
-        </form>
-      ) : (
-        <p className="muted-text" style={{ fontSize: '.78rem', marginTop: '.5rem' }}>
-          <a href="/login">Sign in</a> to join the discussion.
-        </p>
-      )}
+        )}
 
-      {error && (
-        <p style={{ color: 'var(--destructive)', fontSize: '.75rem', marginTop: '.4rem' }}>{error}</p>
-      )}
+        {error && <div className="mt-chat-error">{error}</div>}
+      </div>
 
       <style>{`
-        .mt-disc {
-          margin-top: .65rem; padding-top: .65rem;
-          border-top: 1px dashed var(--border);
-          display: flex; flex-direction: column; gap: .4rem;
+        .mt-chat-backdrop {
+          position: fixed; inset: 0; z-index: 900;
+          background: oklch(0.18 0.05 250 / 0.55);
+          backdrop-filter: blur(3px);
+          display: flex; justify-content: flex-end;
+          animation: mtchat-fade .18s ease-out;
         }
-        .mt-disc-head {
-          display: flex; align-items: center; gap: .35rem; flex-wrap: wrap;
-          font-size: .78rem;
+        @keyframes mtchat-fade { from { opacity: 0; } to { opacity: 1; } }
+
+        .mt-chat-panel {
+          background: var(--card);
+          width: 100%;
+          max-width: 34rem;
+          height: 100%;
+          display: flex; flex-direction: column;
+          box-shadow: -20px 0 48px oklch(0.2 0.05 250 / 0.25);
+          animation: mtchat-slide .22s cubic-bezier(.2, .8, .2, 1);
         }
-        .mt-disc-list {
+        @keyframes mtchat-slide { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        @media (max-width: 640px) {
+          .mt-chat-backdrop { justify-content: stretch; }
+          .mt-chat-panel { max-width: 100%; }
+        }
+
+        .mt-chat-head {
+          display: flex; align-items: center; gap: .65rem;
+          padding: 1rem 1.1rem .75rem;
+          border-bottom: 1px solid var(--border);
+          background: linear-gradient(180deg, oklch(0.94 0.03 250), var(--card));
+        }
+        .mt-chat-head-icon {
+          width: 2.2rem; height: 2.2rem; border-radius: 999px;
+          background: var(--primary); color: white;
+          display: inline-flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+        }
+        .mt-chat-head-body { flex: 1; min-width: 0; }
+        .mt-chat-title { font-weight: 700; font-size: .95rem; line-height: 1.2; }
+        .mt-chat-subtitle {
+          font-size: .75rem; color: var(--muted-foreground);
+          margin-top: .1rem;
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .mt-chat-close {
+          background: transparent; border: none; cursor: pointer;
+          color: var(--muted-foreground);
+          padding: .35rem; border-radius: 999px;
+          display: inline-flex; align-items: center; justify-content: center;
+          transition: background .12s;
+        }
+        .mt-chat-close:hover { background: rgba(0,0,0,.06); color: var(--foreground); }
+
+        .mt-chat-hint {
+          padding: .55rem 1.1rem;
+          font-size: .7rem; color: var(--muted-foreground);
+          background: oklch(0.97 0.01 250);
+          border-bottom: 1px solid var(--border);
+        }
+
+        .mt-chat-scroll {
+          flex: 1;
+          overflow-y: auto;
+          padding: 1rem .9rem;
+          background: oklch(0.98 0.005 250);
+        }
+        .mt-chat-list {
           list-style: none; padding: 0; margin: 0;
-          display: flex; flex-direction: column; gap: .55rem;
+          display: flex; flex-direction: column; gap: .35rem;
         }
-        .mt-disc-row {
-          padding: .5rem .65rem;
-          background: var(--muted, #f8fafc);
-          border-radius: .4rem;
+        .mt-chat-msg {
+          display: flex; gap: .5rem;
+          align-items: flex-end;
         }
-        .mt-disc-meta {
-          display: flex; align-items: center; gap: .5rem;
-          font-size: .72rem; margin-bottom: .25rem;
+        .mt-chat-mine { justify-content: flex-end; }
+        .mt-chat-other { justify-content: flex-start; }
+
+        .mt-chat-avatar {
+          width: 1.75rem; height: 1.75rem;
+          border-radius: 999px;
+          background: oklch(0.72 0.16 90);
+          color: white; font-size: .78rem; font-weight: 700;
+          display: inline-flex; align-items: center; justify-content: center;
+          flex-shrink: 0;
+          margin-bottom: .1rem;
         }
-        .mt-disc-author { color: var(--primary); }
-        .mt-disc-body { font-size: .82rem; line-height: 1.4; white-space: pre-wrap; }
-        .mt-disc-del {
-          margin-left: auto; background: none; border: 0; cursor: pointer;
-          color: var(--muted-foreground); padding: 0;
+        .mt-chat-avatar-spacer { width: 1.75rem; flex-shrink: 0; }
+
+        .mt-chat-bubble-wrap { max-width: 82%; display: flex; flex-direction: column; }
+        .mt-chat-mine .mt-chat-bubble-wrap { align-items: flex-end; }
+
+        .mt-chat-meta {
+          display: flex; align-items: center; gap: .4rem;
+          margin-bottom: .15rem;
+          font-size: .68rem;
+          padding: 0 .3rem;
         }
-        .mt-disc-del:hover { color: var(--destructive); }
-        .mt-disc-form { margin-top: .25rem; }
+        .mt-chat-author { font-weight: 700; color: var(--foreground); }
+        .mt-chat-mine .mt-chat-author { color: var(--primary); }
+        .mt-chat-time { color: var(--muted-foreground); }
+
+        .mt-chat-bubble {
+          padding: .55rem .8rem;
+          border-radius: 1rem;
+          font-size: .87rem;
+          line-height: 1.4;
+          white-space: pre-wrap;
+          word-break: break-word;
+          position: relative;
+        }
+        .mt-chat-other .mt-chat-bubble {
+          background: var(--card);
+          border: 1px solid var(--border);
+          border-bottom-left-radius: .35rem;
+        }
+        .mt-chat-mine .mt-chat-bubble {
+          background: var(--primary);
+          color: white;
+          border-bottom-right-radius: .35rem;
+        }
+        .mt-chat-del {
+          margin-left: .5rem;
+          background: transparent; border: none; cursor: pointer;
+          color: rgba(255,255,255,.6);
+          padding: 0;
+          vertical-align: middle;
+          transition: color .12s;
+        }
+        .mt-chat-del:hover { color: white; }
+
+        .mt-chat-empty {
+          text-align: center;
+          padding: 3rem 1rem;
+          color: var(--muted-foreground);
+        }
+        .mt-chat-empty-icon {
+          width: 3rem; height: 3rem; border-radius: 999px;
+          background: var(--muted);
+          display: inline-flex; align-items: center; justify-content: center;
+          margin-bottom: .65rem;
+        }
+        .mt-chat-empty-title { font-weight: 700; color: var(--foreground); margin-bottom: .25rem; }
+        .mt-chat-empty-sub { font-size: .82rem; max-width: 22rem; margin: 0 auto; line-height: 1.4; }
+
+        .mt-chat-composer {
+          display: flex; gap: .5rem;
+          padding: .75rem 1rem;
+          border-top: 1px solid var(--border);
+          background: var(--card);
+          align-items: flex-end;
+        }
+        .mt-chat-composer textarea {
+          flex: 1;
+          border: 1px solid var(--border);
+          border-radius: 1.1rem;
+          padding: .55rem .9rem;
+          font-size: .87rem;
+          font-family: inherit;
+          resize: none;
+          max-height: 8rem;
+          background: var(--background);
+          color: var(--foreground);
+          outline: none;
+        }
+        .mt-chat-composer textarea:focus {
+          border-color: var(--primary);
+          box-shadow: 0 0 0 3px oklch(0.36 0.13 255 / 0.15);
+        }
+        .mt-chat-send {
+          width: 2.5rem; height: 2.5rem; border-radius: 999px;
+          padding: 0;
+          display: inline-flex; align-items: center; justify-content: center;
+        }
+
+        .mt-chat-signin {
+          padding: 1rem;
+          text-align: center;
+          font-size: .82rem;
+          color: var(--muted-foreground);
+          border-top: 1px solid var(--border);
+          background: var(--card);
+        }
+        .mt-chat-signin a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .mt-chat-signin a:hover { text-decoration: underline; }
+
+        .mt-chat-error {
+          padding: .55rem 1rem;
+          background: oklch(0.96 0.04 25);
+          color: oklch(0.35 0.18 25);
+          font-size: .78rem;
+          border-top: 1px solid oklch(0.85 0.1 25);
+        }
       `}</style>
     </div>
   );

@@ -230,9 +230,6 @@ function QuizCTA({ quiz, slug }) {
         <IconCheckCircle />
         <div>
           <strong>You've already passed this quiz</strong>
-          <p className="muted-text" style={{ margin: '.15rem 0 0', fontSize: '.85rem' }}>
-            {quiz.quiz.cpe_credit_minutes} min unstructured CPE credit recorded.
-          </p>
         </div>
       </div>
     );
@@ -254,9 +251,9 @@ function QuizCTA({ quiz, slug }) {
     <a href={`/resources/papers/${slug}/quiz`} className="pp-quiz-cta pp-quiz-open">
       <span style={{ fontSize: '1.75rem' }}>🎓</span>
       <div style={{ flex: 1 }}>
-        <strong>Take the quiz · earn {quiz.quiz.cpe_credit_minutes} min CPE</strong>
+        <strong>Take the comprehension quiz</strong>
         <p className="muted-text" style={{ margin: '.15rem 0 0', fontSize: '.85rem' }}>
-          {quiz.questions?.length || quiz.quiz.question_count} questions · pass {quiz.quiz.pass_threshold} to earn unstructured CPE credit
+          {quiz.questions?.length || quiz.quiz.question_count} questions · pass {quiz.quiz.pass_threshold} to complete
         </p>
       </div>
       <IconArrowRight />

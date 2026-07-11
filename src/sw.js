@@ -29,7 +29,18 @@ registerRoute(({ url }) => url.pathname.startsWith('/uploads/'), new NetworkOnly
 // old Workbox install can swallow same-origin GETs into a "cache or 503"
 // strategy. The server returns index.html for any unknown path (SPA
 // fallback), so the navigation succeeds and the SPA boots.
-setDefaultHandler(new NetworkOnly());
+//
+// Wrapped so a network failure (Vite HMR restart, aborted navigation,
+// offline) resolves to Response.error() instead of throwing a workbox
+// `no-response` rejection — that would spam the console without changing
+// what the browser ultimately shows the user.
+setDefaultHandler(async ({ request }) => {
+  try {
+    return await fetch(request);
+  } catch {
+    return Response.error();
+  }
+});
 
 // Activate the new SW immediately on update so users see fresh notifications
 // without a manual refresh.

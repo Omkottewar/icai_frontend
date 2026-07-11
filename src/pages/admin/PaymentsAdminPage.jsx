@@ -142,7 +142,7 @@ export default function PaymentsAdminPage() {
           onChange={(e) => { setPage(1); setFilters({ ...filters, purpose: e.target.value }); }}>
           {PURPOSES.map((p) => <option key={p} value={p}>{p ? p : 'All purposes'}</option>)}
         </select>
-        <input className="input-base" placeholder="Search Razorpay order/payment id…" style={{ flex: 1, minWidth: 220 }}
+        <input className="input-base" placeholder="Search by UTR or payment id…" style={{ flex: 1, minWidth: 220 }}
           value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); load(); } }} />
       </div>

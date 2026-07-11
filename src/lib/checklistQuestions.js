@@ -57,7 +57,6 @@ export const QUESTION_LIBRARY = [
   { key: 'speaker',        icon: '🎤', label: 'Speaker name',         type: 'short_text', overrides: { label: 'Speaker name & designation' } },
   { key: 'venue',          icon: '📍', label: 'Venue',                type: 'short_text', overrides: { label: 'Venue' } },
   { key: 'capacity',       icon: '👥', label: 'Capacity',             type: 'number',     overrides: { label: 'Maximum attendees', required: false } },
-  { key: 'cpe_hours',      icon: '⏱️', label: 'CPE hours',            type: 'number',     overrides: { label: 'CPE hours', help_text: 'Half-hour increments' } },
   { key: 'agenda',         icon: '📝', label: 'Agenda / programme',   type: 'long_text',  overrides: { label: 'Agenda / programme', help_text: 'One item per line' } },
   { key: 'is_iut',         icon: '🔁', label: 'IUT involved?',        type: 'yes_no',     overrides: { label: 'Does this event involve IUT (Inter-Unit Transfer)?' } },
   { key: 'sponsor_letter', icon: '📎', label: 'Sponsor letter',       type: 'file',       overrides: { label: 'Sponsor letter (if any)', required: false } },
@@ -121,21 +120,12 @@ export const SECTION_PRESETS = [
     key: 'speakers',
     icon: '🎤',
     title: 'Speakers & agenda',
-    description: 'Speaker info, agenda, CPE — Vice-Chairman reviews',
+    description: 'Speaker info and agenda — Vice-Chairman reviews',
     questions: [
       { type: 'short_text', overrides: { label: 'Speaker name & designation', required: true } },
       { type: 'long_text',  overrides: { label: 'Speaker bio (1–2 sentences)', required: true } },
       { type: 'file',       overrides: { label: 'Speaker photo', required: false } },
       { type: 'long_text',  overrides: { label: 'Agenda', required: true, help_text: 'One session per line' } },
-      { type: 'number',     overrides: { label: 'CPE hours', required: true, help_text: 'Half-hour increments' } },
-      { type: 'dropdown',   overrides: {
-          label: 'CPE eligibility', required: true,
-          config: { options: [
-            { value: 'structured', label: 'Structured' },
-            { value: 'unstructured', label: 'Unstructured' },
-            { value: 'na', label: 'N/A' },
-          ] },
-        } },
     ],
   },
   {

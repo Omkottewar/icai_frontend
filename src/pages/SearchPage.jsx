@@ -7,15 +7,15 @@ import { renderMarkdown } from '../lib/markdown.jsx';
 import { cachedGet, subscribe } from '../lib/apiCache';
 import { IconSearch } from '../icons';
 
-// Map a /api/events row onto the shape EventCard expects (title, committee,
-// cpe, date, time, venue). The card is shared across surfaces, so we keep
-// the adaptation local instead of changing the card's contract.
+// Map a /api/events row onto the shape EventCard expects (title,
+// committee, date, time, venue). The card is shared across surfaces, so
+// we keep the adaptation local instead of changing the card's contract.
 function toCardShape(e) {
   const start = e.starts_at ? new Date(e.starts_at) : null;
   return {
     title: e.title,
     committee: e.committee_name || e.committee_code || '—',
-    cpe: e.cpe_hours || 0,
+    cpe: Number(e.cpe_hours || 0),
     date: start ? start.toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '',
     time: start ? start.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '',
     venue: e.venue || (e.mode === 'online' ? 'Online' : '—'),

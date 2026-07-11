@@ -6,7 +6,6 @@ import { renderMarkdown } from '../lib/markdown.jsx';
 import { navigate } from '../hooks/useRoute';
 import { IconGraduationCap, IconArrowRight, IconBriefcase, IconBookOpen, IconUsers, IconAward, IconMessageSquare } from '../icons';
 import RequestMentorshipModal from '../components/student/RequestMentorshipModal';
-import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
 
 // All copy is admin-editable via /admin/site-content → Students tab.
 // Icons + href targets stay structural (they map to internal routes / icon
@@ -34,18 +33,24 @@ export default function StudentsPage() {
   const services    = useSiteContent('students_services');
   const { user } = useAuth();
 
-  const [modal, setModal] = useState(null); // 'mentorship' | 'articleship' | null
+  const [modal, setModal] = useState(null); // 'mentorship' | null
 
   function openAction(action) {
-    // Actions that write to the DB require a signed-in student. Bounce
-    // guests to /login with a return hint so they land back here after auth.
+    // Articleship goes to the openings list for EVERYONE (guest, student,
+    // member). The list page carries its own "Submit your preferences"
+    // CTA that opens the RequestArticleshipModal — that's where the
+    // form belongs, not as the primary action of this tile.
+    if (action === 'articleship') {
+      navigate('/job-vacancies?type=articleship');
+      return;
+    }
+    // Other actions (mentorship, etc.) still write to the DB and need a
+    // signed-in student.
     if (!user) {
       navigate('/login?next=/students');
       return;
     }
     if (user.primary_role !== 'student') {
-      // Non-students hitting a student action — send them to the generic
-      // contact form rather than showing a modal that would 403 on submit.
       navigate('/contact');
       return;
     }
@@ -159,12 +164,7 @@ export default function StudentsPage() {
           onSubmitted={() => setModal(null)}
         />
       )}
-      {modal === 'articleship' && (
-        <RequestArticleshipModal
-          onClose={() => setModal(null)}
-          onSubmitted={() => setModal(null)}
-        />
-      )}
+      {/* Articleship preferences modal moved to /job-vacancies?type=articleship — the vacancies list carries its own "Submit your preferences" button. */}
 
       <style>{`
         .students-svc-card { transition: transform .12s, box-shadow .12s; }

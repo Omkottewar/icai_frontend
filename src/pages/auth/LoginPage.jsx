@@ -50,8 +50,8 @@ export default function LoginPage() {
           </div>
 
           <div className="auth-tabs">
-            <a href="/login" className="auth-tab active" style={{ textAlign: 'center' }}>Sign in</a>
-            <a href="/signup" className="auth-tab" style={{ textAlign: 'center' }}>Create account</a>
+            <a href="/login" className="auth-tab active">Sign in</a>
+            <a href="/signup" className="auth-tab">Create account</a>
           </div>
 
           {err && (

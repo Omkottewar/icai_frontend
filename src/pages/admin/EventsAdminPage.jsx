@@ -23,7 +23,7 @@ import { IconPlus, IconCheckCircle } from '../../icons';
 // Programme types are a fixed list (no more free-text typos). Stays in sync
 // with the dropdown options used in the Event Basics checklist preset.
 const PROGRAM_TYPES = [
-  { value: 'cpe_seminar',  label: 'CPE Seminar' },
+  { value: 'seminar',      label: 'Seminar' },
   { value: 'workshop',     label: 'Workshop' },
   { value: 'study_circle', label: 'Study Circle Meet' },
   { value: 'conference',   label: 'Conference' },
@@ -105,6 +105,27 @@ function fmtPill(status) {
   );
 }
 
+// Sort dropdown presets — combine `sort` + `dir` into one named option so
+// admins pick "Date (newest first)" instead of building the combination
+// from two controls. Every value matches the whitelist in the backend
+// ORDER BY builder.
+const SORT_OPTIONS = [
+  { value: 'starts_at:desc',        label: 'Date — newest first' },
+  { value: 'starts_at:asc',         label: 'Date — oldest first' },
+  { value: 'title:asc',             label: 'Title A → Z' },
+  { value: 'title:desc',            label: 'Title Z → A' },
+  { value: 'registered_count:desc', label: 'Registrations — most first' },
+  { value: 'registered_count:asc',  label: 'Registrations — least first' },
+  { value: 'fill_pct:desc',         label: 'Fill % — most full first' },
+  { value: 'fill_pct:asc',          label: 'Fill % — least full first' },
+  { value: 'fee_paise:desc',        label: 'Fee — highest first' },
+  { value: 'fee_paise:asc',         label: 'Fee — lowest first' },
+  { value: 'cpe_hours:desc',        label: 'CPE hours — most first' },
+  { value: 'cpe_hours:asc',         label: 'CPE hours — least first' },
+  { value: 'created_at:desc',       label: 'Recently created' },
+  { value: 'capacity:desc',         label: 'Capacity — largest first' },
+];
+
 export default function EventsAdminPage() {
   const { showToast } = useAuth();
   const route = useRoute();
@@ -112,6 +133,19 @@ export default function EventsAdminPage() {
   const [status, setStatus] = useState('');
   const [committee, setCommittee] = useState('');
   const [q, setQ] = useState('');
+  // Extended filters — all optional, default "no filter". `when` is a
+  // one-click shortcut ('upcoming' | 'past') that trumps the manual from/to
+  // range when both are set. The date pickers only bind if `when` is empty.
+  const [when, setWhen]           = useState('');
+  const [from, setFrom]           = useState('');
+  const [to, setTo]               = useState('');
+  const [audience, setAudience]   = useState('');
+  const [mode, setMode]           = useState('');
+  const [fee, setFee]             = useState('');       // '' | 'free' | 'paid'
+  const [seats, setSeats]         = useState('');       // '' | 'available' | 'full' | 'unlimited'
+  const [hasCpe, setHasCpe]       = useState('');       // '' | 'yes' | 'no'
+  const [sortOpt, setSortOpt]     = useState('starts_at:desc');
+  const [sort, dir] = sortOpt.split(':');
 
   const [editingId, setEditingId] = useState(null); // null | 'new' | uuid
   const drawerOpen = editingId !== null;
@@ -132,7 +166,21 @@ export default function EventsAdminPage() {
 
   const { data, loading, refresh } = useAdminList('/api/admin/events', {
     page, pageSize: 20, status, committee_id: committee, q,
+    when, from, to, audience, mode, fee, seats, has_cpe: hasCpe,
+    sort, dir,
   });
+
+  // "Clear all" resets every filter except the sort selection. Keeps the
+  // sort choice because it's a preference (like column sort in Excel),
+  // whereas filters are per-question.
+  const activeFilterCount = [
+    status, committee, when, from, to, audience, mode, fee, seats, hasCpe,
+  ].filter(Boolean).length;
+  const clearFilters = () => {
+    setStatus(''); setCommittee(''); setWhen(''); setFrom(''); setTo('');
+    setAudience(''); setMode(''); setFee(''); setSeats(''); setHasCpe('');
+    setPage(1);
+  };
   const { data: lookups } = useAdminList('/api/admin/events/_meta/lookups');
 
   const columns = useMemo(() => [
@@ -180,21 +228,16 @@ export default function EventsAdminPage() {
         onRowClick={(row) => setEditingId(row.id)}
         emptyMessage="No events match your filters. Create your first event to get started."
         filters={
-          <>
-            <select className="input-base" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} style={{ maxWidth: 180 }}>
-              <option value="">All statuses</option>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="cancelled">Cancelled</option>
-              <option value="completed">Completed</option>
-            </select>
-            <select className="input-base" value={committee} onChange={(e) => { setCommittee(e.target.value); setPage(1); }} style={{ maxWidth: 200 }}>
-              <option value="">All committees</option>
-              {lookups?.committees?.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </>
+          <FiltersToolbar
+            state={{ status, committee, when, from, to, audience, mode, fee, seats, hasCpe }}
+            setters={{ setStatus, setCommittee, setWhen, setFrom, setTo, setAudience, setMode, setFee, setSeats, setHasCpe }}
+            lookups={lookups}
+            sortOpt={sortOpt}
+            onSortChange={(v) => { setSortOpt(v); setPage(1); }}
+            onAnyChange={() => setPage(1)}
+            activeFilterCount={activeFilterCount}
+            clearFilters={clearFilters}
+          />
         }
       />
 
@@ -228,6 +271,231 @@ export default function EventsAdminPage() {
         .admin-pill-completed { background: #e5e7eb; color: #374151; }
       `}</style>
     </AdminLayout>
+  );
+}
+
+// ─── Filters toolbar ─────────────────────────────────────────────────────
+// One-row header: Sort + Filters button + Clear. Every filter control
+// lives inside the Filters popover so the toolbar stays a single line
+// even when a bunch of filters are active. Click-outside + Esc close
+// the popover — mid-selection clicks stay inside so the user can tick
+// several filters in one visit.
+function FiltersToolbar({ state, setters, lookups, sortOpt, onSortChange, onAnyChange, activeFilterCount, clearFilters }) {
+  const { status, committee, when, from, to, audience, mode, fee, seats, hasCpe } = state;
+  const { setStatus, setCommittee, setWhen, setFrom, setTo, setAudience, setMode, setFee, setSeats, setHasCpe } = setters;
+  const [open, setOpen] = useState(false);
+  const popoverRef = useRef(null);
+  const buttonRef  = useRef(null);
+
+  // Close on outside-click / Esc so the popover stays out of the way once
+  // the admin's done setting filters. Clicks inside the popover — including
+  // on <select> options that briefly bubble outside — are excluded via the
+  // ref containment check.
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e) => {
+      if (popoverRef.current?.contains(e.target) || buttonRef.current?.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const wrap = (fn) => (v) => { fn(v); onAnyChange?.(); };
+
+  return (
+    <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flex: 1, flexWrap: 'wrap' }}>
+      <select
+        className="input-base"
+        value={sortOpt}
+        onChange={(e) => onSortChange(e.target.value)}
+        style={{ maxWidth: 220 }}
+        aria-label="Sort by"
+      >
+        {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+
+      <div style={{ position: 'relative' }}>
+        <button
+          ref={buttonRef}
+          type="button"
+          className="btn btn-outline"
+          onClick={() => setOpen((v) => !v)}
+          style={{ padding: '.45rem .85rem', fontSize: '.85rem', display: 'inline-flex', alignItems: 'center', gap: '.4rem' }}
+          aria-expanded={open}
+        >
+          <span>Filters</span>
+          {activeFilterCount > 0 && (
+            <span style={{
+              background: 'var(--primary)', color: 'white',
+              padding: '.05rem .45rem', borderRadius: 999,
+              fontSize: '.7rem', fontWeight: 700, lineHeight: 1.4,
+            }}>{activeFilterCount}</span>
+          )}
+        </button>
+
+        {open && (
+          <div
+            ref={popoverRef}
+            role="dialog"
+            aria-label="Event filters"
+            style={{
+              position: 'absolute', top: 'calc(100% + .4rem)', right: 0,
+              width: 'min(560px, 90vw)',
+              background: 'var(--card)',
+              border: '1px solid var(--border)',
+              borderRadius: '.5rem',
+              boxShadow: '0 20px 40px oklch(0.2 0.05 250 / 0.15)',
+              zIndex: 50,
+              padding: '1rem',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: '.75rem',
+            }}
+          >
+            <FilterField label="Status">
+              <select className="input-base" value={status} onChange={(e) => wrap(setStatus)(e.target.value)}>
+                <option value="">All statuses</option>
+                <option value="draft">Draft</option>
+                <option value="pending_approval">Pending approval</option>
+                <option value="approved">Approved</option>
+                <option value="published">Published</option>
+                <option value="cancelled">Cancelled</option>
+                <option value="completed">Completed</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Committee">
+              <select className="input-base" value={committee} onChange={(e) => wrap(setCommittee)(e.target.value)}>
+                <option value="">All committees</option>
+                {lookups?.committees?.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="When (shortcut)">
+              <select className="input-base" value={when} onChange={(e) => wrap(setWhen)(e.target.value)}>
+                <option value="">Any date</option>
+                <option value="upcoming">Upcoming only</option>
+                <option value="past">Past only</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Audience">
+              <select className="input-base" value={audience} onChange={(e) => wrap(setAudience)(e.target.value)}>
+                <option value="">Any audience</option>
+                <option value="members">Members</option>
+                <option value="students">Students</option>
+                <option value="all">All</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="From date" hint={when ? 'disabled — clear the shortcut above' : null}>
+              <input
+                type="date"
+                className="input-base"
+                value={from}
+                disabled={!!when}
+                onChange={(e) => wrap(setFrom)(e.target.value)}
+              />
+            </FilterField>
+
+            <FilterField label="To date" hint={when ? 'disabled — clear the shortcut above' : null}>
+              <input
+                type="date"
+                className="input-base"
+                value={to}
+                disabled={!!when}
+                onChange={(e) => wrap(setTo)(e.target.value)}
+              />
+            </FilterField>
+
+            <FilterField label="Mode">
+              <select className="input-base" value={mode} onChange={(e) => wrap(setMode)(e.target.value)}>
+                <option value="">Any mode</option>
+                <option value="in_person">In person</option>
+                <option value="online">Online</option>
+                <option value="hybrid">Hybrid</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Fee">
+              <select className="input-base" value={fee} onChange={(e) => wrap(setFee)(e.target.value)}>
+                <option value="">Any fee</option>
+                <option value="free">Free only</option>
+                <option value="paid">Paid only</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="Seats">
+              <select className="input-base" value={seats} onChange={(e) => wrap(setSeats)(e.target.value)}>
+                <option value="">Any capacity</option>
+                <option value="available">Seats available</option>
+                <option value="full">Fully booked</option>
+                <option value="unlimited">Unlimited capacity</option>
+              </select>
+            </FilterField>
+
+            <FilterField label="CPE hours">
+              <select className="input-base" value={hasCpe} onChange={(e) => wrap(setHasCpe)(e.target.value)}>
+                <option value="">Any CPE</option>
+                <option value="yes">Awards CPE</option>
+                <option value="no">No CPE</option>
+              </select>
+            </FilterField>
+
+            <div style={{
+              gridColumn: '1 / -1',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              marginTop: '.4rem', paddingTop: '.75rem',
+              borderTop: '1px solid var(--border)',
+            }}>
+              <span className="muted-text" style={{ fontSize: '.75rem' }}>
+                {activeFilterCount === 0 ? 'No filters applied' : `${activeFilterCount} filter${activeFilterCount === 1 ? '' : 's'} applied`}
+              </span>
+              <div style={{ display: 'flex', gap: '.4rem' }}>
+                {activeFilterCount > 0 && (
+                  <button type="button" className="btn btn-ghost" onClick={clearFilters} style={{ padding: '.35rem .7rem', fontSize: '.75rem', color: '#dc2626' }}>
+                    Clear all
+                  </button>
+                )}
+                <button type="button" className="btn btn-primary" onClick={() => setOpen(false)} style={{ padding: '.35rem .8rem', fontSize: '.8rem' }}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {activeFilterCount > 0 && (
+        <button
+          type="button"
+          className="btn btn-ghost"
+          onClick={clearFilters}
+          style={{ padding: '.4rem .6rem', fontSize: '.75rem', color: '#dc2626' }}
+          aria-label="Clear all filters"
+        >
+          Clear
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FilterField({ label, hint, children }) {
+  return (
+    <label style={{ fontSize: '.72rem', color: 'var(--muted-foreground)', display: 'flex', flexDirection: 'column', gap: '.25rem' }}>
+      <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--foreground)' }}>{label}</span>
+      {children}
+      {hint && <span style={{ fontSize: '.68rem', color: 'var(--muted-foreground)' }}>{hint}</span>}
+    </label>
   );
 }
 
@@ -573,7 +841,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
         <form
           id="event-form"
           onSubmit={onSubmit}
-          // Stop Enter inside a numeric input (CPE hours, fee, capacity, …)
+          // Stop Enter inside a numeric input (fee, capacity, …)
           // from submitting the half-filled form. The user gets a failed
           // validation error and assumes the input rejected their keypress.
           // Submission still works via the explicit footer buttons.
@@ -669,7 +937,7 @@ function EventDrawer({ open, id, lookups, canManage, onClose, onSaved, showToast
           {stepIdx === 1 && (<>
           <Section title="Pricing & capacity">
             <Grid>
-              <FormField label="CPE hours">
+              <FormField label="CPE hours" hint="Display-only label shown to members. Leave 0 if the event doesn't carry CPE.">
                 <input type="number" step="0.5" min="0" className="input-base" value={form.cpe_hours} onChange={(e) => set('cpe_hours', e.target.value)} />
               </FormField>
               <FormField label="Registration fee (₹)">
@@ -982,7 +1250,7 @@ function WizardReview({ form, lookups, onJumpToStep }) {
     { label: 'Mode',          value: form.mode?.replace('_', ' '),        step: 0 },
     { label: 'Venue / URL',   value: form.mode === 'online' ? (form.online_url || '—') : (form.venue || '—'), step: 0 },
     { label: 'Audience',      value: form.audience,                       step: 1 },
-    { label: 'CPE hours',     value: form.cpe_hours || '0',                step: 1 },
+    { label: 'CPE hours',     value: form.cpe_hours && Number(form.cpe_hours) > 0 ? `${form.cpe_hours} hrs` : '—', step: 1 },
     { label: 'Fee',           value: form.fee_rupees && Number(form.fee_rupees) > 0 ? `₹${form.fee_rupees}` : 'Free', step: 1 },
     { label: 'Capacity',      value: form.capacity || 'Unlimited',         step: 1 },
     { label: 'Banner',        value: form.banner_url ? 'Uploaded' : 'No banner',  step: 2 },

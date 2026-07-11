@@ -4,6 +4,7 @@ import EventRegisterModal from '../events/EventRegisterModal';
 import EventDetailsModal from '../events/EventDetailsModal';
 import EventChat from '../events/EventChat';
 import { useMyRegistrations } from '../../hooks/useMyRegistrations';
+import { useMyPendingPayments } from '../../hooks/useMyPendingPayments';
 import { googleCalendarEventUrl } from '../../lib/googleCalendar';
 
 function getMode(venue) {
@@ -47,7 +48,13 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
   const [showDetails, setShowDetails] = useState(false);
   const mode = getMode(e.venue);
   const { eventIds, refresh: refreshMyRegistrations } = useMyRegistrations();
+  const { eventIds: pendingPaymentEventIds, refresh: refreshPendingPayments } = useMyPendingPayments();
   const isRegistered = e.id && eventIds.has(e.id);
+  // User has a payment for this event that's either awaiting UTR submission
+  // ('pending') or awaiting admin verification ('pending_verification'). In
+  // both cases we hide the Register button and show a "Payment under review"
+  // pill instead, so they can't accidentally start a duplicate payment.
+  const hasPendingPayment = e.id && pendingPaymentEventIds.has(e.id);
 
   // Capacity awareness — drives the seats-left meta and the waitlist UX.
   const cap = Number(e.capacity ?? 0);
@@ -226,6 +233,19 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
                           <IconMessageSquare size="sm" /> Open chat
                         </button>
                       </>
+                    ) : hasPendingPayment ? (
+                      <span
+                        className="badge"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+                          padding: '.45rem 1rem', borderRadius: '999px',
+                          background: '#fef3c7', color: '#92400e',
+                          fontWeight: 600, fontSize: '.8125rem',
+                        }}
+                        title="We're verifying your payment against the bank statement. You'll get an email once it's confirmed — usually within 24 hours."
+                      >
+                        Payment under review
+                      </span>
                     ) : (
                       <button
                         type="button"
@@ -263,8 +283,8 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
       {showRegister && (
         <EventRegisterModal
           event={e}
-          onClose={() => setShowRegister(false)}
-          onRegistered={refreshMyRegistrations}
+          onClose={() => { setShowRegister(false); refreshPendingPayments(); }}
+          onRegistered={() => { refreshMyRegistrations(); refreshPendingPayments(); }}
         />
       )}
       {showChat && (

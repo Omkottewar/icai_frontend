@@ -2,15 +2,16 @@
 import PageHeader from '../components/layout/PageHeader';
 import { useAuth } from '../context/AuthContext';
 import { useRoute, navigate } from '../hooks/useRoute';
-import { IconCheckCircle, IconArrowRight } from '../icons';
+import { IconArrowRight } from '../icons';
 import { ShimmerPageBody } from '../components/ui/Shimmer';
 import { toast } from '../lib/notify';
 import Button from '../components/ui/Button';
 
-// CPE quiz taker. State machine:
+// Paper comprehension quiz taker. State machine:
 //   loading → ready → submitting → result (passed | failed)
-// On pass, the attempts row IS the CPE credit record — no separate ledger
-// write needed (server-side endpoint inserts it transactionally).
+// On pass, the attempts row is what proves completion — the CPE credit
+// attribution was removed alongside the rest of the CPE feature in
+// migration 0087.
 
 async function api(url, opts = {}) {
   const r = await fetch(url, {
@@ -83,15 +84,14 @@ export default function ResourceQuizPage() {
   }
 
   // Result view
-  if (result) return <ResultView result={result} slug={slug} quizMinutes={data.quiz.cpe_credit_minutes} />;
+  if (result) return <ResultView result={result} slug={slug} />;
 
   // Cooldown / already passed views
   if (data.already_passed) {
     return (
       <ResultView
-        result={{ attempt: { score: data.quiz.pass_threshold, passed: true, total: data.quiz.question_count }, cpe_credit_minutes: data.quiz.cpe_credit_minutes }}
+        result={{ attempt: { score: data.quiz.pass_threshold, passed: true, total: data.quiz.question_count } }}
         slug={slug}
-        quizMinutes={data.quiz.cpe_credit_minutes}
         alreadyPassed
       />
     );
@@ -113,7 +113,7 @@ export default function ResourceQuizPage() {
 
   return (
     <>
-      <PageHeader title="CPE Quiz" subtitle={`Pass ${data.quiz.pass_threshold} of ${data.quiz.question_count} to earn ${data.quiz.cpe_credit_minutes} min unstructured CPE.`} />
+      <PageHeader title="Paper comprehension quiz" subtitle={`Pass ${data.quiz.pass_threshold} of ${data.quiz.question_count} questions.`} />
       <section className="container" style={{ padding: '1.5rem 1rem 3rem', maxWidth: '720px' }}>
         <a href={`/resources/papers/${slug}`} className="quiz-back">← Back to paper</a>
 
@@ -150,7 +150,7 @@ export default function ResourceQuizPage() {
   );
 }
 
-function ResultView({ result, slug, quizMinutes, alreadyPassed }) {
+function ResultView({ result, slug, alreadyPassed }) {
   const passed = result.attempt.passed;
   return (
     <section className="container" style={{ padding: '3rem 1rem', maxWidth: '600px' }}>
@@ -158,11 +158,6 @@ function ResultView({ result, slug, quizMinutes, alreadyPassed }) {
         <div className="quiz-result-icon">{passed ? '🎉' : '😔'}</div>
         <h2>{alreadyPassed ? "You've already passed this quiz" : (passed ? 'You passed!' : 'Not quite — try again later')}</h2>
         <p className="quiz-result-score">Score: <strong>{result.attempt.score} of {result.attempt.total}</strong></p>
-        {passed && (
-          <p className="quiz-result-cpe">
-            <IconCheckCircle /> <span>{result.cpe_credit_minutes} min unstructured CPE recorded</span>
-          </p>
-        )}
         {!passed && (
           <p className="muted-text" style={{ marginTop: '.75rem' }}>
             Re-read the paper and try again after the cooldown.
@@ -210,6 +205,5 @@ const RESULT_STYLES = `
   .quiz-result-icon { font-size: 3.5rem; line-height: 1; }
   .quiz-result h2 { margin: .75rem 0 .5rem; font-size: 1.6rem; }
   .quiz-result-score strong { font-size: 1.15rem; }
-  .quiz-result-cpe { display: inline-flex; gap: .4rem; align-items: center; margin-top: .75rem; padding: .5rem 1rem; background: rgba(22, 101, 52, .12); border-radius: 999px; font-weight: 600; color: #166534; }
   .quiz-result-actions { display: flex; gap: .5rem; justify-content: center; margin-top: 1.5rem; flex-wrap: wrap; }
 `;

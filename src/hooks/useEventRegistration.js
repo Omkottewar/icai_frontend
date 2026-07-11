@@ -21,13 +21,20 @@ export function useEventRegistration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const startRegister = useCallback(async ({ slug, phone }) => {
+  const startRegister = useCallback(async ({ slug, phone, attendee_user_ids }) => {
     setLoading(true);
     setError(null);
     try {
+      // No cache invalidation here — paid /register does NOT create an
+      // event_registrations row (only admin approve does), so refetching
+      // /api/events would find no change. Worse, the invalidation broadcast
+      // would remount the modal in flight and blank the QR. Free /register
+      // is picked up naturally by the next useMyRegistrations refetch.
       const resp = await apiWrite(`/api/events/${encodeURIComponent(slug)}/register`, {
-        body: { phone },
-        invalidates: '/api/events',
+        body: {
+          phone,
+          attendee_user_ids: Array.isArray(attendee_user_ids) ? attendee_user_ids : [],
+        },
       });
       return { ok: true, ...resp };
     } catch (e) {
@@ -42,9 +49,11 @@ export function useEventRegistration() {
     setLoading(true);
     setError(null);
     try {
+      // Same reasoning as startRegister — UTR submission flips payment to
+      // 'pending_verification' but does NOT create a registration yet,
+      // so no need to invalidate the events cache.
       const resp = await apiWrite(`/api/events/${encodeURIComponent(slug)}/submit-utr`, {
         body: { payment_id, utr, screenshot_file_id: screenshot_file_id || null },
-        invalidates: '/api/events',
       });
       return { ok: true, ...resp };
     } catch (e) {

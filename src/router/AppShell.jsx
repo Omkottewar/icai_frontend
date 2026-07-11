@@ -96,11 +96,11 @@ const ChecklistTemplatesAdminPage = lazy(() => import('../pages/admin/ChecklistT
 const NotificationsLogAdminPage  = lazy(() => import('../pages/admin/NotificationsLogAdminPage'));
 const ApprovalsAdminPage         = lazy(() => import('../pages/admin/ApprovalsAdminPage'));
 const PragyaanAdminPage          = lazy(() => import('../pages/admin/PragyaanAdminPage'));
-const CpeAdminPage               = lazy(() => import('../pages/admin/CpeAdminPage'));
 const RoomsAdminPage             = lazy(() => import('../pages/admin/RoomsAdminPage'));
 const BookingsAdminPage          = lazy(() => import('../pages/admin/BookingsAdminPage'));
 const CabfAdminPage              = lazy(() => import('../pages/admin/CabfAdminPage'));
 const PaymentsAdminPage          = lazy(() => import('../pages/admin/PaymentsAdminPage'));
+const ReportsAdminPage           = lazy(() => import('../pages/admin/ReportsAdminPage'));
 const PaperPresentationsAdminPage = lazy(() => import('../pages/admin/PaperPresentationsAdminPage'));
 const NewslettersAdminPage       = lazy(() => import('../pages/admin/NewslettersAdminPage'));
 const GalleryAlbumsAdminPage     = lazy(() => import('../pages/admin/GalleryAlbumsAdminPage'));
@@ -192,7 +192,6 @@ const ADMIN_ROUTES = {
   '/admin/registrations': EventRegistrationsAdminPage,
   '/admin/users': UsersAdminPage,
   '/admin/signup-approvals': SignupApprovalsAdminPage,
-  '/admin/cpe': CpeAdminPage,
   '/admin/approvals': ApprovalsAdminPage,
   '/admin/rooms': RoomsAdminPage,
   '/admin/bookings': BookingsAdminPage,
@@ -204,6 +203,7 @@ const ADMIN_ROUTES = {
   '/admin/jobs': JobPostingsAdminPage,
   '/admin/cabf': CabfAdminPage,
   '/admin/payments': PaymentsAdminPage,
+  '/admin/reports':  ReportsAdminPage,
   '/admin/notifications-log': NotificationsLogAdminPage,
   // ─── Branch content (Resources page, Gallery, About page) ───
   '/admin/paper-presentations': PaperPresentationsAdminPage,

@@ -23,7 +23,6 @@ export default function QuizEditorPage() {
   const [questions, setQuestions] = useState([]);
   const [config, setConfig] = useState({
     pass_threshold: 4,
-    cpe_credit_minutes: 30,
     cooldown_hours: 24,
   });
   const [busy, setBusy] = useState(false);
@@ -39,7 +38,6 @@ export default function QuizEditorPage() {
         setQuiz(r.quiz);
         setConfig({
           pass_threshold: r.quiz.pass_threshold,
-          cpe_credit_minutes: r.quiz.cpe_credit_minutes,
           cooldown_hours: r.quiz.cooldown_hours,
         });
         setQuestions((r.questions || []).map((q) => ({
@@ -69,7 +67,7 @@ export default function QuizEditorPage() {
   const publish = async () => {
     const ok = await dialog.confirm({
       title: 'Publish quiz?',
-      message: 'Publish this quiz? Members will be able to take it for CPE credit.',
+      message: 'Publish this quiz? Members will be able to take it once published.',
       confirmText: 'Publish',
     });
     if (!ok) return;
@@ -116,9 +114,6 @@ export default function QuizEditorPage() {
       <div className="qe-cfg">
         <label>Pass threshold (of {questions.length} questions)
           <input type="number" min="1" max={questions.length} value={config.pass_threshold} onChange={(e) => setConfig((c) => ({ ...c, pass_threshold: Math.max(1, Math.min(questions.length, Number(e.target.value))) }))} />
-        </label>
-        <label>CPE credit minutes
-          <input type="number" min="0" value={config.cpe_credit_minutes} onChange={(e) => setConfig((c) => ({ ...c, cpe_credit_minutes: Number(e.target.value) }))} />
         </label>
         <label>Retake cooldown (hours)
           <input type="number" min="0" value={config.cooldown_hours} onChange={(e) => setConfig((c) => ({ ...c, cooldown_hours: Number(e.target.value) }))} />

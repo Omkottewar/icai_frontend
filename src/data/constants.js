@@ -48,28 +48,28 @@ export const ICAI_LINKS = [
 // audience: 'Members' | 'Students' | 'All'
 export const HOME_EVENTS = [
   // Direct Tax
-  { title: 'Direct Tax Amendments — Practical Insights', committee: 'Direct Tax', audience: 'Members', date: '18 May 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur', cpe: 3,
+  { title: 'Direct Tax Amendments — Practical Insights', committee: 'Direct Tax', audience: 'Members', date: '18 May 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur',
     speaker: 'CA Rahul Sharma',
     highlights: [
       'Key amendments from the latest Finance Act with worked examples',
       'Impact on individual and corporate assessees',
       'Compliance checklist for the upcoming assessment year',
     ] },
-  { title: 'TDS Compliance & New Forms Walkthrough', committee: 'Direct Tax', audience: 'Members', date: '02 Jun 2026', time: '5:30 PM', venue: 'Online (Zoom)', cpe: 2,
+  { title: 'TDS Compliance & New Forms Walkthrough', committee: 'Direct Tax', audience: 'Members', date: '02 Jun 2026', time: '5:30 PM', venue: 'Online (Zoom)',
     speaker: 'CA Priya Mehta',
     highlights: [
       'Section-wise TDS rate chart and recent changes',
       'Live walkthrough of revised return forms and corrections',
       'Common notices and how to respond effectively',
     ] },
-  { title: 'Income Tax Assessment Procedures — Case Studies', committee: 'Direct Tax', audience: 'Members', date: '14 Jun 2026', time: '10:00 AM', venue: 'Hotel Centre Point', cpe: 4,
+  { title: 'Income Tax Assessment Procedures — Case Studies', committee: 'Direct Tax', audience: 'Members', date: '14 Jun 2026', time: '10:00 AM', venue: 'Hotel Centre Point',
     speaker: 'CA Anjali Singh',
     highlights: [
       'Faceless assessment workflow explained end to end',
       'Real case studies on scrutiny and reassessment',
       'Drafting effective submissions and replies',
     ] },
-  { title: 'Capital Gains Taxation — Recent Judicial Developments', committee: 'Direct Tax', audience: 'Members', date: '28 Jun 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur', cpe: 3,
+  { title: 'Capital Gains Taxation — Recent Judicial Developments', committee: 'Direct Tax', audience: 'Members', date: '28 Jun 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur',
     speaker: 'CA Vikram Joshi',
     highlights: [
       'Recent ITAT and High Court rulings on capital gains',
@@ -78,28 +78,28 @@ export const HOME_EVENTS = [
     ] },
 
   // GST
-  { title: 'GST Annual Return & Audit Workshop', committee: 'GST', audience: 'Members', date: '22 May 2026', time: '10:00 AM', venue: 'Hotel Centre Point', cpe: 6,
+  { title: 'GST Annual Return & Audit Workshop', committee: 'GST', audience: 'Members', date: '22 May 2026', time: '10:00 AM', venue: 'Hotel Centre Point',
     speaker: 'CA Suresh Patel',
     highlights: [
       'Step-by-step GSTR-9 and GSTR-9C preparation',
       'Reconciliation of books with returns filed',
       'Common errors that trigger departmental notices',
     ] },
-  { title: 'GST Input Tax Credit — Practical Issues', committee: 'GST', audience: 'Members', date: '05 Jun 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur', cpe: 3,
+  { title: 'GST Input Tax Credit — Practical Issues', committee: 'GST', audience: 'Members', date: '05 Jun 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur',
     speaker: 'CA Rahul Desai',
     highlights: [
       'ITC eligibility, blocked credits and reversal rules',
       'Matching ITC with GSTR-2B in practice',
       'Handling supplier defaults and mismatches',
     ] },
-  { title: 'E-Invoicing & E-Way Bill — Compliance Update', committee: 'GST', audience: 'Members', date: '19 Jun 2026', time: '4:30 PM', venue: 'Online (Teams)', cpe: 2,
+  { title: 'E-Invoicing & E-Way Bill — Compliance Update', committee: 'GST', audience: 'Members', date: '19 Jun 2026', time: '4:30 PM', venue: 'Online (Teams)',
     speaker: 'CA Neha Gupta',
     highlights: [
       'Latest e-invoicing thresholds and exemptions',
       'Generating and amending e-way bills correctly',
       'Penalties and how to avoid common lapses',
     ] },
-  { title: 'GST Litigation & Advance Ruling Insights', committee: 'GST', audience: 'Members', date: '03 Jul 2026', time: '10:00 AM', venue: 'Chitnavis Centre', cpe: 4,
+  { title: 'GST Litigation & Advance Ruling Insights', committee: 'GST', audience: 'Members', date: '03 Jul 2026', time: '10:00 AM', venue: 'Chitnavis Centre',
     speaker: 'CA Suresh Patel',
     highlights: [
       'Structure of the GST appellate process',
@@ -108,28 +108,28 @@ export const HOME_EVENTS = [
     ] },
 
   // WICASA
-  { title: 'WICASA Mock Test Series — Foundation', committee: 'WICASA', audience: 'Students', date: '25 May 2026', time: '9:00 AM', venue: 'Branch Premises', cpe: 0,
+  { title: 'WICASA Mock Test Series — Foundation', committee: 'WICASA', audience: 'Students', date: '25 May 2026', time: '9:00 AM', venue: 'Branch Premises',
     speaker: 'CA Deepika Rao',
     highlights: [
       'Full-syllabus mock papers under exam conditions',
       'Detailed answer-key discussion and evaluation',
       'Time-management and answer-presentation tips',
     ] },
-  { title: 'Articleship Orientation & Industry Talk', committee: 'WICASA', audience: 'Students', date: '07 Jun 2026', time: '11:00 AM', venue: 'ICAI Bhawan, Nagpur', cpe: 0,
+  { title: 'Articleship Orientation & Industry Talk', committee: 'WICASA', audience: 'Students', date: '07 Jun 2026', time: '11:00 AM', venue: 'ICAI Bhawan, Nagpur',
     speaker: 'CA Manoj Kulkarni',
     highlights: [
       'What to expect during your articleship journey',
       'Choosing the right firm and area of specialisation',
       'Industry leaders share career-building advice',
     ] },
-  { title: 'CA Intermediate — Paper 6 Strategy Session', committee: 'WICASA', audience: 'Students', date: '21 Jun 2026', time: '10:00 AM', venue: 'Branch Premises', cpe: 0,
+  { title: 'CA Intermediate — Paper 6 Strategy Session', committee: 'WICASA', audience: 'Students', date: '21 Jun 2026', time: '10:00 AM', venue: 'Branch Premises',
     speaker: 'CA Kavita Rao',
     highlights: [
       'Chapter-wise weightage and a preparation roadmap',
       'Solving practical problems efficiently',
       'Revision strategy for the final month',
     ] },
-  { title: 'WICASA Annual Cultural & Sports Meet 2026', committee: 'WICASA', audience: 'All', date: '12 Jul 2026', time: '9:00 AM', venue: 'Sports Complex, Nagpur', cpe: 0,
+  { title: 'WICASA Annual Cultural & Sports Meet 2026', committee: 'WICASA', audience: 'All', date: '12 Jul 2026', time: '9:00 AM', venue: 'Sports Complex, Nagpur',
     speaker: 'NICASA Committee',
     highlights: [
       'Inter-batch sports, cultural and talent competitions',
@@ -138,28 +138,28 @@ export const HOME_EVENTS = [
     ] },
 
   // Audit
-  { title: 'Audit Quality & Documentation', committee: 'Audit', audience: 'Members', date: '01 Jun 2026', time: '5:30 PM', venue: 'Online (Zoom)', cpe: 2,
+  { title: 'Audit Quality & Documentation', committee: 'Audit', audience: 'Members', date: '01 Jun 2026', time: '5:30 PM', venue: 'Online (Zoom)',
     speaker: 'CA Rekha Nair',
     highlights: [
       'Building an audit file that withstands review',
       'Documentation requirements under SQC 1',
       'Common quality-review observations to avoid',
     ] },
-  { title: 'SA 315 — Risk Assessment in Practice', committee: 'Audit', audience: 'Members', date: '15 Jun 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur', cpe: 3,
+  { title: 'SA 315 — Risk Assessment in Practice', committee: 'Audit', audience: 'Members', date: '15 Jun 2026', time: '5:00 PM', venue: 'ICAI Bhawan, Nagpur',
     speaker: 'CA Manoj Kulkarni',
     highlights: [
       'Understanding the entity and its environment',
       'Identifying and assessing risks of material misstatement',
       'Linking risk assessment to audit procedures',
     ] },
-  { title: 'Bank Audit — Issues & Best Practices', committee: 'Audit', audience: 'Members', date: '29 Jun 2026', time: '10:00 AM', venue: 'Hotel Centre Point', cpe: 4,
+  { title: 'Bank Audit — Issues & Best Practices', committee: 'Audit', audience: 'Members', date: '29 Jun 2026', time: '10:00 AM', venue: 'Hotel Centre Point',
     speaker: 'CA Vivek Joshi',
     highlights: [
       'LFAR, IRAC norms and provisioning essentials',
       'Verifying advances, NPAs and documentation',
       'Practical tips for timely completion',
     ] },
-  { title: 'Peer Review Programme — Overview & FAQs', committee: 'Audit', audience: 'Members', date: '10 Jul 2026', time: '4:00 PM', venue: 'Online (Zoom)', cpe: 2,
+  { title: 'Peer Review Programme — Overview & FAQs', committee: 'Audit', audience: 'Members', date: '10 Jul 2026', time: '4:00 PM', venue: 'Online (Zoom)',
     speaker: 'CA Rekha Nair',
     highlights: [
       'Who needs peer review and when',
@@ -168,28 +168,28 @@ export const HOME_EVENTS = [
     ] },
 
   // IT
-  { title: 'AI Tools for Chartered Accountants', committee: 'IT', audience: 'Members', date: '08 Jun 2026', time: '4:00 PM', venue: 'ICAI Bhawan', cpe: 3,
+  { title: 'AI Tools for Chartered Accountants', committee: 'IT', audience: 'Members', date: '08 Jun 2026', time: '4:00 PM', venue: 'ICAI Bhawan',
     speaker: 'CA Neha Gupta',
     highlights: [
       'Practical AI tools for audit, tax and advisory work',
       'Automating routine documentation and research',
       'Data privacy and professional caution',
     ] },
-  { title: 'Excel Automation & Power Query for CAs', committee: 'IT', audience: 'Members', date: '22 Jun 2026', time: '10:00 AM', venue: 'Branch Premises', cpe: 3,
+  { title: 'Excel Automation & Power Query for CAs', committee: 'IT', audience: 'Members', date: '22 Jun 2026', time: '10:00 AM', venue: 'Branch Premises',
     speaker: 'CA Sunita Bhatt',
     highlights: [
       'Power Query for cleaning and merging data',
       'Building reusable, automated working papers',
       'Time-saving formulas and shortcuts',
     ] },
-  { title: 'Cybersecurity Essentials for CA Firms', committee: 'IT', audience: 'Members', date: '06 Jul 2026', time: '5:00 PM', venue: 'Online (Zoom)', cpe: 2,
+  { title: 'Cybersecurity Essentials for CA Firms', committee: 'IT', audience: 'Members', date: '06 Jul 2026', time: '5:00 PM', venue: 'Online (Zoom)',
     speaker: 'CA Dinesh Thakre',
     highlights: [
       'Common threats facing accounting practices',
       'Securing client data and email communication',
       'Building a simple incident-response plan',
     ] },
-  { title: 'Data Analytics in Audit & Assurance', committee: 'IT', audience: 'Members', date: '20 Jul 2026', time: '10:00 AM', venue: 'Hotel Centre Point', cpe: 4,
+  { title: 'Data Analytics in Audit & Assurance', committee: 'IT', audience: 'Members', date: '20 Jul 2026', time: '10:00 AM', venue: 'Hotel Centre Point',
     speaker: 'CA Arjun Mehta',
     highlights: [
       'Using analytics for sampling and anomaly detection',
@@ -198,28 +198,28 @@ export const HOME_EVENTS = [
     ] },
 
   // CPE
-  { title: 'Annual Regional Conference 2026', committee: 'CPE', audience: 'All', date: '20 Jun 2026', time: '9:00 AM', venue: 'Chitnavis Centre', cpe: 12,
+  { title: 'Annual Regional Conference 2026', committee: 'CPE', audience: 'All', date: '20 Jun 2026', time: '9:00 AM', venue: 'Chitnavis Centre',
     speaker: 'Multiple National Speakers',
     highlights: [
       'Two days of technical sessions across domains',
       'National-level faculty and panel discussions',
       'Networking with peers from across the region',
     ] },
-  { title: 'Full-Day CPE Seminar — Finance & Economy', committee: 'CPE', audience: 'Members', date: '04 Jul 2026', time: '9:30 AM', venue: 'Hotel Centre Point', cpe: 6,
+  { title: 'Full-Day CPE Seminar — Finance & Economy', committee: 'CPE', audience: 'Members', date: '04 Jul 2026', time: '9:30 AM', venue: 'Hotel Centre Point',
     speaker: 'CA Arjun Mehta',
     highlights: [
       'Macro-economic outlook and its impact on practice',
       'Sessions on corporate finance and valuation',
       'Interactive Q&A with subject experts',
     ] },
-  { title: 'CPE Study Circle — Monthly Meeting', committee: 'CPE', audience: 'Members', date: '18 Jul 2026', time: '5:30 PM', venue: 'ICAI Bhawan, Nagpur', cpe: 2,
+  { title: 'CPE Study Circle — Monthly Meeting', committee: 'CPE', audience: 'Members', date: '18 Jul 2026', time: '5:30 PM', venue: 'ICAI Bhawan, Nagpur',
     speaker: 'CA Kavita Rao',
     highlights: [
       'Peer-led discussion on a current professional topic',
       'Sharing of practical experiences and queries',
-      'Structured CPE credit in a collegial setting',
+      'Collegial peer-learning setting',
     ] },
-  { title: 'National CPE Webinar — FEMA Updates 2026', committee: 'CPE', audience: 'Members', date: '01 Aug 2026', time: '3:00 PM', venue: 'Online (Zoom)', cpe: 3,
+  { title: 'National CPE Webinar — FEMA Updates 2026', committee: 'CPE', audience: 'Members', date: '01 Aug 2026', time: '3:00 PM', venue: 'Online (Zoom)',
     speaker: 'CA Anjali Singh',
     highlights: [
       'Recent FEMA notifications and circulars',

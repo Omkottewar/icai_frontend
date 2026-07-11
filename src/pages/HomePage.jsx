@@ -6,6 +6,7 @@ import CategoryCard from '../components/ui/CategoryCard';
 import WicasaCard from '../components/ui/WicasaCard';
 import HeroCarousel from '../components/ui/HeroCarousel';
 import RecentPhotosStrip from '../components/home/RecentPhotosStrip';
+import BestPaperPopup from '../components/home/BestPaperPopup';
 // Bundled fallbacks used only when the admin hasn't uploaded a custom
 // hero image / watermark via /admin/site-content. Once a site-content row
 // exists with bg_image_url / watermark_url set, those URLs win.
@@ -60,6 +61,7 @@ export default function HomePage() {
   const eventsText      = useSiteContent('home_events_section');
   const premisesText    = useSiteContent('home_premises_section');
   const knowledgeText   = useSiteContent('home_knowledge_section');
+  const bestPaperText   = useSiteContent('home_best_paper');
   const carousel        = useSiteContent('home_leadership_carousel');
 
   // Build the leadership carousel from site-content slots. A slide is
@@ -446,6 +448,10 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Best Paper Presentation — promotion popup that fires ~1.4s after
+          the homepage lands. Self-hides if no winner is flagged, and
+          remembers dismissal per award year so it doesn't nag on every visit. */}
+      <BestPaperPopup text={bestPaperText} />
     </>
   );
 }

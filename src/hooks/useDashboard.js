@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { cachedGet, invalidate, subscribe } from '../lib/apiCache';
 
 // Fetches /api/dashboard once auth resolves. Shape depends on user.primary_role:
-//   member  → { role, profile, cpe, upcomingEvents, recentCertificates, ... }
+//   member  → { role, profile, upcomingEvents, recentCertificates, ... }
 //   student → { role, profile, eventsAttended, upcomingEvents }
 //   other   → { role, upcomingEvents }
 //

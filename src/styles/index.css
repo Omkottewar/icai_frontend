@@ -1149,13 +1149,18 @@ a:focus-visible,
 .auth-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   background: var(--background);
+  align-items: stretch;
 }
 @media (max-width: 900px) {
   .auth-shell { grid-template-columns: 1fr; }
   .auth-side { display: none; }
 }
+/* Pin the marketing panel to the viewport so its content never moves as
+ * the right-hand form grows or shrinks (e.g. the MRN field appearing
+ * when Member is selected). `sticky top:0 h:100vh` keeps it visually
+ * fixed while still respecting the two-column grid on scroll. */
 .auth-side {
   background:
     radial-gradient(circle at 80% 20%, oklch(0.4 0.14 200 / 0.55), transparent 55%),
@@ -1165,68 +1170,103 @@ a:focus-visible,
   padding: 3rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  position: relative;
+  gap: 2.5rem;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
   overflow: hidden;
 }
 .auth-side::before {
   content: ""; position: absolute; inset: 0;
   background-image:
-    linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,.05) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 70%);
+    linear-gradient(to right, rgba(255,255,255,.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse at center, black 25%, transparent 75%);
   pointer-events: none;
 }
+/* Decorative glow behind the headline — anchored to the panel so it
+ * stays put even if the parent height shifts. */
+.auth-side::after {
+  content: "";
+  position: absolute;
+  right: -6rem; bottom: -6rem;
+  width: 22rem; height: 22rem;
+  background: radial-gradient(circle, oklch(0.7 0.16 90 / 0.18), transparent 65%);
+  pointer-events: none;
+}
+.auth-side-body {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;      /* Push the headline block toward the bottom of the panel */
+  max-width: 32rem;
+}
 .auth-form-wrap {
-  display: flex; align-items: center; justify-content: center;
-  padding: 2rem;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 2.5rem 2rem;
+  min-height: 100vh;
 }
 .auth-card {
   width: 100%;
   max-width: 26rem;
+  margin: auto 0;         /* Vertically centre within the viewport */
 }
 .auth-tabs {
   display: grid; grid-template-columns: 1fr 1fr;
   background: var(--muted);
-  border-radius: .5rem;
+  border-radius: .625rem;
   padding: .25rem;
   margin-bottom: 1.5rem;
+  gap: .15rem;
 }
 .auth-tab {
-  padding: .5rem; border-radius: .375rem; font-size: .875rem; font-weight: 600;
+  padding: .55rem; border-radius: .5rem; font-size: .875rem; font-weight: 600;
   color: var(--muted-foreground);
   transition: all .15s;
+  text-align: center;
+  cursor: pointer;
 }
+.auth-tab:hover { color: var(--foreground); }
 .auth-tab.active {
   background: var(--card);
   color: var(--primary);
   box-shadow: 0 1px 3px oklch(0.18 0.05 250 / 0.08);
 }
+/* Role picker — one row of pills that always fits. Three self-signup
+ * roles today (CA Member / Student / Employer); if we ever add a fourth,
+ * increase the grid to 4 columns with a media query fallback. */
 .role-pills {
-  display: grid; grid-template-columns: 1fr 1fr;
+  display: grid; grid-template-columns: repeat(3, 1fr);
   gap: .5rem;
   margin-bottom: 1.25rem;
 }
+@media (max-width: 400px) {
+  .role-pills { grid-template-columns: 1fr; }
+}
 .role-pill {
-  padding: .75rem;
-  border-radius: .5rem;
-  border: 1px solid var(--border);
+  padding: .7rem .5rem;
+  border-radius: .55rem;
+  border: 1.5px solid var(--border);
   background: var(--card);
-  font-size: .8125rem;
+  font-size: .82rem;
   font-weight: 600;
   color: var(--foreground);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: .375rem;
+  gap: .4rem;
   transition: all .15s;
+  cursor: pointer;
 }
+.role-pill:hover { border-color: oklch(0.6 0.05 250); }
 .role-pill.active {
   border-color: var(--primary);
-  background: oklch(0.36 0.13 255 / 0.07);
+  background: oklch(0.36 0.13 255 / 0.08);
   color: var(--primary);
+  box-shadow: 0 0 0 3px oklch(0.36 0.13 255 / 0.10);
 }
+.role-pill.active svg { color: var(--primary); }
 .field-label {
   display: block;
   font-size: .8125rem; font-weight: 500; color: var(--foreground);
@@ -2475,4 +2515,12 @@ html[data-standalone="true"] body {
     transform: translate(-50%, -50%) !important;
     max-height: 70% !important;
   }
+}
+
+/* Hide the floating Google reCAPTCHA v3 badge. Google's ToS require the
+   attribution to be visible somewhere — the ContactPage renders a
+   "Protected by reCAPTCHA. Google Privacy & Terms apply." line below the
+   form which satisfies that requirement. */
+.grecaptcha-badge {
+  visibility: hidden !important;
 }

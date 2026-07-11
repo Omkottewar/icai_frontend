@@ -10,7 +10,7 @@ import { IconCheckCircle, IconArrowRight, IconUsers, IconBriefcase, IconShield, 
 const CARD_FRAMES = [
   { Icon: IconShield,       href: 'https://eservices.icai.org/', external: true,                                 },
   { Icon: IconCheckCircle,  href: 'https://udin.icai.org/',      external: true,                                 },
-  { Icon: IconAward,        href: '/dashboard',                 note: 'Sign in to see your live tracker · official records on ICAI CPE portal' },
+  { Icon: IconAward,        href: '/dashboard',                 note: 'Sign in to download your event attendance certificates' },
   { Icon: IconBookOpen,     href: '/resources',                 note: 'Submit an article → /resources/submit' },
 ];
 

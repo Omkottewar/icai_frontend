@@ -367,9 +367,19 @@ export default function StudentSuggestionsPage() {
           onSubmitted={() => {
             setShowSubmit(false);
             toast.success('Submitted — visible once an admin approves it.');
-            // Bust the "all" cache so the new pending row shows up immediately
-            // in the user's "Mine" tab when they switch to it.
             invalidate('/api/student-suggestions');
+            // Jump the user to their "Mine" tab so they can see the new row
+            // in its `pending` state without reloading. loadMine() has to be
+            // called explicitly — setTab alone won't retrigger the loader
+            // effect if `mine` was already the active tab, and even when it
+            // does fire, the effect reads a stale (cached-cleared) response
+            // only if we refetch here.
+            if (user) {
+              setTab('mine');
+              loadMine();
+            } else {
+              loadAll();
+            }
           }}
         />
       )}
