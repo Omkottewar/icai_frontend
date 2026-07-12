@@ -66,6 +66,7 @@ const PhotoGalleryPage   = lazy(() => import('../pages/PhotoGalleryPage'));
 const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
 const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'));
 const RoomBookingPage    = lazy(() => import('../pages/RoomBookingPage'));
+const ReadingRoomPage    = lazy(() => import('../pages/ReadingRoomPage'));
 const TrackGrievancePage = lazy(() => import('../pages/TrackGrievancePage'));
 const MySpeakerEventsPage = lazy(() => import('../pages/MySpeakerEventsPage'));
 const StudentSuggestionsPage = lazy(() => import('../pages/StudentSuggestionsPage'));
@@ -98,6 +99,7 @@ const ApprovalsAdminPage         = lazy(() => import('../pages/admin/ApprovalsAd
 const PragyaanAdminPage          = lazy(() => import('../pages/admin/PragyaanAdminPage'));
 const RoomsAdminPage             = lazy(() => import('../pages/admin/RoomsAdminPage'));
 const BookingsAdminPage          = lazy(() => import('../pages/admin/BookingsAdminPage'));
+const ReadingRoomAdminPage       = lazy(() => import('../pages/admin/ReadingRoomAdminPage'));
 const CabfAdminPage              = lazy(() => import('../pages/admin/CabfAdminPage'));
 const PaymentsAdminPage          = lazy(() => import('../pages/admin/PaymentsAdminPage'));
 const ReportsAdminPage           = lazy(() => import('../pages/admin/ReportsAdminPage'));
@@ -161,6 +163,7 @@ const ROUTES = {
   '/job-vacancies': JobVacanciesPage,
   '/members-directory': MembersDirectoryPage,
   '/book-room': RoomBookingPage,
+  '/reading-room': ReadingRoomPage,
   '/track-grievance': TrackGrievancePage,
   '/my-speaker-events': MySpeakerEventsPage,
   '/student-suggestions': StudentSuggestionsPage,
@@ -195,6 +198,7 @@ const ADMIN_ROUTES = {
   '/admin/approvals': ApprovalsAdminPage,
   '/admin/rooms': RoomsAdminPage,
   '/admin/bookings': BookingsAdminPage,
+  '/admin/reading-room': ReadingRoomAdminPage,
   '/admin/committees': CommitteesAdminPage,
   '/admin/site-content': SiteContentAdminPage,
   '/admin/site-settings': SiteSettingsAdminPage,

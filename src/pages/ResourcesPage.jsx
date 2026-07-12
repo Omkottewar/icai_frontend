@@ -13,7 +13,9 @@ import { Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 
 // Structural frames for the top category tiles — icon is built-in; title /
 // description / URL come from the `resources_categories` slot.
-const CATEGORY_ICONS = [IconFileText, IconBookOpen, IconAward, IconShield];
+// Order matches the 4 default cards: Circulars, Standards on Auditing (SA),
+// Accounting Standards (AS / Ind AS), e-Journal Archive.
+const CATEGORY_ICONS = [IconFileText, IconShield, IconBookOpen, IconDownload];
 
 // Renders a cover image with a graceful gradient fallback when the URL is
 // missing OR when the image fails to load (404, mock data, etc.). The

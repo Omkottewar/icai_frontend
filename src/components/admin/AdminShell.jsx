@@ -92,6 +92,7 @@ const NAV_GROUPS = [
       { to: '/admin/approvals',  label: 'Approvals',     Icon: IconCheckCircle, roles: [ROLE_CHAIRMAN, ROLE_TREASURER] },
       { to: '/admin/rooms',      label: 'Rooms',         Icon: IconMapPin,      roles: [ROLE_CHAIRMAN] },
       { to: '/admin/bookings',   label: 'Room bookings', Icon: IconBookOpen,    roles: [ROLE_CHAIRMAN] },
+      { to: '/admin/reading-room', label: 'Reading Room',  Icon: IconBookOpen,    roles: [ROLE_CHAIRMAN] },
       { to: '/admin/grievances',         label: 'Grievances',         Icon: IconHandshake, roles: [ROLE_CHAIRMAN] },
       { to: '/admin/grievance-routes',   label: 'Grievance routing',  Icon: IconSettings,  roles: [] /* admin-only */ },
       { to: '/admin/checklist-templates', label: 'Checklist templates', Icon: IconCheckCircle, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },

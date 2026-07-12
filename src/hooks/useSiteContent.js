@@ -98,6 +98,20 @@ export const SITE_CONTENT_DEFAULTS = {
     inner_title:        'ICAI Bhawan, Dhantoli',
     reading_room_label: 'Book the Reading Room',
   },
+  reading_room_page: {
+    title:    'Reading Room — monthly pass',
+    subtitle: '40-seat study hall at ICAI Bhawan, Dhantoli. Open Mon–Sat, 8 AM – 10 PM.',
+    location_hint: 'ICAI Bhawan, Dhantoli · Mon–Sat, 8am–10pm',
+    deposit_heading: 'Enrol with a one-time refundable deposit',
+    deposit_body:    'Pay ₹500 once. It’s fully refundable when you exit — think of it as a security deposit for the seat card. Once verified, you can book any upcoming month.',
+    non_student_msg: 'The reading room is dedicated to CA students of the branch. If you’re a student, sign in with your student account to enrol.',
+    house_rules:
+`• Bookings open on the 25th of every month for the next month.
+• Seat is on a monthly basis — no daily slots. Show your student card at the desk on the 1st.
+• Silence inside the hall. Discussions in the atrium.
+• No food; sealed water bottles allowed. Lockers on request at the desk.
+• Deposit is refunded on request when you stop using the facility (allow 7 working days).`,
+  },
   home_knowledge_section: {
     eyebrow:        'KNOWLEDGE HUB',
     title:          'Circulars, standards & e-Journal',
@@ -226,15 +240,15 @@ export const SITE_CONTENT_DEFAULTS = {
     card_1_title: 'Circulars',
     card_1_desc:  'ICAI announcements, notifications and council decisions.',
     card_1_url:   'https://www.icai.org/category/announcements',
-    card_2_title: 'Standards (AS / SA)',
-    card_2_desc:  'Accounting Standards, Ind AS and Standards on Auditing.',
+    card_2_title: 'Standards on Auditing (SA)',
+    card_2_desc:  'ICAI-issued Standards on Auditing — planning, evidence, reporting and quality.',
     card_2_url:   'https://www.icai.org/post/standards-on-auditing',
-    card_3_title: 'e-Journal Archive',
-    card_3_desc:  'Browse The Chartered Accountant journal archives.',
-    card_3_url:   'https://www.icai.org/category/e-journal',
-    card_4_title: 'Web-Media Policy',
-    card_4_desc:  'ICAI guidelines for member online presence.',
-    card_4_url:   'https://acrobat.adobe.com/id/urn:aaid:sc:AP:eb1357ad-534c-40f8-93e7-6563ada35afd',
+    card_3_title: 'Accounting Standards (AS / Ind AS)',
+    card_3_desc:  'Accounting Standards and Ind AS notified for entities in India.',
+    card_3_url:   'https://www.icai.org/post/accounting-standards',
+    card_4_title: 'e-Journal Archive',
+    card_4_desc:  'Browse The Chartered Accountant journal archives.',
+    card_4_url:   'https://www.icai.org/category/e-journal',
   },
   resources_sections: {
     newsletter_eyebrow:    'Monthly',

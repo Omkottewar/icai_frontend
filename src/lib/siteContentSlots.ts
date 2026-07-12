@@ -154,6 +154,19 @@ export const SITE_SLOTS = {
       { key: "reading_room_label", label: "Reading-room CTA label",                                        kind: "text" },
     ],
   },
+  reading_room_page: {
+    label: "Reading Room — public page copy",
+    page:  "Reading Room",
+    fields: [
+      { key: "title",           label: "Page title",                                                      kind: "text" },
+      { key: "subtitle",        label: "Page subtitle (shown under the title)",                           kind: "text" },
+      { key: "location_hint",   label: "Location + hours tagline (shown on the capacity tile)",           kind: "text" },
+      { key: "deposit_heading", label: "Heading for the deposit-collection card",                         kind: "text" },
+      { key: "deposit_body",    label: "Body copy explaining the ₹500 deposit",                           kind: "markdown" },
+      { key: "non_student_msg", label: "Message shown to non-students who visit the page",                kind: "markdown" },
+      { key: "house_rules",     label: "House rules (bulleted plain-text — one rule per line)",           kind: "markdown" },
+    ],
+  },
   home_knowledge_section: {
     label: "Home — Knowledge hub section (Circulars / Standards / e-Journal)",
     page:  "Home",
@@ -692,7 +705,7 @@ export function isValidSlug(s: string): s is SlotSlug {
 export interface SettingDef {
   key:    string;
   label:  string;
-  group:  "Contact" | "Footer" | "Social" | "Payments";
+  group:  "Contact" | "Footer" | "Social" | "Payments" | "Reading Room";
   hint?:  string;
 }
 
@@ -711,6 +724,9 @@ export const SITE_SETTINGS: SettingDef[] = [
   // Payments — UPI VPA every paid event QR encodes.
   { key: "payment_upi_id",         label: "UPI ID (VPA)",       group: "Payments", hint: "e.g. icainagpur@sbi — every paid event's QR encodes this address." },
   { key: "payment_upi_payee_name", label: "Payee display name", group: "Payments", hint: "Name shown to the payer inside their UPI app." },
+  { key: "reading_room_capacity",      label: "Reading Room capacity (seats)",        group: "Reading Room", hint: "Hard limit on active bookings per month." },
+  { key: "reading_room_deposit_paise", label: "Reading Room deposit (paise)",         group: "Reading Room", hint: "One-time refundable deposit in paise. 50000 = ₹500." },
+  { key: "reading_room_open",          label: "Reading Room bookings open? (1 or 0)", group: "Reading Room", hint: "Set to 0 to freeze bookings temporarily. 1 = open." },
 ];
 
 export const SETTING_KEYS = SITE_SETTINGS.map((s) => s.key);

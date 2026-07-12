@@ -405,7 +405,7 @@ export default function HomePage() {
                 ))}
               </div>
               <a
-                href="/book-room?room=reading-room"
+                href="/reading-room"
                 className="btn btn-primary"
                 style={{ marginTop: '.85rem' }}
               >

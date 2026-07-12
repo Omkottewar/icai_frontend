@@ -130,13 +130,16 @@ export default function StudentsPage() {
 
             // Modal-triggering cards render as buttons; the rest stay as
             // anchors so shift-click / middle-click still work like normal links.
+            // Explicitly do NOT zero out the border — the .card class supplies
+            // the 1px border and the button-rendered tiles need it too so they
+            // don't look bare next to the anchor tiles.
             if (frame.action) {
               return (
                 <button
                   key={n}
                   type="button"
                   className="card students-svc-card"
-                  style={{ textAlign: 'left', border: 'none', background: 'transparent', font: 'inherit', color: 'inherit', cursor: 'pointer', display: 'block', width: '100%', padding: undefined }}
+                  style={{ textAlign: 'left', font: 'inherit', color: 'inherit', cursor: 'pointer', display: 'block', width: '100%' }}
                   onClick={() => openAction(frame.action)}
                 >
                   {commonInner}
@@ -167,8 +170,19 @@ export default function StudentsPage() {
       {/* Articleship preferences modal moved to /job-vacancies?type=articleship — the vacancies list carries its own "Submit your preferences" button. */}
 
       <style>{`
-        .students-svc-card { transition: transform .12s, box-shadow .12s; }
-        .students-svc-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.08); }
+        /* Same tile layout as before — no colour changes, no accent bar.
+           Just a heavier neutral shadow on hover so the tile "pops" more
+           clearly against the section background. */
+        .students-svc-card {
+          transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+        .students-svc-card:hover {
+          transform: translateY(-3px);
+          box-shadow:
+            0 18px 36px -14px rgba(15, 23, 42, .22),
+            0 4px 10px rgba(15, 23, 42, .08);
+          border-color: rgba(15, 23, 42, .18);
+        }
         .students-svc-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
       `}</style>
     </>

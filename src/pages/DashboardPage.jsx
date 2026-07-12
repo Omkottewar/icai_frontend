@@ -13,6 +13,8 @@ import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklists
 import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
 import MemberDashboard from '../components/dashboard/MemberDashboard';
 import StudentRequestsCard from '../components/student/StudentRequestsCard';
+import MyArticleshipPrefsCard from '../components/student/MyArticleshipPrefsCard';
+import MyRoomBookingsCard from '../components/student/MyRoomBookingsCard';
 import RequestMentorshipModal from '../components/student/RequestMentorshipModal';
 import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
 import InsightsStyles from '../components/dashboard/insights/insightsStyles';
@@ -438,6 +440,11 @@ function StudentTabbedBody({ data, user, logout }) {
 
       {tab === 'requests' && (
         <div role="tabpanel" className="sd-tab-body">
+          {/* Detailed cards up top so the student sees their submitted
+              articleship preferences + room bookings at a glance; the
+              mixed "all requests" list stays below for older items. */}
+          <MyArticleshipPrefsCard />
+          <MyRoomBookingsCard />
           <StudentRequestsCard />
         </div>
       )}
