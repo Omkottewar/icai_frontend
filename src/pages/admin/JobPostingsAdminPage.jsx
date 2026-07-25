@@ -16,6 +16,7 @@ const EMPTY_FORM = {
   description: '',
   firm_id: '',
   employer_id: '',
+  category_id: '',
   seat_count: '1',
   experience_required: '',
   location: '',
@@ -195,6 +196,7 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
           description: row.description || '',
           firm_id: row.firm_id || '',
           employer_id: row.employer_id || '',
+          category_id: row.category_id || '',
           seat_count: String(row.seat_count ?? 1),
           experience_required: row.experience_required || '',
           location: row.location || '',
@@ -218,6 +220,7 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
         description: form.description,
         firm_id: form.firm_id || null,
         employer_id: form.employer_id || null,
+        category_id: form.category_id || null,
         seat_count: Number(form.seat_count) || 1,
         experience_required: form.experience_required || null,
         location: form.location || null,
@@ -348,6 +351,17 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
                 </select>
               </FormField>
             </Grid>
+          </Section>
+
+          <Section title="Category">
+            <FormField label="Job category" hint="Subscribers to this category will be alerted when the posting activates.">
+              <select className="input-base" value={form.category_id} onChange={(e) => set('category_id', e.target.value)}>
+                <option value="">— no category —</option>
+                {lookups?.categories?.filter((c) => c.active).map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </FormField>
           </Section>
 
           <Section title="Requirements">

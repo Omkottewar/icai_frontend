@@ -64,6 +64,9 @@ const OnboardingPage     = lazy(() => import('../pages/auth/OnboardingPage'));
 const AnnouncementsPage  = lazy(() => import('../pages/AnnouncementsPage'));
 const PhotoGalleryPage   = lazy(() => import('../pages/PhotoGalleryPage'));
 const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
+const JobAlertsSubscribePage = lazy(() => import('../pages/JobAlertsSubscribePage'));
+const JobAlertsConfirmPage   = lazy(() => import('../pages/JobAlertsConfirmPage'));
+const JobAlertsManagePage    = lazy(() => import('../pages/JobAlertsManagePage'));
 const MembersDirectoryPage = lazy(() => import('../pages/MembersDirectoryPage'));
 const RoomBookingPage    = lazy(() => import('../pages/RoomBookingPage'));
 const ReadingRoomPage    = lazy(() => import('../pages/ReadingRoomPage'));
@@ -93,6 +96,8 @@ const SiteSettingsAdminPage      = lazy(() => import('../pages/admin/SiteSetting
 const AnnouncementsAdminPage     = lazy(() => import('../pages/admin/AnnouncementsAdminPage'));
 const ComingSoonPage             = lazy(() => import('../pages/admin/ComingSoonPage'));
 const JobPostingsAdminPage       = lazy(() => import('../pages/admin/JobPostingsAdminPage'));
+const JobCategoriesAdminPage     = lazy(() => import('../pages/admin/JobCategoriesAdminPage'));
+const JobSubscribersAdminPage    = lazy(() => import('../pages/admin/JobSubscribersAdminPage'));
 const ChecklistTemplatesAdminPage = lazy(() => import('../pages/admin/ChecklistTemplatesAdminPage'));
 const NotificationsLogAdminPage  = lazy(() => import('../pages/admin/NotificationsLogAdminPage'));
 const ApprovalsAdminPage         = lazy(() => import('../pages/admin/ApprovalsAdminPage'));
@@ -100,6 +105,8 @@ const PragyaanAdminPage          = lazy(() => import('../pages/admin/PragyaanAdm
 const RoomsAdminPage             = lazy(() => import('../pages/admin/RoomsAdminPage'));
 const BookingsAdminPage          = lazy(() => import('../pages/admin/BookingsAdminPage'));
 const ReadingRoomAdminPage       = lazy(() => import('../pages/admin/ReadingRoomAdminPage'));
+const ChairmanInsightsPage       = lazy(() => import('../pages/admin/ChairmanInsightsPage'));
+const WicasaInsightsPage         = lazy(() => import('../pages/admin/WicasaInsightsPage'));
 const CabfAdminPage              = lazy(() => import('../pages/admin/CabfAdminPage'));
 const PaymentsAdminPage          = lazy(() => import('../pages/admin/PaymentsAdminPage'));
 const ReportsAdminPage           = lazy(() => import('../pages/admin/ReportsAdminPage'));
@@ -161,6 +168,9 @@ const ROUTES = {
   '/announcements': AnnouncementsPage,
   '/gallery': PhotoGalleryPage,
   '/job-vacancies': JobVacanciesPage,
+  '/job-alerts/subscribe': JobAlertsSubscribePage,
+  '/job-alerts/confirm':   JobAlertsConfirmPage,
+  '/job-alerts/manage':    JobAlertsManagePage,
   '/members-directory': MembersDirectoryPage,
   '/book-room': RoomBookingPage,
   '/reading-room': ReadingRoomPage,
@@ -199,12 +209,16 @@ const ADMIN_ROUTES = {
   '/admin/rooms': RoomsAdminPage,
   '/admin/bookings': BookingsAdminPage,
   '/admin/reading-room': ReadingRoomAdminPage,
+  '/admin/insights':        ChairmanInsightsPage,
+  '/admin/wicasa-insights': WicasaInsightsPage,
   '/admin/committees': CommitteesAdminPage,
   '/admin/site-content': SiteContentAdminPage,
   '/admin/site-settings': SiteSettingsAdminPage,
   '/admin/announcements': AnnouncementsAdminPage,
   '/admin/checklist-templates': ChecklistTemplatesAdminPage,
-  '/admin/jobs': JobPostingsAdminPage,
+  '/admin/jobs':             JobPostingsAdminPage,
+  '/admin/job-categories':   JobCategoriesAdminPage,
+  '/admin/job-subscribers':  JobSubscribersAdminPage,
   '/admin/cabf': CabfAdminPage,
   '/admin/payments': PaymentsAdminPage,
   '/admin/reports':  ReportsAdminPage,

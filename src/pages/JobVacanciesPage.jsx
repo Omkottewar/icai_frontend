@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import PageHeader from '../components/layout/PageHeader';
 import { useRoute, navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
@@ -6,7 +6,10 @@ import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../lib/markdown.jsx';
 import { cachedGet } from '../lib/apiCache';
 import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
-import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap, IconHandshake } from '../icons';
+import SubscribeAlertsModal from '../components/jobs/SubscribeAlertsModal';
+import ApplyModal from '../components/jobs/ApplyModal';
+import SaveButton from '../components/jobs/SaveButton';
+import { IconMapPin, IconCalendar, IconMail, IconBriefcase, IconX, IconGraduationCap, IconHandshake, IconBell, IconCheckCircle } from '../icons';
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -17,7 +20,7 @@ function orgName(v) {
   return v.firm_name || v.employer_name || 'ICAI Nagpur';
 }
 
-function usePostings(type) {
+function usePostings(type, category) {
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,23 +28,31 @@ function usePostings(type) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(null);
+    const qs = new URLSearchParams({ type });
+    if (category) qs.set('category', category);
     // 60s TTL — postings change at most a few times per day; this makes
     // toggling between Jobs / Articleships tabs feel instant.
-    cachedGet(`/api/jobs?type=${type}`, undefined, 60_000)
+    cachedGet('/api/jobs?' + qs.toString(), undefined, 60_000)
       .then((data) => { if (!cancelled) setRows(data.rows); })
       .catch((e) => { if (!cancelled) setError(e.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [type]);
+  }, [type, category]);
 
   return { rows, loading, error };
 }
 
-// Three modes the page can show — picked via ?type= query string. Each
-// resolves the page header copy from site-content with a per-type fallback,
-// so editors can override individual strings via /admin/site-content
-// without changing the URL contract. New `assignment` mode surfaces
-// short-term / freelance engagements for Members.
+function useCategories() {
+  const [cats, setCats] = useState([]);
+  useEffect(() => {
+    cachedGet('/api/job-alerts/categories', undefined, 300_000)
+      .then((j) => setCats(j.items || []))
+      .catch(() => setCats([]));
+  }, []);
+  return cats;
+}
+
+// Three modes the page can show — picked via ?type= query string.
 const MODE_CONFIG = {
   job: {
     type: 'job',
@@ -74,25 +85,49 @@ export default function JobVacanciesPage() {
   const { user } = useAuth();
   const header = useSiteContent('job_vacancies_page_header');
   const mode = MODE_CONFIG[route.query.type] ?? MODE_CONFIG.job;
-  const { rows, loading, error } = usePostings(mode.type);
+  const categories = useCategories();
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const { rows, loading, error } = usePostings(mode.type, categoryFilter);
   const [enquiryTarget, setEnquiryTarget] = useState(null);
-  // Preferences modal is only reachable from the articleship view. Students
-  // fill it once to have WICASA match them to firms — separate from clicking
-  // "Apply" on a specific vacancy.
+  const [applyTarget, setApplyTarget] = useState(null);
+  const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const isArticleshipView = mode.type === 'articleship';
 
+  // Restrict the category chips to those that actually appear in the current
+  // result set — clutter avoidance while still leaving the "All" chip.
+  const visibleCategories = useMemo(() => {
+    if (!rows || rows.length === 0) return categories;
+    const codes = new Set(rows.map((r) => r.category_code).filter(Boolean));
+    return categories.filter((c) => codes.has(c.code) || c.id === categoryFilter);
+  }, [rows, categories, categoryFilter]);
+
   const openPreferences = () => {
-    // Guests bounce to login with a return hint so they land back here
-    // after signing in. Everyone else — students, members, admin — can
-    // open the modal. The backend endpoint enforces the role check on
-    // submit, so non-students see a clear "students only" toast rather
-    // than silently getting nothing.
     if (!user) {
       navigate('/login?next=' + encodeURIComponent('/job-vacancies?type=articleship'));
       return;
     }
     setPrefsOpen(true);
+  };
+
+  const openApply = (posting) => {
+    if (!user) {
+      navigate('/login?next=' + encodeURIComponent(window.location.pathname + window.location.search));
+      return;
+    }
+    if (user.primary_role !== 'member' && user.primary_role !== 'student') {
+      setEnquiryTarget(posting); // fallback for guests/employers — email path
+      return;
+    }
+    setApplyTarget(posting);
+  };
+
+  const openSubscribe = () => {
+    if (!user) {
+      navigate('/login?next=' + encodeURIComponent('/job-alerts/subscribe'));
+      return;
+    }
+    setSubscribeOpen(true);
   };
 
   const notice = (
@@ -101,11 +136,32 @@ export default function JobVacanciesPage() {
       border: '1px solid oklch(0.36 0.13 255 / 0.15)',
       borderRadius: '.5rem',
       padding: '.875rem 1rem',
-      marginBottom: '2rem',
+      marginBottom: '1rem',
       fontSize: '.8125rem',
       color: 'var(--foreground)',
     }}>
       {renderMarkdown(header.notice)}
+    </div>
+  );
+
+  const subscribeBanner = (
+    <div style={{
+      background: 'linear-gradient(90deg, oklch(0.94 0.05 255), oklch(0.96 0.03 145))',
+      border: '1px solid oklch(0.36 0.13 255 / 0.2)',
+      borderRadius: '.5rem',
+      padding: '.875rem 1rem',
+      marginBottom: '1.5rem',
+      display: 'flex', gap: '.75rem', flexWrap: 'wrap',
+      alignItems: 'center', justifyContent: 'space-between',
+      fontSize: '.85rem',
+    }}>
+      <div style={{ display: 'flex', gap: '.6rem', alignItems: 'center', minWidth: 0 }}>
+        <IconBell />
+        <div>{renderMarkdown(header.subscribe_banner)}</div>
+      </div>
+      <button type="button" onClick={openSubscribe} className="btn btn-primary" style={{ padding: '.4rem .9rem', fontSize: '.8rem', flexShrink: 0 }}>
+        Subscribe to alerts
+      </button>
     </div>
   );
 
@@ -117,11 +173,12 @@ export default function JobVacanciesPage() {
       />
       <section className="container" style={{ padding: '2.5rem 1rem' }}>
         {notice}
+        {subscribeBanner}
 
         <div style={{
           display: 'flex', gap: '1rem', flexWrap: 'wrap',
           alignItems: 'flex-end', justifyContent: 'space-between',
-          marginBottom: '1.5rem',
+          marginBottom: '1.25rem',
         }}>
           <div>
             <div className="tiny-eyebrow">{mode.eyebrow}</div>
@@ -145,6 +202,44 @@ export default function JobVacanciesPage() {
             </button>
           )}
         </div>
+
+        {/* Category filter chips */}
+        {categories.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem', marginBottom: '1rem' }}>
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('')}
+              style={{
+                padding: '.3rem .75rem', borderRadius: '999px',
+                border: '1px solid ' + (categoryFilter === '' ? 'var(--primary)' : 'var(--border)'),
+                background: categoryFilter === '' ? 'oklch(0.36 0.13 255 / 0.1)' : 'var(--card)',
+                color: categoryFilter === '' ? 'var(--primary)' : 'var(--foreground)',
+                fontSize: '.75rem', fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              All
+            </button>
+            {visibleCategories.map((c) => {
+              const on = categoryFilter === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(on ? '' : c.id)}
+                  style={{
+                    padding: '.3rem .75rem', borderRadius: '999px',
+                    border: '1px solid ' + (on ? 'var(--primary)' : 'var(--border)'),
+                    background: on ? 'oklch(0.36 0.13 255 / 0.1)' : 'var(--card)',
+                    color: on ? 'var(--primary)' : 'var(--foreground)',
+                    fontSize: '.75rem', fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  {c.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {isArticleshipView && (
           <div
@@ -186,6 +281,8 @@ export default function JobVacanciesPage() {
                 key={v.id}
                 posting={v}
                 mode={mode}
+                user={user}
+                onApply={() => openApply(v)}
                 onEnquire={() => setEnquiryTarget(v)}
               />
             ))}
@@ -195,6 +292,18 @@ export default function JobVacanciesPage() {
 
       {enquiryTarget && (
         <EnquiryModal posting={enquiryTarget} onClose={() => setEnquiryTarget(null)} />
+      )}
+
+      {applyTarget && (
+        <ApplyModal
+          posting={applyTarget}
+          onClose={() => setApplyTarget(null)}
+          onApplied={() => {/* card status updates on next fetch */}}
+        />
+      )}
+
+      {subscribeOpen && (
+        <SubscribeAlertsModal onClose={() => setSubscribeOpen(false)} initialCategoryId={categoryFilter || undefined} />
       )}
 
       {prefsOpen && (
@@ -207,29 +316,36 @@ export default function JobVacanciesPage() {
   );
 }
 
-function PostingCard({ posting: v, mode, onEnquire }) {
+function PostingCard({ posting: v, mode, user, onApply, onEnquire }) {
   const isArticleship = mode.type === 'articleship';
   const isAssignment  = mode.type === 'assignment';
-  const ctaLabel = isArticleship ? 'Apply' : isAssignment ? 'Express interest' : 'Enquire';
+  const ctaLabel = isArticleship ? 'Apply' : isAssignment ? 'Express interest' : 'Apply';
   const seatLine = isArticleship
     ? <><IconGraduationCap size="sm" /> {v.seat_count} seat{v.seat_count !== 1 ? 's' : ''} available</>
     : isAssignment
       ? <><IconBriefcase size="sm" /> {v.seat_count} opening{v.seat_count !== 1 ? 's' : ''}</>
       : <><IconBriefcase size="sm" /> {v.seat_count} position{v.seat_count !== 1 ? 's' : ''}</>;
+  const canApply = user && (user.primary_role === 'member' || user.primary_role === 'student');
 
   return (
-    <div className="card" style={{ padding: '1.5rem' }}>
+    <div className="card" id={`p-${v.id}`} style={{ padding: '1.5rem' }}>
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
-          {/* Org name */}
           <div style={{ fontSize: '.8125rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '.25rem' }}>
             {orgName(v)}
           </div>
-          {/* Title */}
           <h3 style={{ fontWeight: 700, fontSize: '1.0625rem', margin: 0 }}>{v.title}</h3>
-          {/* Meta chips */}
           <div className="row gap-3" style={{ marginTop: '.625rem', flexWrap: 'wrap' }}>
+            {v.category_name && (
+              <span style={{
+                padding: '.15rem .5rem', borderRadius: '.25rem',
+                fontSize: '.7rem', fontWeight: 600,
+                background: 'oklch(0.9 0.05 145 / 0.6)', color: 'oklch(0.32 0.13 145)',
+              }}>
+                {v.category_name}
+              </span>
+            )}
             {isAssignment && (
               <span style={{
                 padding: '.15rem .5rem', borderRadius: '.25rem',
@@ -249,15 +365,35 @@ function PostingCard({ posting: v, mode, onEnquire }) {
                 {v.experience_required}
               </span>
             )}
+            {v.application_status && (
+              <span style={{
+                padding: '.15rem .5rem', borderRadius: '.25rem',
+                fontSize: '.7rem', fontWeight: 700,
+                background: 'oklch(0.9 0.05 145 / 0.4)', color: 'oklch(0.35 0.14 145)',
+                textTransform: 'uppercase', letterSpacing: '.04em',
+                display: 'inline-flex', alignItems: 'center', gap: '.25rem',
+              }}>
+                <IconCheckCircle size="sm" /> Applied
+              </span>
+            )}
           </div>
         </div>
-        <button
-          onClick={onEnquire}
-          className="btn btn-primary"
-          style={{ padding: '.45rem 1rem', fontSize: '.8125rem', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '.375rem' }}
-        >
-          <IconMail size="sm" /> {ctaLabel}
-        </button>
+        <div style={{ display: 'flex', gap: '.4rem', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <SaveButton postingId={v.id} saved={v.saved} />
+          {canApply && !v.application_status ? (
+            <button onClick={onApply} className="btn btn-primary" style={{ padding: '.45rem 1rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.375rem' }}>
+              <IconMail size="sm" /> {ctaLabel}
+            </button>
+          ) : v.application_status ? (
+            <span className="muted-text" style={{ fontSize: '.75rem', padding: '.45rem .75rem', border: '1px dashed var(--border)', borderRadius: '.375rem' }}>
+              Already applied
+            </span>
+          ) : (
+            <button onClick={onEnquire} className="btn btn-primary" style={{ padding: '.45rem 1rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.375rem' }}>
+              <IconMail size="sm" /> Enquire
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Description */}
@@ -290,6 +426,10 @@ function PostingCard({ posting: v, mode, onEnquire }) {
   );
 }
 
+// ─── Legacy enquiry-by-email modal ──────────────────────────────────────
+// Kept as a fallback for non-authenticated users and non-member/student
+// roles who tap "Enquire" instead of "Apply". Sends via the user's mail
+// client until a dedicated /api/jobs/:id/enquire endpoint lands.
 function EnquiryModal({ posting, onClose }) {
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
   const [resumeFile, setResumeFile] = useState(null);
@@ -306,10 +446,6 @@ function EnquiryModal({ posting, onClose }) {
     if (e.target === overlayRef.current) onClose();
   }
 
-  // Until a backend enquiry endpoint exists (POST /api/jobs/:id/enquire
-  // with email-routing to the firm/employer), hand off to the user's mail
-  // client so the message isn't silently discarded. The branch inbox is
-  // the safe destination — admin staff route enquiries from there.
   function handleSend(e) {
     e.preventDefault();
     const body = [
@@ -351,7 +487,6 @@ function EnquiryModal({ posting, onClose }) {
         display: 'flex', flexDirection: 'column',
         maxHeight: '90vh', overflow: 'hidden',
       }}>
-        {/* Titlebar */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '.875rem 1.25rem',
@@ -381,7 +516,6 @@ function EnquiryModal({ posting, onClose }) {
           </div>
         ) : (
           <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-            {/* Email header fields */}
             <div style={{ borderBottom: '1px solid var(--border)' }}>
               <EmailRow label="To">
                 <span style={{ fontSize: '.875rem', color: 'var(--foreground)' }}>{org}</span>
@@ -391,34 +525,14 @@ function EnquiryModal({ posting, onClose }) {
               </EmailRow>
               <EmailRow label="From">
                 <div style={{ display: 'flex', gap: '.625rem', flex: 1, flexWrap: 'wrap' }}>
-                  <input
-                    required
-                    placeholder="Your name"
-                    value={form.name}
-                    onChange={(e) => set('name', e.target.value)}
-                    style={inputStyle}
-                  />
-                  <input
-                    required type="email"
-                    placeholder="Your email"
-                    value={form.email}
-                    onChange={(e) => set('email', e.target.value)}
-                    style={inputStyle}
-                  />
+                  <input required placeholder="Your name" value={form.name} onChange={(e) => set('name', e.target.value)} style={inputStyle} />
+                  <input required type="email" placeholder="Your email" value={form.email} onChange={(e) => set('email', e.target.value)} style={inputStyle} />
                 </div>
               </EmailRow>
               <EmailRow label="Phone">
-                <input
-                  type="tel"
-                  placeholder="Your phone number"
-                  value={form.phone}
-                  onChange={(e) => set('phone', e.target.value)}
-                  style={{ ...inputStyle, maxWidth: 220 }}
-                />
+                <input type="tel" placeholder="Your phone number" value={form.phone} onChange={(e) => set('phone', e.target.value)} style={{ ...inputStyle, maxWidth: 220 }} />
               </EmailRow>
             </div>
-
-            {/* Message body */}
             <textarea
               required
               placeholder={`Write your message to ${org}…`}
@@ -431,8 +545,6 @@ function EnquiryModal({ posting, onClose }) {
                 minHeight: 140, lineHeight: 1.6, fontFamily: 'inherit',
               }}
             />
-
-            {/* Footer */}
             <div style={{
               display: 'flex', alignItems: 'center', gap: '.75rem',
               padding: '.875rem 1.25rem',
@@ -441,17 +553,10 @@ function EnquiryModal({ posting, onClose }) {
               borderRadius: '0 0 .75rem .75rem',
               flexWrap: 'wrap',
             }}>
-              {/* Attach resume */}
               <label style={{ display: 'flex', alignItems: 'center', gap: '.375rem', cursor: 'pointer', fontSize: '.8125rem', color: 'var(--muted-foreground)', padding: '.375rem .625rem', borderRadius: '.375rem', border: '1px solid var(--border)', background: 'var(--card)' }}>
                 <span>📎</span>
                 <span>{resumeFile ? resumeFile.name : 'Attach resume'}</span>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  style={{ display: 'none' }}
-                  onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
-                />
+                <input ref={fileRef} type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }} onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)} />
               </label>
               {resumeFile && (
                 <button type="button" onClick={() => { setResumeFile(null); fileRef.current.value = ''; }}
@@ -459,11 +564,8 @@ function EnquiryModal({ posting, onClose }) {
                   ✕
                 </button>
               )}
-
               <div style={{ marginLeft: 'auto', display: 'flex', gap: '.5rem' }}>
-                <button type="button" onClick={onClose} className="btn btn-outline" style={{ padding: '.4rem .875rem', fontSize: '.8125rem' }}>
-                  Cancel
-                </button>
+                <button type="button" onClick={onClose} className="btn btn-outline" style={{ padding: '.4rem .875rem', fontSize: '.8125rem' }}>Cancel</button>
                 <button type="submit" className="btn btn-primary" style={{ padding: '.4rem .875rem', fontSize: '.8125rem', display: 'flex', alignItems: 'center', gap: '.375rem' }}>
                   <IconMail size="sm" /> Send
                 </button>
@@ -479,17 +581,14 @@ function EnquiryModal({ posting, onClose }) {
 function EmailRow({ label, children }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', padding: '.625rem 1.25rem', gap: '.75rem', borderBottom: '1px solid var(--border)' }}>
-      <span style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--muted-foreground)', width: 52, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '.04em' }}>
-        {label}
-      </span>
+      <span style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--muted-foreground)', width: 52, flexShrink: 0, textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</span>
       {children}
     </div>
   );
 }
 
 const inputStyle = {
-  flex: 1, minWidth: 120,
-  border: 0, outline: 'none',
+  flex: 1, minWidth: 120, border: 0, outline: 'none',
   fontSize: '.875rem', color: 'var(--foreground)',
   background: 'transparent', fontFamily: 'inherit',
 };

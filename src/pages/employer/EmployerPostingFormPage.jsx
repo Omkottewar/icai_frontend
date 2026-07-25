@@ -15,6 +15,7 @@ const EMPTY = {
   location:    'Nagpur',
   experience_required: '',
   expires_at:  '',
+  category_id: '',
 };
 
 // Handles both /employer/postings/new and /employer/postings/:id/edit.
@@ -34,6 +35,13 @@ export default function EmployerPostingFormPage() {
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    fetch('/api/employer/postings/_meta/lookups', { credentials: 'include' })
+      .then((r) => r.ok ? r.json() : { categories: [] })
+      .then((j) => setCategories(j.categories || []));
+  }, []);
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -52,6 +60,7 @@ export default function EmployerPostingFormPage() {
           location:    p.location ?? '',
           experience_required: p.experience_required ?? '',
           expires_at:  p.expires_at ? p.expires_at.slice(0, 10) : '',
+          category_id: p.category_id ?? '',
         });
       })
       .catch((e) => setErr(e.message))
@@ -147,6 +156,19 @@ export default function EmployerPostingFormPage() {
               <input className="input-base" type="text" value={form.experience_required}
                 onChange={(e) => update('experience_required', e.target.value)} placeholder="e.g. 3–5 years" />
             </div>
+          </div>
+
+          <div>
+            <label className="field-label">Category</label>
+            <select className="input-base" value={form.category_id} onChange={(e) => update('category_id', e.target.value)}>
+              <option value="">— pick a category (optional but recommended) —</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+              Subscribers to this category will be alerted when the posting goes live.
+            </p>
           </div>
 
           <div>

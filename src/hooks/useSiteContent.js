@@ -341,6 +341,33 @@ export const SITE_CONTENT_DEFAULTS = {
     assignment_title:     'Assignment Openings',
     assignment_subtitle:  'Short-term and freelance engagements posted by member firms — audit assistance, due-diligence, GST/tax projects and consulting work.',
     notice:               '**Notice:** These postings are made by member firms and organisations in Nagpur / Vidarbha region. The branch does not verify or endorse any posting. Contact the respective firm directly for enquiries.',
+    subscribe_banner:     "**Don't miss the next opening.** Subscribe to email alerts for the categories you care about — we'll send new postings the moment they go live.",
+  },
+  job_alerts_subscribe: {
+    title:        'Subscribe to Job Alerts',
+    subtitle:     'Get notified when new openings match the categories you care about.',
+    how_it_works: "### How it works\n\n1. Pick one or more categories and posting types below.\n2. Choose how often you want to hear from us — instantly, daily, or weekly.\n3. We'll email you a confirmation link the first time. After that, matching openings arrive automatically.\n\nYou can unsubscribe anytime from any email.",
+    faq:          "### Who can subscribe?\nMembers and students of ICAI Nagpur.\n\n### Can I subscribe to more than one category?\nYes — pick as many as you like.\n\n### How do I stop the emails?\nEvery alert has a one-click unsubscribe link, or edit your preferences from your dashboard.",
+  },
+  job_alerts_confirm: {
+    success_title: 'Subscription confirmed',
+    success_body:  "You'll start receiving job alerts for the categories you chose. You can edit or pause them anytime from your dashboard.",
+    error_title:   'This link is no longer valid',
+    error_body:    "Confirmation links expire after a week. Sign in and re-subscribe from the Job Alerts page to get a fresh link.",
+  },
+  job_alerts_manage: {
+    title:    'Job Alert Preferences',
+    subtitle: 'Review, pause, or unsubscribe from your job alert subscriptions.',
+    empty:    "You don't have any active job alerts yet. Head to **Subscribe to Job Alerts** to pick your categories.",
+  },
+  job_apply_modal: {
+    heading:    'Apply to this opening',
+    disclaimer: "By applying, you agree to share your name, email, phone number, and current profile resume with the employer. The resume is snapshotted at the time you apply — later profile edits won't change what the employer sees.",
+    no_resume:  "**Upload a resume first.** Head to your profile, upload a PDF resume, then come back and apply.",
+  },
+  job_apply_success: {
+    title: 'Application received',
+    body:  "The employer will review your application and reach out through the contact details on your profile. You can track the status from **Dashboard → My Applications**.",
   },
   // ── Track grievance defaults ────────────────────────────────────────
   track_grievance_page_header: {

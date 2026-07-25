@@ -1241,8 +1241,10 @@ a:focus-visible,
   gap: .5rem;
   margin-bottom: 1.25rem;
 }
-@media (max-width: 400px) {
-  .role-pills { grid-template-columns: 1fr; }
+/* Below 520px the three icon+label pills collide with each other; stack
+ * them vertically so each pill has enough room for its label. */
+@media (max-width: 520px) {
+  .role-pills { grid-template-columns: 1fr; gap: .4rem; }
 }
 .role-pill {
   padding: .7rem .5rem;
@@ -1258,6 +1260,7 @@ a:focus-visible,
   gap: .4rem;
   transition: all .15s;
   cursor: pointer;
+  min-height: 44px;
 }
 .role-pill:hover { border-color: oklch(0.6 0.05 250); }
 .role-pill.active {
@@ -1749,8 +1752,10 @@ body:has(.modal-backdrop) {
   .date-chip { min-width: 3.5rem; padding: .5rem .4rem; }
   .booking-summary { position: static; }
 
-  /* Auth */
-  .auth-form-wrap { padding: 1.25rem 1rem; }
+  /* Auth — narrower gutters and fluid card on phones so the form isn't
+   * hemmed in against tiny viewport widths. */
+  .auth-form-wrap { padding: 1.25rem .9rem; min-height: auto; align-items: stretch; }
+  .auth-card { max-width: 100%; margin: 0 auto; }
   .auth-tabs { margin-bottom: 1.1rem; }
   .auth-side { padding: 1.5rem; }
 

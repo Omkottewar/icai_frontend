@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import NotificationSettingsCard from './NotificationSettingsCard';
 import MemberProfileDrawer from './MemberProfileDrawer';
+import MyJobsTab from './MyJobsTab';
 import {
   IconAward, IconShield, IconCalendar, IconBookOpen, IconUsers,
   IconBot, IconArrowRight, IconUser, IconSettings, IconLogOut,
@@ -125,6 +126,7 @@ export default function MemberDashboard({ user, data, logout, onRefresh, pending
     { id: 'overview', label: 'Overview' },
     { id: 'events',   label: 'Events' },
     { id: 'library',  label: 'Library' },
+    { id: 'jobs',     label: 'Jobs' },
     { id: 'settings', label: 'Settings' },
   ];
   const [tab, setTab] = useState(() => {
@@ -186,6 +188,12 @@ export default function MemberDashboard({ user, data, logout, onRefresh, pending
         <div id="md-tab-library" role="tabpanel" className="md-tab-body">
           <SavedLibraryCard items={recentBookmarks} total={bookmarksCount} />
           <MemberServicesGrid />
+        </div>
+      )}
+
+      {tab === 'jobs' && (
+        <div id="md-tab-jobs" role="tabpanel" className="md-tab-body">
+          <MyJobsTab />
         </div>
       )}
 

@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
-import { IconBriefcase, IconX } from '../../icons';
+import { IconBriefcase, IconX, IconUsers } from '../../icons';
 import { Shimmer } from '../../components/ui/Shimmer';
 import { dialog } from '../../lib/dialog';
 import Button from '../../components/ui/Button';
 import { cachedGet, revalidate, invalidate } from '../../lib/apiCache';
+import PostingApplicantsPanel from '../../components/employer/PostingApplicantsPanel';
 
 const STATUS_BADGE = {
   draft:           { bg: '#f1f5f9', fg: '#475569', label: 'Draft'   },
@@ -27,6 +28,8 @@ export default function EmployerPostingsPage() {
   const { showToast } = useAuth();
   const [items, setItems] = useState(null);
   const [err, setErr] = useState('');
+  const [applicantsPosting, setApplicantsPosting] = useState(null);
+  const [counts, setCounts] = useState({});
 
   // `force` switches to revalidate() to bypass the cache, so post-mutation
   // reloads (close / delete) always fetch fresh data.
@@ -40,6 +43,22 @@ export default function EmployerPostingsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Batch-load applicant counts for every posting once the list arrives.
+  // Each request is cheap (indexed count query) and cached with a short TTL
+  // so re-visiting the page in the same session is instant.
+  useEffect(() => {
+    if (!items || items.length === 0) return;
+    let cancelled = false;
+    Promise.all(items.map((p) =>
+      cachedGet(`/api/employer/postings/${p.id}/applicants`, undefined, 60_000)
+        .then((j) => [p.id, (j.items || []).length])
+        .catch(() => [p.id, 0])
+    )).then((entries) => {
+      if (!cancelled) setCounts(Object.fromEntries(entries));
+    });
+    return () => { cancelled = true; };
+  }, [items]);
 
   const close = async (id) => {
     const ok = await dialog.confirm({
@@ -122,6 +141,7 @@ export default function EmployerPostingsPage() {
                 <th style={{ textAlign: 'left', padding: '.75rem' }}>Type</th>
                 <th style={{ textAlign: 'left', padding: '.75rem' }}>Status</th>
                 <th style={{ textAlign: 'left', padding: '.75rem' }}>Seats</th>
+                <th style={{ textAlign: 'left', padding: '.75rem' }}>Applicants</th>
                 <th style={{ textAlign: 'right', padding: '.75rem' }}>Actions</th>
               </tr>
             </thead>
@@ -147,6 +167,16 @@ export default function EmployerPostingsPage() {
                       }}>{badge.label}</span>
                     </td>
                     <td style={{ padding: '.75rem' }}>{p.seat_count}</td>
+                    <td style={{ padding: '.75rem' }}>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => setApplicantsPosting(p)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '.3rem', fontSize: '.8125rem' }}
+                        title="View applicants"
+                      >
+                        <IconUsers size="sm" /> {counts[p.id] ?? '—'}
+                      </button>
+                    </td>
                     <td style={{ padding: '.75rem', textAlign: 'right' }}>
                       <button className="btn btn-ghost" onClick={() => navigate(`/employer/postings/${p.id}/edit`)}>Edit</button>
                       {p.status === 'active' && (
@@ -160,6 +190,13 @@ export default function EmployerPostingsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {applicantsPosting && (
+        <PostingApplicantsPanel
+          posting={applicantsPosting}
+          onClose={() => setApplicantsPosting(null)}
+        />
       )}
     </EmployerLayout>
   );

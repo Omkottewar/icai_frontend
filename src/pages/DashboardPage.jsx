@@ -12,6 +12,7 @@ import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
 import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
 import MemberDashboard from '../components/dashboard/MemberDashboard';
+import MyJobsTab from '../components/dashboard/MyJobsTab';
 import StudentRequestsCard from '../components/student/StudentRequestsCard';
 import MyArticleshipPrefsCard from '../components/student/MyArticleshipPrefsCard';
 import MyRoomBookingsCard from '../components/student/MyRoomBookingsCard';
@@ -366,6 +367,7 @@ function StudentTabbedBody({ data, user, logout }) {
   const TABS = [
     { id: 'events',    label: 'My events' },
     { id: 'requests',  label: 'My requests' },
+    { id: 'jobs',      label: 'Jobs' },
     { id: 'actions',   label: 'Quick actions' },
     { id: 'settings',  label: 'Profile & settings' },
   ];
@@ -446,6 +448,12 @@ function StudentTabbedBody({ data, user, logout }) {
           <MyArticleshipPrefsCard />
           <MyRoomBookingsCard />
           <StudentRequestsCard />
+        </div>
+      )}
+
+      {tab === 'jobs' && (
+        <div role="tabpanel" className="sd-tab-body">
+          <MyJobsTab />
         </div>
       )}
 

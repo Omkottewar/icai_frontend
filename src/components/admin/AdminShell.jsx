@@ -7,7 +7,7 @@ import {
   IconCalendar, IconUsers, IconAward, IconShield, IconBriefcase, IconHeart,
   IconFileText, IconSettings, IconArrowLeft, IconLogOut, IconMenu, IconX,
   IconCheckCircle, IconBookOpen, IconMapPin, IconGraduationCap, IconHandshake,
-  IconMessageSquare,
+  IconMessageSquare, IconTrending,
 } from '../../icons';
 import caIndiaLogo from '../../assets/CA India Logo.png';
 
@@ -44,6 +44,8 @@ const NAV_GROUPS = [
     label: 'Overview',
     items: [
       { to: '/admin', label: 'Dashboard', Icon: IconShield, exact: true },
+      { to: '/admin/insights',        label: 'Insights',        Icon: IconTrending, roles: [ROLE_CHAIRMAN, ROLE_TREASURER] },
+      { to: '/admin/wicasa-insights', label: 'WICASA insights', Icon: IconTrending, roles: [ROLE_WICASA] },
     ],
   },
   {
