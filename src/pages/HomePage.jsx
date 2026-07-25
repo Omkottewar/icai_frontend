@@ -83,7 +83,7 @@ export default function HomePage() {
   const heroWatermarkSrc = heroText.watermark_url || heroLogo;
 
   return (
-    <>
+    <div className="home-page">
       {/* Announcement ticker — industry-standard pattern:
             • Slow, continuous marquee (90s/cycle for readability)
             • Pause on hover OR keyboard focus so users can read + click
@@ -452,6 +452,6 @@ export default function HomePage() {
           the homepage lands. Self-hides if no winner is flagged, and
           remembers dismissal per award year so it doesn't nag on every visit. */}
       <BestPaperPopup text={bestPaperText} />
-    </>
+    </div>
   );
 }

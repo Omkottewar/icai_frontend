@@ -5,7 +5,7 @@ import { useSiteContent } from '../../hooks/useSiteContent';
 import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import PasswordField from '../../components/auth/PasswordField';
 import SocialButtons from '../../components/auth/SocialButtons';
-import { IconArrowRight, IconShield, IconX, IconMail } from '../../icons';
+import { IconArrowLeft, IconArrowRight, IconShield, IconX, IconMail } from '../../icons';
 import Button from '../../components/ui/Button';
 
 export default function LoginPage() {
@@ -42,6 +42,9 @@ export default function LoginPage() {
       <AuthSidePanel mode="login" />
       <div className="auth-form-wrap">
         <div className="auth-card">
+          <a href="/" className="row gap-1 muted-text" style={{ fontSize: '.8125rem', marginBottom: '1rem', textDecoration: 'none', width: 'fit-content' }}>
+            <IconArrowLeft size="sm" /> Back to home
+          </a>
           <div style={{ marginBottom: '1.5rem' }}>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{header.title}</h1>
             <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.25rem' }}>

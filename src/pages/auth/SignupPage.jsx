@@ -6,7 +6,7 @@ import AuthSidePanel from '../../components/auth/AuthSidePanel';
 import PasswordField from '../../components/auth/PasswordField';
 import RolePicker from '../../components/auth/RolePicker';
 import SocialButtons from '../../components/auth/SocialButtons';
-import { IconArrowRight, IconShield, IconX, IconMail, IconUser } from '../../icons';
+import { IconArrowLeft, IconArrowRight, IconShield, IconX, IconMail, IconUser } from '../../icons';
 import Button from '../../components/ui/Button';
 
 export default function SignupPage() {
@@ -86,6 +86,9 @@ export default function SignupPage() {
       <AuthSidePanel mode="signup" />
       <div className="auth-form-wrap">
         <div className="auth-card">
+          <a href="/" className="row gap-1 muted-text" style={{ fontSize: '.8125rem', marginBottom: '1rem', textDecoration: 'none', width: 'fit-content' }}>
+            <IconArrowLeft size="sm" /> Back to home
+          </a>
           <div style={{ marginBottom: '1.5rem' }}>
             <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0, letterSpacing: '-.015em' }}>{header.title}</h1>
             <p className="muted-text" style={{ fontSize: '.875rem', marginTop: '.35rem', lineHeight: 1.5 }}>
