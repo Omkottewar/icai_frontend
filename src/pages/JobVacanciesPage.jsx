@@ -4,7 +4,7 @@ import { useRoute, navigate } from '../hooks/useRoute';
 import { useSiteContent } from '../hooks/useSiteContent';
 import { useAuth } from '../context/AuthContext';
 import { renderMarkdown } from '../lib/markdown.jsx';
-import { cachedGet } from '../lib/apiCache';
+import { cachedGet, subscribe } from '../lib/apiCache';
 import RequestArticleshipModal from '../components/student/RequestArticleshipModal';
 import SubscribeAlertsModal from '../components/jobs/SubscribeAlertsModal';
 import ApplyModal from '../components/jobs/ApplyModal';
@@ -93,6 +93,35 @@ export default function JobVacanciesPage() {
   const [subscribeOpen, setSubscribeOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const isArticleshipView = mode.type === 'articleship';
+
+  // Latest active articleship submission for this student — powers the
+  // "already submitted" state on the CTA + info banner and pre-fills the
+  // modal when the student re-opens it. Only relevant for signed-in
+  // students on the articleship view; everyone else gets `null` and sees
+  // the original "Submit your preferences" copy.
+  const shouldFetchPrefs = isArticleshipView && user?.primary_role === 'student';
+  const [existingPref, setExistingPref] = useState(null);
+  useEffect(() => {
+    if (!shouldFetchPrefs) { setExistingPref(null); return; }
+    let cancelled = false;
+    const load = () => {
+      cachedGet('/api/articleship-matches/my', null, 30_000)
+        .then((j) => {
+          if (cancelled) return;
+          const rows = j?.rows || [];
+          // Pick the most recent non-cancelled row — "submitted", "matched"
+          // and "placed" all count as an active preference on file.
+          const active = rows.find((r) => r.status !== 'cancelled');
+          setExistingPref(active || null);
+        })
+        .catch(() => { if (!cancelled) setExistingPref(null); });
+    };
+    load();
+    const unsub = subscribe('/api/articleship-matches/my', load);
+    return () => { cancelled = true; unsub(); };
+  }, [shouldFetchPrefs]);
+
+  const hasExistingPref = !!existingPref;
 
   // Restrict the category chips to those that actually appear in the current
   // result set — clutter avoidance while still leaving the "All" chip.
@@ -196,9 +225,12 @@ export default function JobVacanciesPage() {
               onClick={openPreferences}
               className="btn btn-primary"
               style={{ padding: '.6rem 1.1rem', display: 'inline-flex', alignItems: 'center', gap: '.5rem', flexShrink: 0 }}
-              title="Fill your preferences — WICASA matches you to firms"
+              title={hasExistingPref
+                ? 'You already submitted preferences — open the form to edit them'
+                : 'Fill your preferences — WICASA matches you to firms'}
             >
-              <IconHandshake size="sm" /> Submit your preferences
+              <IconHandshake size="sm" />
+              {hasExistingPref ? 'Update your preferences' : 'Submit your preferences'}
             </button>
           )}
         </div>
@@ -244,28 +276,26 @@ export default function JobVacanciesPage() {
         {isArticleshipView && (
           <div
             style={{
-              background: 'oklch(0.94 0.03 250)',
-              border: '1px solid oklch(0.85 0.05 250)',
+              background: hasExistingPref ? 'oklch(0.95 0.04 145)' : 'oklch(0.94 0.03 250)',
+              border: '1px solid ' + (hasExistingPref ? 'oklch(0.80 0.10 145)' : 'oklch(0.85 0.05 250)'),
               borderRadius: '.5rem',
               padding: '.85rem 1rem',
               marginBottom: '1.5rem',
               fontSize: '.85rem',
-              color: 'oklch(0.28 0.09 250)',
+              color: hasExistingPref ? 'oklch(0.28 0.10 145)' : 'oklch(0.28 0.09 250)',
               display: 'flex', flexWrap: 'wrap', gap: '.75rem',
               alignItems: 'center', justifyContent: 'space-between',
             }}
           >
-            <span>
-              <strong>Not sure which firm suits you?</strong> Fill out your specialisation, location, and firm-size preferences once — WICASA will match you to member firms and recommend openings that fit.
-            </span>
-            <button
-              type="button"
-              onClick={openPreferences}
-              className="btn btn-outline"
-              style={{ padding: '.35rem .8rem', fontSize: '.8rem', background: 'white' }}
-            >
-              Open preference form →
-            </button>
+            {hasExistingPref ? (
+              <span>
+                <strong>Your preferences are on file.</strong> WICASA is reviewing them — you'll hear back with matched firms. Use the <em>Update your preferences</em> button above to edit anything (specialisations, location, CV) until they finalise recommendations.
+              </span>
+            ) : (
+              <span>
+                <strong>Not sure which firm suits you?</strong> Fill out your specialisation, location, and firm-size preferences once — WICASA will match you to member firms and recommend openings that fit. Use the <em>Submit your preferences</em> button above to get started.
+              </span>
+            )}
           </div>
         )}
 
@@ -308,6 +338,7 @@ export default function JobVacanciesPage() {
 
       {prefsOpen && (
         <RequestArticleshipModal
+          initial={existingPref}
           onClose={() => setPrefsOpen(false)}
           onSubmitted={() => setPrefsOpen(false)}
         />

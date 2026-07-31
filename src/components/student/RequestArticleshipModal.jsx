@@ -27,16 +27,29 @@ const FIRM_SIZES = [
   { value: 'big4',              label: 'Big 4' },
 ];
 
-export default function RequestArticleshipModal({ onClose, onSubmitted }) {
-  const [selected, setSelected] = useState(new Set());
-  const [location, setLocation] = useState('');
-  const [firmSize, setFirmSize] = useState('');
-  const [stipend,  setStipend]  = useState('');
-  const [notes,    setNotes]    = useState('');
+export default function RequestArticleshipModal({ onClose, onSubmitted, initial = null }) {
+  // When `initial` is a previous submission (from GET /api/articleship-matches/my),
+  // the modal opens in "update" mode with every field pre-filled — the student
+  // edits rather than re-enters from scratch. The CV is treated as attached
+  // if the previous submission had one; the student can Remove + re-upload.
+  const isUpdate = !!initial;
+
+  const initialSpecs = Array.isArray(initial?.preferred_specialisations)
+    ? initial.preferred_specialisations
+    : [];
+  const initialStipendRupees = initial?.expected_stipend_paise != null
+    ? String(Math.round(Number(initial.expected_stipend_paise) / 100))
+    : '';
+
+  const [selected, setSelected] = useState(new Set(initialSpecs));
+  const [location, setLocation] = useState(initial?.preferred_location || '');
+  const [firmSize, setFirmSize] = useState(initial?.preferred_firm_size || '');
+  const [stipend,  setStipend]  = useState(initialStipendRupees);
+  const [notes,    setNotes]    = useState(initial?.notes || '');
   const [busy,     setBusy]     = useState(false);
-  const [cvFileId,   setCvFileId]   = useState('');
-  const [cvName,     setCvName]     = useState('');
-  const [cvSize,     setCvSize]     = useState(0);
+  const [cvFileId,   setCvFileId]   = useState(initial?.cv_file_id || '');
+  const [cvName,     setCvName]     = useState(initial?.cv_file_name || (initial?.cv_file_id ? 'Attached CV' : ''));
+  const [cvSize,     setCvSize]     = useState(initial?.cv_file_size || 0);
   const [cvUploading, setCvUploading] = useState(false);
   const [cvError,    setCvError]    = useState('');
 
@@ -126,7 +139,9 @@ export default function RequestArticleshipModal({ onClose, onSubmitted }) {
         },
       });
       invalidate('/api/articleship-matches/my');
-      toast.success('Articleship preferences submitted. WICASA will share recommendations soon.');
+      toast.success(isUpdate
+        ? 'Articleship preferences updated. WICASA will use the latest details.'
+        : 'Articleship preferences submitted. WICASA will share recommendations soon.');
       onSubmitted?.();
     } catch (err) {
       toast.error(err?.message || 'Could not submit — please try again.');
@@ -141,15 +156,18 @@ export default function RequestArticleshipModal({ onClose, onSubmitted }) {
       <div className="dialog-shell" role="dialog" aria-modal="true" aria-labelledby="articleship-title"
            style={{ width: 'min(34rem, 100%)' }}>
         <div className="dialog-header">
-          <h2 id="articleship-title" className="dialog-title">Articleship preferences</h2>
+          <h2 id="articleship-title" className="dialog-title">
+            {isUpdate ? 'Update articleship preferences' : 'Articleship preferences'}
+          </h2>
           <button type="button" className="dialog-close" onClick={onClose} aria-label="Close"><IconX /></button>
         </div>
 
-        <form onSubmit={submit}>
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', flex: '1 1 auto', minHeight: 0, overflow: 'hidden' }}>
           <div className="dialog-body">
             <p className="dialog-text" style={{ fontSize: '.875rem' }}>
-              Tell us what you're looking for in your articleship. WICASA reviews these and shares
-              matched firms from the branch's employer network.
+              {isUpdate
+                ? "We've loaded your last submission. Edit anything that's changed and re-submit — WICASA will use the latest details when they match you to firms."
+                : "Tell us what you're looking for in your articleship. WICASA reviews these and shares matched firms from the branch's employer network."}
             </p>
 
             <div style={{ marginTop: '1rem' }}>
@@ -295,7 +313,9 @@ export default function RequestArticleshipModal({ onClose, onSubmitted }) {
               loading={busy}
               disabled={selected.size === 0}
             >
-              {busy ? 'Submitting…' : 'Submit preferences'}
+              {busy
+                ? (isUpdate ? 'Updating…' : 'Submitting…')
+                : (isUpdate ? 'Update preferences' : 'Submit preferences')}
             </Button>
           </div>
         </form>
