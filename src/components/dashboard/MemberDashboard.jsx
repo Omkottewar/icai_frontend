@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
-import NotificationSettingsCard from './NotificationSettingsCard';
 import MemberProfileDrawer from './MemberProfileDrawer';
 import MyJobsTab from './MyJobsTab';
+import { MentorAvailabilityCard, MyMenteesCard } from './MentorshipMemberCards';
 import {
   IconAward, IconShield, IconCalendar, IconBookOpen, IconUsers,
   IconBot, IconArrowRight, IconUser, IconSettings, IconLogOut,
@@ -13,6 +13,7 @@ import { googleCalendarEventUrl, googleCalendarSubscribeUrl } from '../../lib/go
 import { withCAPrefix } from '../../lib/displayName';
 import { toast } from '../../lib/notify';
 import { dialog } from '../../lib/dialog';
+import { apiWrite } from '../../lib/apiCache';
 import Button from '../ui/Button';
 
 // Profile-completeness helper. We only consider editable fields here —
@@ -171,6 +172,8 @@ export default function MemberDashboard({ user, data, logout, onRefresh, pending
       {/* ── Tab panels ───────────────────────────────────────────── */}
       {tab === 'overview' && (
         <div id="md-tab-overview" role="tabpanel" className="md-tab-body">
+          <MyCpeCard credits={profile?.cpe_credits ?? null} onSaved={() => onRefresh?.()} />
+          <MyMenteesCard />
           {announcements.length > 0 && <AnnouncementsCard items={announcements} />}
         </div>
       )}
@@ -201,7 +204,7 @@ export default function MemberDashboard({ user, data, logout, onRefresh, pending
         <div id="md-tab-settings" role="tabpanel" className="md-tab-body md-tab-body-grid">
           <ProfileSidecard user={user} profile={profile} logout={logout} onEdit={openEdit} />
           <CalendarSubscriptionCard />
-          <NotificationSettingsCard />
+          <MentorAvailabilityCard />
           <GrievanceTile />
         </div>
       )}
@@ -332,6 +335,107 @@ function MembershipIdentityCard({ user, profile, pendingBadge, onEdit }) {
         {pendingBadge}
         <a href="/events" className="btn btn-outline">Browse events</a>
         <a href="/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
+      </div>
+    </div>
+  );
+}
+
+// ─── Self-reported CPE credits card ─────────────────────────────────────
+//
+// Members enter their current CPE total from the ICAI portal here and we
+// display it back on the dashboard. Deliberately dumb: no ledger, no
+// per-event attribution, no ICAI sync (all removed in migration 0087).
+// The value is stored on member_profiles.cpe_credits (migration 0099) and
+// round-trips through the existing /api/members/profile PATCH.
+function MyCpeCard({ credits, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(credits ?? '');
+  const [saving, setSaving] = useState(false);
+
+  // Reset the input whenever the incoming value changes (e.g. after refresh).
+  useEffect(() => { setValue(credits ?? ''); }, [credits]);
+
+  const hasValue = credits !== null && credits !== undefined && credits !== '';
+  const display = hasValue ? Number(credits).toFixed(1).replace(/\.0$/, '') : '—';
+
+  async function save() {
+    setSaving(true);
+    try {
+      const body = { cpe_credits: value === '' ? null : value };
+      await apiWrite('/api/members/profile', {
+        method: 'PATCH',
+        body,
+        invalidates: ['/api/dashboard'],
+      });
+      toast.success('CPE credits updated');
+      setEditing(false);
+      onSaved?.();
+    } catch (err) {
+      toast.error(err.message || 'Could not save CPE credits');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="card md-card md-cpe">
+      <div className="md-cpe-icon"><IconAward /></div>
+      <div className="md-cpe-body">
+        <div className="md-card-mini-label">CPE credits</div>
+        {!editing ? (
+          <>
+            <div className="md-cpe-value">
+              {display}<span className="md-cpe-unit"> hrs</span>
+            </div>
+            <p className="muted-text md-cpe-hint">
+              {hasValue
+                ? 'Self-reported from your ICAI account. Update whenever it changes.'
+                : "Enter your current CPE credit total to keep it handy on your dashboard."}
+            </p>
+          </>
+        ) : (
+          <div className="md-cpe-edit">
+            <label className="md-cpe-input-wrap">
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.5"
+                min="0"
+                max="9999.9"
+                className="input-base md-cpe-input"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="e.g. 24.5"
+                autoFocus
+              />
+              <span className="md-cpe-input-suffix">hours</span>
+            </label>
+            <p className="muted-text md-cpe-hint">
+              Enter the total credits you've earned this cycle. Leave blank to clear.
+            </p>
+          </div>
+        )}
+      </div>
+      <div className="md-cpe-actions">
+        {!editing ? (
+          <button type="button" className="btn btn-outline" onClick={() => setEditing(true)}>
+            <IconEdit size="sm" /> {hasValue ? 'Update' : 'Add credits'}
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => { setValue(credits ?? ''); setEditing(false); }}
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <Button className="btn btn-primary" onClick={save} loading={saving}>
+              {saving ? 'Saving…' : 'Save'}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1331,6 +1435,56 @@ function MemberDashboardStyles() {
         border-bottom: 1px solid var(--border);
       }
       .md-announce:last-child { border-bottom: none; }
+
+      /* ── CPE credits card ───────────────────────────────────────── */
+      .md-cpe {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: .85rem;
+        align-items: center;
+        background: linear-gradient(135deg, oklch(0.85 0.16 90 / .10), oklch(0.55 0.14 155 / .06));
+      }
+      .md-cpe-icon {
+        width: 2.6rem; height: 2.6rem; border-radius: 10px;
+        display: grid; place-items: center; flex-shrink: 0;
+        background: oklch(0.85 0.16 90 / .22);
+        color: #92400e;
+      }
+      .md-cpe-body { min-width: 0; }
+      .md-cpe-value {
+        font-size: 1.9rem; font-weight: 800; line-height: 1.05;
+        font-variant-numeric: tabular-nums; letter-spacing: -.02em;
+        margin-top: .1rem; color: var(--foreground);
+      }
+      .md-cpe-unit {
+        font-size: .95rem; font-weight: 600;
+        color: var(--muted-foreground); margin-left: .15rem;
+      }
+      .md-cpe-hint {
+        font-size: .75rem; margin: .3rem 0 0; line-height: 1.4;
+      }
+      .md-cpe-actions {
+        grid-column: 1 / -1;
+        display: flex; gap: .5rem; justify-content: flex-end;
+        flex-wrap: wrap;
+      }
+      .md-cpe-edit { display: flex; flex-direction: column; gap: .35rem; }
+      .md-cpe-input-wrap {
+        display: inline-flex; align-items: center; gap: .5rem;
+        margin-top: .15rem;
+      }
+      .md-cpe-input {
+        max-width: 8rem;
+        font-size: 1.1rem; font-weight: 700;
+        font-variant-numeric: tabular-nums;
+      }
+      .md-cpe-input-suffix {
+        font-size: .85rem; color: var(--muted-foreground); font-weight: 600;
+      }
+      @media (min-width: 640px) {
+        .md-cpe { grid-template-columns: auto 1fr auto; }
+        .md-cpe-actions { grid-column: auto; }
+      }
 
       /* ── Grievance tile ─────────────────────────────────────────── */
       .md-grievance {

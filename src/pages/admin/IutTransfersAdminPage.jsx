@@ -75,7 +75,18 @@ export default function IutTransfersAdminPage() {
     <AdminLayout
       title="IUT transfers"
       subtitle="Inter-unit transfers between branch accounts — approve then record the bank reference on execution"
-      actions={<button className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size="sm" /> New transfer</button>}
+      actions={
+        <>
+          <a
+            href={`/api/admin/iut-transfers/export.csv?status=${tab}`}
+            className="btn btn-outline"
+            style={{ padding: '.5rem 1rem', textDecoration: 'none' }}
+          >
+            ⬇ Export CSV
+          </a>
+          <button className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size="sm" /> New transfer</button>
+        </>
+      }
     >
       <div className="row" role="tablist" style={{ borderBottom: '1px solid var(--border)', marginBottom: '1rem', flexWrap: 'wrap', gap: 0 }}>
         {STATUS_TABS.map((t) => (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { cachedGet, apiWrite, invalidate, subscribe } from '../../lib/apiCache';
 import { toast } from '../../lib/notify';
+import { dialog } from '../../lib/dialog';
 import { IconBriefcase, IconArrowRight } from '../../icons';
 
 // Full detail view of the student's most recent articleship-preferences
@@ -89,6 +90,11 @@ export default function MyArticleshipPrefsCard() {
   const stipendLabel = fmtStipend(latest.expected_stipend_paise);
   const palette = STATUS_PALETTE[latest.status] || STATUS_PALETTE.submitted;
   const canCancel = latest.status === 'submitted';
+  const recommendedFirms = Array.isArray(latest.recommended_firms) ? latest.recommended_firms : [];
+  const canFinalise = latest.status === 'matched'
+    && !latest.student_confirmed_at
+    && !latest.student_declined_at
+    && recommendedFirms.length > 0;
 
   async function cancel() {
     try {
@@ -100,8 +106,43 @@ export default function MyArticleshipPrefsCard() {
     }
   }
 
+  async function confirmPlacement(firm) {
+    const ok = await dialog.confirm({
+      title: `Confirm you've joined ${firm.name}?`,
+      message: 'This tells WICASA you accepted this firm\'s offer. Only mark this after you\'ve actually signed on — the record is used for placement tracking.',
+      confirmText: 'Yes, I\'ve joined',
+    });
+    if (!ok) return;
+    try {
+      await apiWrite(`/api/articleship-matches/${latest.id}/confirm-placement`, {
+        method: 'POST',
+        body: { firm_id: firm.id },
+      });
+      invalidate('/api/articleship-matches/my');
+      toast.success('Placement recorded. Congrats!');
+    } catch (err) {
+      toast.error(err?.message || 'Could not record placement — try again shortly.');
+    }
+  }
+
+  async function declineShortlist() {
+    const ok = await dialog.confirm({
+      title: 'None of the shortlisted firms worked?',
+      message: 'WICASA will see this so they can revise the shortlist. Your submission stays open.',
+      confirmText: 'Yes, decline shortlist',
+    });
+    if (!ok) return;
+    try {
+      await apiWrite(`/api/articleship-matches/${latest.id}/decline-shortlist`, { method: 'POST' });
+      invalidate('/api/articleship-matches/my');
+      toast.success('Feedback sent to WICASA');
+    } catch (err) {
+      toast.error(err?.message || 'Could not update — try again shortly.');
+    }
+  }
+
   return (
-    <div className="card">
+    <div className="card" id="articleship">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: '.75rem' }}>
         <div className="row gap-2" style={{ alignItems: 'center' }}>
           <span className="icon-tile green" style={{ width: '2rem', height: '2rem', padding: '.3rem' }}>
@@ -140,12 +181,6 @@ export default function MyArticleshipPrefsCard() {
         gap: '.6rem',
         gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
       }}>
-        {latest.preferred_location && (
-          <div>
-            <div className="ap-label">Preferred location</div>
-            <div className="ap-value">{latest.preferred_location}</div>
-          </div>
-        )}
         {firmSizeLabel && (
           <div>
             <div className="ap-label">Firm size</div>
@@ -172,16 +207,71 @@ export default function MyArticleshipPrefsCard() {
         </div>
       )}
 
-      {/* WICASA response */}
-      {latest.status === 'matched' && Array.isArray(latest.recommended_firm_ids) && latest.recommended_firm_ids.length > 0 && (
+      {/* WICASA response — shortlist with contact details + accept / decline
+          actions. Once the student confirms or declines, the buttons are
+          replaced by an outcome badge. */}
+      {latest.status === 'matched' && recommendedFirms.length > 0 && (
+        <div style={{ marginTop: '.9rem' }}>
+          <div className="ap-label">WICASA shortlisted these firms</div>
+          <div style={{ marginTop: '.35rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            {recommendedFirms.map((f) => (
+              <div key={f.id} style={{
+                padding: '.55rem .7rem',
+                background: 'oklch(0.96 0.03 250 / .6)',
+                border: '1px solid oklch(0.82 0.06 250 / .4)',
+                borderRadius: '.4rem',
+                display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '.5rem',
+                alignItems: 'center',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '.88rem', fontWeight: 600 }}>{f.name}</div>
+                  <div className="muted-text" style={{ fontSize: '.72rem' }}>
+                    {[f.city, f.phone, f.email].filter(Boolean).join(' · ') || 'Contact the branch office for details'}
+                  </div>
+                </div>
+                {canFinalise && (
+                  <button
+                    type="button"
+                    onClick={() => confirmPlacement(f)}
+                    className="btn btn-primary"
+                    style={{ padding: '.3rem .7rem', fontSize: '.72rem', whiteSpace: 'nowrap' }}
+                    title="I've accepted this firm's offer"
+                  >
+                    I joined this firm
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {canFinalise && (
+            <div style={{ marginTop: '.5rem' }}>
+              <button
+                type="button"
+                onClick={declineShortlist}
+                className="btn btn-outline"
+                style={{ fontSize: '.72rem', padding: '.3rem .7rem', color: '#991b1b' }}
+              >
+                None of these worked — let WICASA know
+              </button>
+            </div>
+          )}
+          {latest.student_declined_at && (
+            <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem', fontStyle: 'italic' }}>
+              You told WICASA the shortlist didn't work. They'll revise and get back to you.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Placed outcome — set either by student (self-confirm) or WICASA. */}
+      {latest.status === 'placed' && (
         <div style={{
-          marginTop: '.9rem',
-          padding: '.6rem .8rem',
-          background: 'oklch(0.90 0.10 250 / .35)',
-          borderRadius: '.4rem',
-          fontSize: '.8rem',
+          marginTop: '.9rem', padding: '.6rem .8rem',
+          background: 'oklch(0.94 0.10 145 / .5)',
+          border: '1px solid oklch(0.65 0.14 145 / .35)',
+          borderRadius: '.4rem', fontSize: '.85rem',
         }}>
-          WICASA has shortlisted {latest.recommended_firm_ids.length} firm{latest.recommended_firm_ids.length === 1 ? '' : 's'} for you. Contact the branch office for the introduction.
+          🎉 <strong>Placed.</strong> WICASA has recorded your placement. All the best for articleship!
         </div>
       )}
 

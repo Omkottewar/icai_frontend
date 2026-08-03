@@ -620,72 +620,118 @@ a:focus-visible,
   gap: .65rem;
 }
 
-/* Committee details panel (committee detail page header) */
-.committee-panel {
-  display: grid;
-  grid-template-columns: 1fr;
+/* Committee profile — single unified card holding About body,
+   Leadership trio, and optional Chairman message stacked vertically.
+   Each subsection is padded on the shared surface with a thin divider
+   between them (no per-subsection card chrome). */
+.committee-profile {
   background: var(--card);
   border: 1px solid var(--border);
+  border-left: 3px solid var(--cat-accent);
   border-radius: .9rem;
-  overflow: hidden;
   margin-bottom: 2rem;
+  overflow: hidden;
 }
-@media (min-width: 760px) {
-  .committee-panel { grid-template-columns: 300px 1fr; }
+.committee-profile-block {
+  padding: 1.5rem 1.75rem;
 }
-.committee-panel-img {
-  width: 100%;
-  height: 100%;
-  min-height: 190px;
-  object-fit: cover;
-  display: block;
+.committee-profile-block + .committee-profile-block {
+  border-top: 1px solid var(--border);
 }
-.committee-panel-body {
-  padding: 1.5rem;
+.committee-profile-eyebrow {
+  color: var(--cat-accent);
+  margin-bottom: .85rem;
+}
+.committee-profile-chairman {
+  background: color-mix(in srgb, var(--cat-accent) 4%, transparent);
+}
+
+.committee-about-body {
+  font-size: .9375rem;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+.committee-about-body > *:first-child { margin-top: 0; }
+.committee-about-body > *:last-child { margin-bottom: 0; }
+.committee-about-body p {
+  margin: 0 0 .9rem;
+  color: var(--muted-foreground);
+}
+.committee-about-body p:last-child { margin-bottom: 0; }
+.committee-about-body strong { color: var(--foreground); }
+/* Leadership tiles — 3-across on wide, wraps naturally as viewport
+   narrows, single-column on phones. Vertical stack: photo → role badge
+   → name so the badge sits directly under the portrait. */
+.committee-leadership-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+.committee-role-tile {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  text-align: center;
+  gap: .5rem;
+  padding: 1.25rem 1rem;
+  background: var(--muted, #f5f5f4);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
-.committee-panel-badge {
-  align-self: flex-start;
-  font-size: .75rem;
+.committee-role-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, .06);
+  border-color: var(--cat-accent);
+}
+.committee-role-photo-wrap {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  padding: 3px;
+  background: linear-gradient(135deg, var(--cat-accent), color-mix(in srgb, var(--cat-accent) 55%, white));
+  margin-bottom: .3rem;
+}
+.committee-role-photo {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  background: var(--card);
+}
+.committee-role-photo-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--cat-accent);
+  letter-spacing: -.02em;
+  background: var(--card);
+}
+.committee-role-badge {
+  display: inline-block;
+  font-size: .65rem;
   font-weight: 700;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: #fff;
   background: var(--cat-accent);
-  padding: .22rem .6rem;
+  padding: .18rem .55rem;
   border-radius: 999px;
+  width: fit-content;
 }
-.committee-panel-title {
-  margin: .7rem 0 0;
-  font-size: clamp(1.375rem, 3vw, 1.875rem);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -.01em;
+.committee-role-name {
+  font-size: .9rem;
+  font-weight: 600;
   color: var(--foreground);
+  line-height: 1.25;
 }
-.committee-panel-desc {
-  margin: .65rem 0 0;
-  font-size: .9375rem;
-  line-height: 1.6;
-  color: var(--muted-foreground);
-  max-width: 44rem;
-}
-.committee-panel-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: .45rem;
-  margin-top: 1.1rem;
-  font-size: .8125rem;
-  font-weight: 700;
-  color: var(--cat-accent);
-}
-.committee-panel-dot {
-  width: .5rem;
-  height: .5rem;
-  border-radius: 999px;
-  background: var(--cat-accent);
+
+@media (max-width: 640px) {
+  .committee-profile-block { padding: 1.125rem 1rem; }
+  .committee-role-photo-wrap { width: 72px; height: 72px; }
 }
 
 /* Footer top links bar — hover highlight */
@@ -1720,12 +1766,6 @@ body:has(.modal-backdrop) {
   .event-acc-speaker-name { font-size: .8125rem; }
 
   /* Committee panel (detail page header) */
-  .committee-panel { border-radius: .75rem; margin-bottom: 1.5rem; }
-  .committee-panel-img { min-height: 160px; aspect-ratio: 16/9; }
-  .committee-panel-body { padding: 1.125rem; }
-  .committee-panel-title { margin-top: .5rem; line-height: 1.2; }
-  .committee-panel-desc { font-size: .875rem; line-height: 1.55; }
-  .committee-panel-stat { font-size: .75rem; margin-top: .85rem; }
 
   /* Hero carousel — caption + arrows scale down */
   .hero-carousel-caption {
@@ -1795,7 +1835,6 @@ body:has(.modal-backdrop) {
   .feature-card { padding: 1.5rem !important; }
   .stat-num { font-size: 1.65rem; }
   .event-acc-title { font-size: .9375rem; }
-  .committee-panel-body { padding: 1.25rem; }
 }
 
 /* Very narrow phones (≤380px): one more notch of breathing room */
@@ -1807,7 +1846,6 @@ body:has(.modal-backdrop) {
   .event-acc-head { padding: .8rem .9rem; }
   .event-acc-meta { margin: 0 .9rem; }
   .event-acc-cta { margin: 0 .9rem .9rem; }
-  .committee-panel-body { padding: 1rem; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { cachedGet, apiWrite } from '../../lib/apiCache';
 import { toast } from '../../lib/notify';
+import { usePushSubscription } from '../../hooks/usePushSubscription';
 import { IconX, IconBell, IconCheckCircle } from '../../icons';
 
 // Modal that lets a signed-in member/student pick categories + posting types
@@ -31,7 +32,8 @@ export default function SubscribeAlertsModal({ onClose, initialCategoryId }) {
     category_ids: initialCategoryId ? [initialCategoryId] : [],
     posting_types: ['job'],
     frequency: 'instant',
-    filter_location: '',
+    // Location filter is intentionally omitted — every posting is
+    // Nagpur-branch scoped, so filtering by city adds no value.
     filter_experience: '',
   });
 
@@ -63,7 +65,6 @@ export default function SubscribeAlertsModal({ onClose, initialCategoryId }) {
           category_ids: form.category_ids,
           posting_types: form.posting_types,
           frequency: form.frequency,
-          filter_location: form.filter_location.trim() || null,
           filter_experience: form.filter_experience.trim() || null,
         },
         invalidates: ['/api/job-alerts'],
@@ -224,26 +225,20 @@ export default function SubscribeAlertsModal({ onClose, initialCategoryId }) {
               </div>
             </fieldset>
 
+            <PushEnablePrompt frequency={form.frequency} />
+
             <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
               <legend style={{ fontSize: '.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--muted-foreground)', marginBottom: '.5rem' }}>
-                Optional filters
+                Optional experience filter
               </legend>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem' }}>
-                <input
-                  placeholder="Location contains… e.g. Nagpur"
-                  value={form.filter_location}
-                  onChange={(e) => set('filter_location', e.target.value)}
-                  style={{ padding: '.5rem .65rem', border: '1px solid var(--border)', borderRadius: '.375rem', fontSize: '.8125rem' }}
-                />
-                <input
-                  placeholder="Experience contains… e.g. Fresher"
-                  value={form.filter_experience}
-                  onChange={(e) => set('filter_experience', e.target.value)}
-                  style={{ padding: '.5rem .65rem', border: '1px solid var(--border)', borderRadius: '.375rem', fontSize: '.8125rem' }}
-                />
-              </div>
+              <input
+                placeholder="Experience contains… e.g. Fresher, 2+ years"
+                value={form.filter_experience}
+                onChange={(e) => set('filter_experience', e.target.value)}
+                style={{ width: '100%', padding: '.5rem .65rem', border: '1px solid var(--border)', borderRadius: '.375rem', fontSize: '.8125rem' }}
+              />
               <div className="muted-text" style={{ fontSize: '.72rem', marginTop: '.3rem' }}>
-                Leave blank to receive every matching posting. Filters are case-insensitive substring matches.
+                Leave blank to receive every matching posting. Case-insensitive substring match against the posting's experience field.
               </div>
             </fieldset>
 
@@ -258,6 +253,62 @@ export default function SubscribeAlertsModal({ onClose, initialCategoryId }) {
           </form>
         )}
       </div>
+    </div>
+  );
+}
+
+// Inline nudge shown inside the subscribe modal — a user asking to be
+// alerted is the highest-intent audience for browser push. Only appears
+// when push is supported, not already granted, and the user picked the
+// "instant" frequency (digests don't benefit from push).
+function PushEnablePrompt({ frequency }) {
+  const push = usePushSubscription({ enabled: true });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  if (frequency !== 'instant') return null;
+  if (!push.supported) return null;
+  if (push.loading) return null;
+  if (push.permission === 'granted' && push.subscribed) return null;
+
+  const enable = async () => {
+    if (busy) return;
+    setBusy(true); setError('');
+    try {
+      await push.enable();
+    } catch (err) {
+      setError(err?.message || 'Could not enable push notifications');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const denied = push.permission === 'denied';
+
+  return (
+    <div style={{
+      display: 'flex', gap: '.65rem', alignItems: 'flex-start',
+      padding: '.7rem .85rem',
+      background: 'oklch(0.95 0.04 255)',
+      border: '1px solid oklch(0.85 0.05 255)',
+      borderRadius: '.4rem',
+      fontSize: '.8rem',
+    }}>
+      <span aria-hidden style={{ fontSize: '1.1rem', lineHeight: 1 }}>🔔</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, marginBottom: '.15rem' }}>Get instant push alerts</div>
+        <div className="muted-text" style={{ fontSize: '.75rem' }}>
+          {denied
+            ? 'Notifications are blocked in your browser. Enable them from the site permissions to get instant push alerts on your desktop and phone.'
+            : 'A tap-to-open notification the moment a matching posting is added — before the email lands. Works on your desktop and phone.'}
+        </div>
+        {error && <div style={{ color: '#991b1b', fontSize: '.72rem', marginTop: '.3rem' }}>{error}</div>}
+      </div>
+      {!denied && (
+        <button type="button" onClick={enable} disabled={busy} className="btn btn-primary" style={{ padding: '.35rem .8rem', fontSize: '.75rem', flexShrink: 0 }}>
+          {busy ? 'Enabling…' : 'Enable'}
+        </button>
+      )}
     </div>
   );
 }

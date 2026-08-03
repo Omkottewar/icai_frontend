@@ -7,7 +7,8 @@ import Button from '../ui/Button';
 // Articleship matchmaking preferences form (Section N.9). WICASA reviews
 // submissions and returns recommended firms.
 //
-// Fields: specialisation checkboxes + location + firm-size + stipend + CV.
+// Fields: specialisation checkboxes + firm-size + stipend + CV. All postings
+// are Nagpur-branch scoped, so we don't ask the student for a location.
 // CV is a student-scoped PDF upload (max 5 MB) — the id is attached to the
 // submission so WICASA can download it from the admin view.
 
@@ -42,7 +43,6 @@ export default function RequestArticleshipModal({ onClose, onSubmitted, initial 
     : '';
 
   const [selected, setSelected] = useState(new Set(initialSpecs));
-  const [location, setLocation] = useState(initial?.preferred_location || '');
   const [firmSize, setFirmSize] = useState(initial?.preferred_firm_size || '');
   const [stipend,  setStipend]  = useState(initialStipendRupees);
   const [notes,    setNotes]    = useState(initial?.notes || '');
@@ -131,7 +131,7 @@ export default function RequestArticleshipModal({ onClose, onSubmitted, initial 
         method: 'POST',
         body: {
           preferred_specialisations: Array.from(selected),
-          preferred_location: location.trim(),
+          preferred_location: 'Nagpur',
           preferred_firm_size: firmSize || null,
           expected_stipend_paise: stipendPaise,
           cv_file_id: cvFileId || null,
@@ -191,18 +191,6 @@ export default function RequestArticleshipModal({ onClose, onSubmitted, initial 
             </div>
 
             <div style={{ display: 'grid', gap: '.75rem', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', marginTop: '.875rem' }}>
-              <label>
-                <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.25rem' }}>Preferred location</div>
-                <input
-                  type="text"
-                  className="input-base"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value.slice(0, 120))}
-                  placeholder="e.g. Nagpur / Mumbai"
-                  disabled={busy}
-                />
-              </label>
-
               <label>
                 <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.25rem' }}>Firm size</div>
                 <select

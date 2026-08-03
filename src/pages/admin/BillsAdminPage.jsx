@@ -87,7 +87,19 @@ export default function BillsAdminPage() {
     <AdminLayout
       title="Bills"
       subtitle="Vendor bills — accountants draft, treasurers approve, then mark as paid"
-      actions={<button className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size="sm" /> New bill</button>}
+      actions={
+        <>
+          <a
+            href={`/api/admin/bills/export.csv?status=${tab}`}
+            className="btn btn-outline"
+            style={{ padding: '.5rem 1rem', textDecoration: 'none' }}
+            title={`Export ${tab} bills as CSV`}
+          >
+            ⬇ Export CSV
+          </a>
+          <button className="btn btn-primary" onClick={() => setCreating(true)}><IconPlus size="sm" /> New bill</button>
+        </>
+      }
     >
       <div className="row" role="tablist" style={{ borderBottom: '1px solid var(--border)', marginBottom: '1rem', flexWrap: 'wrap', gap: 0 }}>
         {STATUS_TABS.map((t) => (

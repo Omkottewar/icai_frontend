@@ -75,6 +75,15 @@ export default function RefundsAdminPage() {
     <AdminLayout
       title="Refunds"
       subtitle="Approve refunds against successful payments and mark them processed"
+      actions={
+        <a
+          href={`/api/admin/refunds/export.csv?status=${tab}`}
+          className="btn btn-outline"
+          style={{ padding: '.5rem 1rem', textDecoration: 'none' }}
+        >
+          ⬇ Export CSV
+        </a>
+      }
     >
       <div className="row" role="tablist" style={{ borderBottom: '1px solid var(--border)', marginBottom: '1rem', flexWrap: 'wrap', gap: 0 }}>
         {STATUS_TABS.map((t) => (

@@ -64,6 +64,7 @@ const OnboardingPage     = lazy(() => import('../pages/auth/OnboardingPage'));
 const AnnouncementsPage  = lazy(() => import('../pages/AnnouncementsPage'));
 const PhotoGalleryPage   = lazy(() => import('../pages/PhotoGalleryPage'));
 const JobVacanciesPage   = lazy(() => import('../pages/JobVacanciesPage'));
+const JobDetailPage      = lazy(() => import('../pages/JobDetailPage'));
 const JobAlertsSubscribePage = lazy(() => import('../pages/JobAlertsSubscribePage'));
 const JobAlertsConfirmPage   = lazy(() => import('../pages/JobAlertsConfirmPage'));
 const JobAlertsManagePage    = lazy(() => import('../pages/JobAlertsManagePage'));
@@ -96,6 +97,9 @@ const SiteSettingsAdminPage      = lazy(() => import('../pages/admin/SiteSetting
 const AnnouncementsAdminPage     = lazy(() => import('../pages/admin/AnnouncementsAdminPage'));
 const ComingSoonPage             = lazy(() => import('../pages/admin/ComingSoonPage'));
 const JobPostingsAdminPage       = lazy(() => import('../pages/admin/JobPostingsAdminPage'));
+const ArticleshipMatchesAdminPage = lazy(() => import('../pages/admin/ArticleshipMatchesAdminPage'));
+const MentorshipAdminPage         = lazy(() => import('../pages/admin/MentorshipAdminPage'));
+const AuditLogAdminPage           = lazy(() => import('../pages/admin/AuditLogAdminPage'));
 const JobCategoriesAdminPage     = lazy(() => import('../pages/admin/JobCategoriesAdminPage'));
 const JobSubscribersAdminPage    = lazy(() => import('../pages/admin/JobSubscribersAdminPage'));
 const ChecklistTemplatesAdminPage = lazy(() => import('../pages/admin/ChecklistTemplatesAdminPage'));
@@ -195,6 +199,10 @@ const SLUG_ROUTES = [
   // attempt and forwards to /attempts/<aid> which is the live UI.
   { prefix: '/mock-tests/',         suffix: '/attempt', Page: MockTestAttemptPage },
   { prefix: '/attempts/',                              Page: MockTestAttemptPage },
+  // Job posting detail page — /jobs/<id> is the shareable/deep-linkable
+  // URL used by alert emails and the "Related jobs" cards on the detail
+  // page itself. The list stays at /job-vacancies?type=<type>.
+  { prefix: '/jobs/',                                  Page: JobDetailPage },
 ];
 
 // Admin routes. Each is wrapped in <RequireAdmin> at render time. Placeholder
@@ -244,10 +252,9 @@ const ADMIN_ROUTES = {
   '/admin/iut-transfers':        IutTransfersAdminPage,
   '/admin/vendors':              VendorsAdminPage,
   '/admin/budgets':              BudgetsAdminPage,
-  // Mentorship + articleship-matches admin views still ship as stubs — WICASA
-  // has been reviewing those in the /admin/home inbox for now.
-  '/admin/mentorship':           () => <ComingSoonPage title="Mentorship" description="Member-mentor pairings and meeting logs. Backend wiring is ready; the admin view ships in a follow-up." />,
-  '/admin/articleship-matches':  () => <ComingSoonPage title="Articleship matching" description="Match students to firms offering articleship vacancies. Backend wiring is ready; the admin view ships in a follow-up." />,
+  '/admin/mentorship':           MentorshipAdminPage,
+  '/admin/articleship-matches':  ArticleshipMatchesAdminPage,
+  '/admin/audit-log':            AuditLogAdminPage,
 };
 
 const FULL_BLEED_ROUTES = new Set(['/login', '/signup', '/forgot', '/onboarding']);

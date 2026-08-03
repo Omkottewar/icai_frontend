@@ -42,12 +42,27 @@ export default function GrievancesAdminPage() {
   const [stats, setStats] = useState({ open: 0, in_review: 0, resolved: 0, closed: 0 });
   const [err, setErr] = useState('');
   const [editing, setEditing] = useState(null);
+  // Search + pagination (backend supports both since F28).
+  const [queryInput, setQueryInput] = useState('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 50;
+
+  // Debounced search — reset to page 1 when query changes.
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(queryInput.trim()); setPage(1); }, 250);
+    return () => clearTimeout(t);
+  }, [queryInput]);
 
   const load = async () => {
     try {
       const params = new URLSearchParams();
       if (tab !== 'all') params.set('status', tab);
       if (query.ticket_no) params.set('ticket_no', query.ticket_no);
+      if (q) params.set('q', q);
+      params.set('page', String(page));
+      params.set('pageSize', String(pageSize));
       const [listRes, statsRes] = await Promise.all([
         fetch(`/api/admin/grievances?${params.toString()}`, { credentials: 'include' }),
         fetch('/api/admin/grievances/stats',                 { credentials: 'include' }),
@@ -55,11 +70,22 @@ export default function GrievancesAdminPage() {
       if (!listRes.ok) throw new Error('Could not load grievances');
       const list = await listRes.json();
       setItems(list.items);
+      setTotal(list.total ?? list.items?.length ?? 0);
       if (statsRes.ok) setStats(await statsRes.json());
     } catch (e) { setErr(e.message); }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tab, query.ticket_no]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [tab, query.ticket_no, q, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const exportUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    if (tab !== 'all') params.set('status', tab);
+    if (q) params.set('q', q);
+    const s = params.toString();
+    return `/api/admin/grievances/export.csv${s ? '?' + s : ''}`;
+  }, [tab, q]);
 
   // Auto-open the deep-linked ticket once the list arrives.
   useEffect(() => {
@@ -89,10 +115,18 @@ export default function GrievancesAdminPage() {
   };
 
   return (
-    <AdminLayout title="Grievances" subtitle="Contact, grievance and suggestion submissions from the public form">
+    <AdminLayout
+      title="Grievances"
+      subtitle="Contact, grievance and suggestion submissions from the public form"
+      actions={
+        <a href={exportUrl} className="btn btn-outline" style={{ padding: '.5rem 1rem', textDecoration: 'none' }}>
+          ⬇ Export CSV
+        </a>
+      }
+    >
       {err && <div className="alert alert-error"><IconX size="sm" /> {err}</div>}
 
-      <div className="row gap-2" style={{ marginBottom: '1rem', flexWrap: 'wrap' }}>
+      <div className="row gap-2" style={{ marginBottom: '.75rem', flexWrap: 'wrap' }}>
         {TABS.map((t) => {
           const count = t.key === 'all'
             ? Object.values(stats).reduce((a, b) => a + b, 0)
@@ -111,6 +145,20 @@ export default function GrievancesAdminPage() {
             </button>
           );
         })}
+      </div>
+
+      <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', marginBottom: '.75rem', flexWrap: 'wrap' }}>
+        <input
+          type="search"
+          value={queryInput}
+          onChange={(e) => setQueryInput(e.target.value.slice(0, 120))}
+          placeholder="Search by name, email, or ticket…"
+          className="input-base"
+          style={{ maxWidth: 340, fontSize: '.85rem' }}
+        />
+        <span className="muted-text" style={{ fontSize: '.75rem', marginLeft: 'auto' }}>
+          {total} result{total === 1 ? '' : 's'}
+        </span>
       </div>
 
       {!items && !err && (
@@ -169,6 +217,18 @@ export default function GrievancesAdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {items && items.length > 0 && totalPages > 1 && (
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', justifyContent: 'center', marginTop: '.9rem', fontSize: '.8rem' }}>
+          <button type="button" className="btn btn-outline"
+            onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
+            style={{ padding: '.35rem .75rem', fontSize: '.75rem' }}>← Previous</button>
+          <span className="muted-text">Page {page} of {totalPages}</span>
+          <button type="button" className="btn btn-outline"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+            style={{ padding: '.35rem .75rem', fontSize: '.75rem' }}>Next →</button>
         </div>
       )}
 

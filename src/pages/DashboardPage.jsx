@@ -10,7 +10,6 @@ import StatCard from '../components/ui/StatCard';
 import { ShimmerPageBody, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 import ApprovalsQueueCard from '../components/dashboard/ApprovalsQueueCard';
 import CommitteeChecklistsCard from '../components/dashboard/CommitteeChecklistsCard';
-import NotificationSettingsCard from '../components/dashboard/NotificationSettingsCard';
 import MemberDashboard from '../components/dashboard/MemberDashboard';
 import MyJobsTab from '../components/dashboard/MyJobsTab';
 import StudentRequestsCard from '../components/student/StudentRequestsCard';
@@ -305,8 +304,6 @@ export default function DashboardPage() {
               </button>
             </div>
           </div>
-
-          <NotificationSettingsCard />
         </div>
       </div>
       )}
@@ -512,7 +509,6 @@ function StudentTabbedBody({ data, user, logout }) {
               </button>
             </div>
           </div>
-          <NotificationSettingsCard />
         </div>
       )}
     </>

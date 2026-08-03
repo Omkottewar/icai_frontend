@@ -11,18 +11,30 @@
 // is the literal SW that ships — no auto-generation magic on top.
 
 import { precacheAndRoute } from 'workbox-precaching';
-import { registerRoute, setDefaultHandler } from 'workbox-routing';
-import { NetworkOnly } from 'workbox-strategies';
+import { setDefaultHandler } from 'workbox-routing';
 
 precacheAndRoute(self.__WB_MANIFEST);
 
-// Belt-and-braces: API + uploads + service-worker-internal paths must NEVER
-// be served from the SW cache. precacheAndRoute already excludes anything
-// not in the manifest, but a stale Workbox version OR a misconfigured
-// devOptions can sometimes intercept and serve a stale response. Explicit
-// NetworkOnly routes guarantee fresh data even after a Workbox upgrade.
-registerRoute(({ url }) => url.pathname.startsWith('/api/'),     new NetworkOnly());
-registerRoute(({ url }) => url.pathname.startsWith('/uploads/'), new NetworkOnly());
+// ─── Explicit passthrough for /api and /uploads ──────────────────────────
+//
+// This raw fetch listener runs BEFORE Workbox's Router listener (which is
+// installed later via `setDefaultHandler`). We inspect the URL and, for
+// backend / upload paths, call `event.respondWith` with a straight
+// `fetch(event.request)` — no Workbox wrapping. That's important because
+// Workbox's `NetworkOnly` strategy has a subtle bug for navigation-mode
+// requests to file-download URLs (Content-Disposition: attachment): the
+// underlying fetch throws `TypeError: Failed to fetch` before the response
+// ever reaches the browser, and the user sees a broken CSV / PDF export.
+//
+// By responding with a raw fetch, we bypass that codepath entirely. The
+// browser gets the response with all download headers intact and handles
+// the save-as as if there were no SW at all.
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/uploads/')) {
+    event.respondWith(fetch(event.request));
+  }
+});
 
 // Fallback for navigation requests not in the precache (e.g. SPA deep
 // links like /dashboard) — go straight to the network. Without this, an

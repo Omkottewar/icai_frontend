@@ -56,6 +56,16 @@ export default function UsersAdminPage() {
   });
   const { data: lookups } = useAdminList('/api/admin/users/_meta/lookups');
 
+  // Backend-driven CSV export honouring every current filter.
+  const exportUrl = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (status)      qs.set('status', status);
+    if (primaryRole) qs.set('primary_role', primaryRole);
+    if (q)           qs.set('q', q);
+    const s = qs.toString();
+    return `/api/admin/users/export.csv${s ? '?' + s : ''}`;
+  }, [status, primaryRole, q]);
+
   const columns = useMemo(() => [
     { key: 'name', header: 'Name', render: (r) => (
       <div>
@@ -85,9 +95,14 @@ export default function UsersAdminPage() {
       title="Users & roles"
       subtitle="Create privileged accounts and assign branch / committee roles"
       actions={
-        <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
-          + New user
-        </button>
+        <>
+          <a href={exportUrl} className="btn btn-outline" style={{ padding: '.5rem 1rem', textDecoration: 'none' }}>
+            ⬇ Export CSV
+          </a>
+          <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
+            + New user
+          </button>
+        </>
       }
     >
       <DataTable

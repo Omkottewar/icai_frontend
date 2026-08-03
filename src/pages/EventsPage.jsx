@@ -35,45 +35,89 @@ function EventRowsShimmer({ count = 4 }) {
 // `events_audience_tabs` slot.
 const AUDIENCE_KEYS = ['All', 'Members', 'Students'];
 
-function CommitteeChairmanSection({ code }) {
+// Committee profile — single unified card holding the About body,
+// Leadership trio, and optional Chairman message stacked vertically.
+// Each subsection auto-hides when the admin hasn't authored it, so the
+// card gracefully compresses to only what's available. Returns null
+// entirely if nothing has been authored yet.
+function CommitteeProfileSection({ code, accent }) {
   const content = useSiteContent(`event_committee_${code.toLowerCase()}`);
-  if (!content.chairman_photo && !content.chairman_message && !content.chairman_name) return null;
+  const hasAbout = !!content.about_md;
+  const roles = [
+    { key: 'chairman',    label: 'Chairman',    name: content.chairman_name,    photo: content.chairman_photo },
+    { key: 'convenor',    label: 'Convenor',    name: content.convenor_name,    photo: content.convenor_photo },
+    { key: 'dy_convenor', label: 'Dy. Convenor', name: content.dy_convenor_name, photo: content.dy_convenor_photo },
+  ].filter((r) => r.name);
+  const hasLeadership = roles.length > 0;
+  const hasMessage    = !!content.chairman_message;
+
+  if (!hasAbout && !hasLeadership && !hasMessage) return null;
 
   return (
-    <>
-      {/* Blurred gradient divider inside the card */}
-      <div style={{
-        margin: '.875rem 0',
-        height: 1,
-        background: 'linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%)',
-        filter: 'blur(2px)',
-        opacity: 0.4,
-      }} />
-
-      <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
-        {content.chairman_photo && (
-          <img
-            src={content.chairman_photo}
-            alt="Committee Chairman"
-            style={{
-              width: 48, height: 48, borderRadius: '50%',
-              objectFit: 'cover', border: '2px solid var(--border)', flexShrink: 0,
-            }}
-          />
-        )}
-        <div style={{ flex: 1 }}>
-          <div className="tiny-eyebrow" style={{ marginBottom: '.2rem', fontSize: '.65rem' }}>From the Chairman</div>
-          {content.chairman_name && (
-            <div style={{ fontWeight: 600, fontSize: '.875rem', marginBottom: '.3rem' }}>{content.chairman_name}</div>
-          )}
-          {content.chairman_message && (
-            <div className="muted-text" style={{ fontSize: '.8125rem', lineHeight: 1.6 }}>
-              {renderMarkdown(content.chairman_message)}
-            </div>
-          )}
+    <div className="committee-profile" style={{ '--cat-accent': accent }}>
+      {hasAbout && (
+        <div className="committee-profile-block">
+          <div className="tiny-eyebrow committee-profile-eyebrow">About the Committee</div>
+          <div className="committee-about-body">
+            {renderMarkdown(content.about_md)}
+          </div>
         </div>
-      </div>
-    </>
+      )}
+
+      {hasLeadership && (
+        <div className="committee-profile-block">
+          <div className="row" style={{ alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1rem', flexWrap: 'wrap', gap: '.5rem' }}>
+            <div className="tiny-eyebrow committee-profile-eyebrow">Committee Leadership</div>
+            <div className="muted-text" style={{ fontSize: '.7rem' }}>
+              {roles.length} member{roles.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+          <div className="committee-leadership-grid">
+            {roles.map((r) => (
+              <div key={r.key} className="committee-role-tile">
+                <div className="committee-role-photo-wrap">
+                  {r.photo ? (
+                    <img src={r.photo} alt={r.name} className="committee-role-photo" loading="lazy" />
+                  ) : (
+                    <div className="committee-role-photo committee-role-photo-fallback" aria-hidden="true">
+                      {String(r.name || '?').replace(/^CA\.?\s+/i, '').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="committee-role-badge">{r.label}</div>
+                <div className="committee-role-name">{r.name}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasMessage && (
+        <div className="committee-profile-block committee-profile-chairman">
+          <div className="tiny-eyebrow committee-profile-eyebrow" style={{ marginBottom: '.75rem' }}>From the Chairman</div>
+          <div className="row gap-3" style={{ alignItems: 'flex-start' }}>
+            {content.chairman_photo && (
+              <img
+                src={content.chairman_photo}
+                alt={content.chairman_name || 'Committee Chairman'}
+                style={{
+                  width: 48, height: 48, borderRadius: '50%',
+                  objectFit: 'cover', border: '2px solid var(--cat-accent)', flexShrink: 0,
+                }}
+              />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {content.chairman_name && (
+                <div style={{ fontWeight: 600, fontSize: '.9rem', marginBottom: '.35rem' }}>{content.chairman_name}</div>
+              )}
+              <div className="muted-text" style={{ fontSize: '.875rem', lineHeight: 1.6 }}>
+                {renderMarkdown(content.chairman_message)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -94,7 +138,6 @@ export default function EventsPage() {
   const header        = useSiteContent('events_page_header');
   const tabs          = useSiteContent('events_audience_tabs');
   const sections      = useSiteContent('events_sections');
-  const committeeImg  = useSiteContent('events_committee_fallback');
 
   const AUDIENCE_TABS = useMemo(() => ([
     { key: 'All',      label: tabs.all_label },
@@ -143,6 +186,7 @@ export default function EventsPage() {
         <PageHeader
           title={info.fullName}
           subtitle={(header.committee_subtitle_template || '').replace(/\{short\}/g, info.short)}
+          size="compact"
         />
 
         <section className="container" style={{ padding: '2rem 1rem' }}>
@@ -154,25 +198,12 @@ export default function EventsPage() {
             <IconArrowLeft size="sm" /> {sections.all_committees_btn}
           </button>
 
-          {/* Committee details panel — fallback image admin-editable via events_committee_fallback */}
-          <div className="committee-panel" style={{ '--cat-accent': info.color }}>
-            <img
-              className="committee-panel-img"
-              src={committeeImg.image_url}
-              alt={info.fullName}
-              loading="lazy"
-            />
-            <div className="committee-panel-body">
-              <span className="committee-panel-badge">{info.short}</span>
-              <h2 className="committee-panel-title">{info.fullName}</h2>
-              {info.description && <p className="committee-panel-desc">{info.description}</p>}
-              <div className="committee-panel-stat">
-                <span className="committee-panel-dot" aria-hidden="true" />
-                {events.length} upcoming event{events.length !== 1 ? 's' : ''}
-              </div>
-              <CommitteeChairmanSection code={selectedCommittee} />
-            </div>
-          </div>
+          {/* Committee profile — About body + Leadership sidebar + optional
+              chairman message. Wrapper picks a 2-col grid when both main
+              and sidebar have content, else stacks single-column. Renders
+              null for a committee without any authored content, so the
+              page falls through to the back button + events list. */}
+          <CommitteeProfileSection code={selectedCommittee} accent={info.color} />
 
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '.5rem', marginTop: '1.5rem' }}>
             <div className="tiny-eyebrow">{info.short} · UPCOMING EVENTS</div>

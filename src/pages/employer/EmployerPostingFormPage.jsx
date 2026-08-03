@@ -7,15 +7,32 @@ import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 import Button from '../../components/ui/Button';
 import { invalidate } from '../../lib/apiCache';
 
+// Location is not on the form — every branch posting defaults to "Nagpur"
+// on the server (this is a Nagpur branch portal). If the employer needs to
+// note a nearby city (Kamptee, Wardha, etc.) they call it out in the
+// description; that keeps the schema simple and the listing tidy.
 const EMPTY = {
   type:        'job',
   title:       '',
   description: '',
   seat_count:  1,
-  location:    'Nagpur',
   experience_required: '',
+  // Salary is captured in rupees on the form (readable) and converted to
+  // paise server-side. Both ends optional so a firm can list "up to ₹8L"
+  // or "from ₹12L". Period defaults to annual for jobs — matches the
+  // per-type fallback the backend uses when period is omitted.
+  salary_rupees_min: '',
+  salary_rupees_max: '',
+  salary_period:     'annual',
   expires_at:  '',
   category_id: '',
+};
+
+// Sensible default period keyed by posting type so switching type flips it.
+const DEFAULT_PERIOD_BY_TYPE = {
+  job:         'annual',
+  articleship: 'monthly',
+  assignment:  'per_engagement',
 };
 
 // Handles both /employer/postings/new and /employer/postings/:id/edit.
@@ -43,7 +60,19 @@ export default function EmployerPostingFormPage() {
       .then((j) => setCategories(j.categories || []));
   }, []);
 
-  const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const update = (k, v) => setForm((f) => {
+    // When the employer switches posting type, auto-flip the salary period
+    // so the "per year / per month" label under the salary inputs matches
+    // the audience (jobs = annual, articleship = monthly, etc.). Only
+    // overrides if the user hasn't manually touched the period yet — we
+    // detect that by checking against the previous default for the prior
+    // type. Cheap heuristic; if they picked a matching period on purpose,
+    // it flips anyway, but the user can always change it back.
+    if (k === 'type' && DEFAULT_PERIOD_BY_TYPE[v] && f.salary_period === DEFAULT_PERIOD_BY_TYPE[f.type]) {
+      return { ...f, type: v, salary_period: DEFAULT_PERIOD_BY_TYPE[v] };
+    }
+    return { ...f, [k]: v };
+  });
 
   // Load existing posting if editing
   useEffect(() => {
@@ -57,8 +86,10 @@ export default function EmployerPostingFormPage() {
           title:       p.title,
           description: p.description,
           seat_count:  p.seat_count,
-          location:    p.location ?? '',
           experience_required: p.experience_required ?? '',
+          salary_rupees_min: p.salary_paise_min != null ? String(Math.round(p.salary_paise_min / 100)) : '',
+          salary_rupees_max: p.salary_paise_max != null ? String(Math.round(p.salary_paise_max / 100)) : '',
+          salary_period:     p.salary_period ?? DEFAULT_PERIOD_BY_TYPE[p.type] ?? 'annual',
           expires_at:  p.expires_at ? p.expires_at.slice(0, 10) : '',
           category_id: p.category_id ?? '',
         });
@@ -140,22 +171,55 @@ export default function EmployerPostingFormPage() {
               placeholder="Responsibilities, qualifications, what the candidate will do day-to-day…" />
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
             <div>
               <label className="field-label">Seats</label>
               <input className="input-base" type="number" min={1} max={50} value={form.seat_count}
                 onChange={(e) => update('seat_count', Math.max(1, Number(e.target.value)))} />
             </div>
             <div>
-              <label className="field-label">Location</label>
-              <input className="input-base" type="text" value={form.location}
-                onChange={(e) => update('location', e.target.value)} placeholder="City or 'Remote'" />
-            </div>
-            <div>
               <label className="field-label">Experience</label>
               <input className="input-base" type="text" value={form.experience_required}
                 onChange={(e) => update('experience_required', e.target.value)} placeholder="e.g. 3–5 years" />
             </div>
+          </div>
+
+          <div>
+            <label className="field-label">
+              Salary / stipend range <span className="muted-text" style={{ fontWeight: 400 }}>(₹, optional)</span>
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 180px', gap: '.5rem' }}>
+              <input
+                className="input-base"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={form.salary_rupees_min}
+                onChange={(e) => update('salary_rupees_min', e.target.value)}
+                placeholder="Min (e.g. 800000)"
+              />
+              <input
+                className="input-base"
+                type="number"
+                min={0}
+                inputMode="numeric"
+                value={form.salary_rupees_max}
+                onChange={(e) => update('salary_rupees_max', e.target.value)}
+                placeholder="Max (e.g. 1200000)"
+              />
+              <select
+                className="input-base"
+                value={form.salary_period}
+                onChange={(e) => update('salary_period', e.target.value)}
+              >
+                <option value="monthly">per month</option>
+                <option value="annual">per year</option>
+                <option value="per_engagement">per engagement</option>
+              </select>
+            </div>
+            <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+              Members see this on the listing. Leave either end blank for open-ended ranges (e.g. "from ₹8L" or "up to ₹12L"). Skip entirely if you'd rather discuss on enquiry.
+            </p>
           </div>
 
           <div>

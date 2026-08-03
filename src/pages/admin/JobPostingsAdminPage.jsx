@@ -19,8 +19,18 @@ const EMPTY_FORM = {
   category_id: '',
   seat_count: '1',
   experience_required: '',
-  location: '',
+  // location is not on the form — backend defaults to 'Nagpur' for this
+  // branch portal. If the firm is elsewhere, describe it in the description.
+  salary_rupees_min: '',
+  salary_rupees_max: '',
+  salary_period:     'annual',
   expires_at: '',
+};
+
+const DEFAULT_PERIOD_BY_TYPE = {
+  job:         'annual',
+  articleship: 'monthly',
+  assignment:  'per_engagement',
 };
 
 // Fee constants mirror the backend FEE_PAISE map.
@@ -74,6 +84,15 @@ export default function JobPostingsAdminPage() {
   });
   const { data: lookups } = useAdminList('/api/admin/jobs/_meta/lookups');
 
+  const exportUrl = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (status) qs.set('status', status);
+    if (type)   qs.set('type', type);
+    if (q)      qs.set('q', q);
+    const s = qs.toString();
+    return `/api/admin/jobs/export.csv${s ? '?' + s : ''}`;
+  }, [status, type, q]);
+
   const columns = useMemo(() => [
     {
       key: 'title', header: 'Posting', render: (r) => (
@@ -87,7 +106,6 @@ export default function JobPostingsAdminPage() {
     },
     { key: 'type', header: 'Type', render: (r) => TYPE_LABEL[r.type] ?? r.type, width: 110 },
     { key: 'audience', header: 'Audience', render: (r) => TYPE_AUDIENCE[r.type] ?? '—', width: 100 },
-    { key: 'location', header: 'Location', render: (r) => r.location || '—', width: 130 },
     {
       key: 'seat_count', header: 'Seats', render: (r) => r.seat_count, width: 70,
     },
@@ -100,9 +118,14 @@ export default function JobPostingsAdminPage() {
       title="Job Postings"
       subtitle="Create and publish vacancies visible to members and students"
       actions={
-        <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
-          + New posting
-        </button>
+        <>
+          <a href={exportUrl} className="btn btn-outline" style={{ padding: '.5rem 1rem', textDecoration: 'none' }}>
+            ⬇ Export CSV
+          </a>
+          <button className="btn btn-primary" onClick={() => setEditingId('new')} style={{ padding: '.5rem 1rem' }}>
+            + New posting
+          </button>
+        </>
       }
     >
       <DataTable
@@ -199,7 +222,9 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
           category_id: row.category_id || '',
           seat_count: String(row.seat_count ?? 1),
           experience_required: row.experience_required || '',
-          location: row.location || '',
+          salary_rupees_min: row.salary_paise_min != null ? String(Math.round(row.salary_paise_min / 100)) : '',
+          salary_rupees_max: row.salary_paise_max != null ? String(Math.round(row.salary_paise_max / 100)) : '',
+          salary_period:     row.salary_period || DEFAULT_PERIOD_BY_TYPE[row.type] || 'annual',
           expires_at: toLocalDateInput(row.expires_at),
           status: row.status,
         });
@@ -208,7 +233,14 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
       .finally(() => setLoading(false));
   }, [open, id, isNew]);
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k, v) => setForm((f) => {
+    // Auto-flip the salary period to the sensible default when the admin
+    // switches posting type (only if they haven't manually deviated).
+    if (k === 'type' && DEFAULT_PERIOD_BY_TYPE[v] && f.salary_period === DEFAULT_PERIOD_BY_TYPE[f.type]) {
+      return { ...f, type: v, salary_period: DEFAULT_PERIOD_BY_TYPE[v] };
+    }
+    return { ...f, [k]: v };
+  });
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -223,7 +255,11 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
         category_id: form.category_id || null,
         seat_count: Number(form.seat_count) || 1,
         experience_required: form.experience_required || null,
-        location: form.location || null,
+        // Backend converts rupees → paise. Empty string is treated as "unset"
+        // (backend PATCH treats "" as null).
+        salary_rupees_min: form.salary_rupees_min === '' ? null : form.salary_rupees_min,
+        salary_rupees_max: form.salary_rupees_max === '' ? null : form.salary_rupees_max,
+        salary_period:     form.salary_period,
         expires_at: form.expires_at ? new Date(form.expires_at).toISOString() : null,
         ...(!isNew && { status: form.status }),
       };
@@ -365,18 +401,52 @@ function JobDrawer({ open, id, lookups, onClose, onSaved, showToast }) {
           </Section>
 
           <Section title="Requirements">
-            <Grid>
-              <FormField label="Experience required" hint="e.g. 3–5 years, Freshers welcome">
-                <input className="input-base" value={form.experience_required}
-                  onChange={(e) => set('experience_required', e.target.value)}
-                  placeholder="e.g. 3–5 years" />
+            <FormField label="Experience required" hint="e.g. 3–5 years, Freshers welcome">
+              <input className="input-base" value={form.experience_required}
+                onChange={(e) => set('experience_required', e.target.value)}
+                placeholder="e.g. 3–5 years" />
+            </FormField>
+            <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.5rem' }}>
+              All postings are attributed to the <strong>Nagpur branch</strong> by default. If the firm is in a nearby city (Kamptee, Wardha, Bhandara, etc.), call it out in the description.
+            </p>
+          </Section>
+
+          <Section title="Salary / stipend">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 180px', gap: '.5rem' }}>
+              <FormField label="Min (₹)">
+                <input
+                  className="input-base"
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={form.salary_rupees_min}
+                  onChange={(e) => set('salary_rupees_min', e.target.value)}
+                  placeholder="e.g. 800000"
+                />
               </FormField>
-              <FormField label="Location">
-                <input className="input-base" value={form.location}
-                  onChange={(e) => set('location', e.target.value)}
-                  placeholder="e.g. Nagpur" />
+              <FormField label="Max (₹)">
+                <input
+                  className="input-base"
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  value={form.salary_rupees_max}
+                  onChange={(e) => set('salary_rupees_max', e.target.value)}
+                  placeholder="e.g. 1200000"
+                />
               </FormField>
-            </Grid>
+              <FormField label="Period">
+                <select className="input-base" value={form.salary_period}
+                  onChange={(e) => set('salary_period', e.target.value)}>
+                  <option value="monthly">per month</option>
+                  <option value="annual">per year</option>
+                  <option value="per_engagement">per engagement</option>
+                </select>
+              </FormField>
+            </div>
+            <p className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
+              Members see this on the listing card. Leave either end blank for open-ended ranges. Skip entirely if the firm prefers to discuss on enquiry.
+            </p>
           </Section>
 
           <Section title="Posting fee">

@@ -309,9 +309,6 @@ export const SITE_CONTENT_DEFAULTS = {
     empty_committee_msg:   'No upcoming events for this committee right now. Check back soon.',
     all_committees_btn:    'All committees',
   },
-  events_committee_fallback: {
-    image_url: 'https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=600&h=420&q=80&auto=format&fit=crop',
-  },
   // ── Announcements page defaults ─────────────────────────────────────
   announcements_page_header: {
     title:               'Announcements',

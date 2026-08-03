@@ -3,6 +3,7 @@ import { cachedGet, apiWrite } from '../../lib/apiCache';
 import { navigate } from '../../hooks/useRoute';
 import { toast } from '../../lib/notify';
 import { dialog } from '../../lib/dialog';
+import { formatSalary } from '../../lib/salary';
 import {
   IconBell, IconBriefcase, IconHeart, IconClock, IconArrowRight, IconMapPin,
 } from '../../icons';
@@ -170,41 +171,64 @@ function SavedJobsCard() {
       )}
       {rows && rows.length > 0 && (
         <div style={{ display: 'grid', gap: '.4rem' }}>
-          {rows.map((r) => (
-            <div key={r.posting_id} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '.55rem .75rem', border: '1px solid var(--border)', borderRadius: '.375rem',
-              flexWrap: 'wrap', gap: '.5rem',
-            }}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: '.875rem', fontWeight: 600 }}>{r.title || 'Removed posting'}</div>
-                <div className="muted-text" style={{ fontSize: '.72rem' }}>
-                  {(r.firm_name || r.employer_name || 'ICAI Nagpur')}
-                  {r.location && <> · <IconMapPin size="sm" /> {r.location}</>}
+          {rows.map((r) => {
+            const salary = formatSalary(r);
+            const title = r.title || 'Removed posting';
+            // Deleted postings (no title) can't be opened — leave the row as
+            // a display-only reminder with only the Remove action.
+            const canOpen = !!r.title && !!r.posting_id;
+            return (
+              <div key={r.posting_id} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '.55rem .75rem', border: '1px solid var(--border)', borderRadius: '.375rem',
+                flexWrap: 'wrap', gap: '.5rem',
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '.875rem', fontWeight: 600 }}>
+                    {canOpen ? (
+                      <a href={`/jobs/${r.posting_id}`} style={{ color: 'inherit', textDecoration: 'none' }}>
+                        {title}
+                      </a>
+                    ) : title}
+                  </div>
+                  <div className="muted-text" style={{ fontSize: '.72rem', display: 'flex', flexWrap: 'wrap', gap: '.35rem', alignItems: 'center' }}>
+                    <span>{r.firm_name || r.employer_name || 'ICAI Nagpur'}</span>
+                    {salary && (
+                      <>
+                        <span>·</span>
+                        <span style={{ color: 'oklch(0.30 0.14 155)', fontWeight: 600 }}>💰 {salary}</span>
+                      </>
+                    )}
+                    {r.location && (
+                      <>
+                        <span>·</span>
+                        <span><IconMapPin size="sm" /> {r.location}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div style={{ display: 'inline-flex', gap: '.3rem' }}>
-                {r.type && (
+                <div style={{ display: 'inline-flex', gap: '.3rem' }}>
+                  {canOpen && (
+                    <a
+                      href={`/jobs/${r.posting_id}`}
+                      className="btn btn-outline"
+                      style={{ padding: '.3rem .65rem', fontSize: '.75rem', textDecoration: 'none' }}
+                    >
+                      View <IconArrowRight size="sm" />
+                    </a>
+                  )}
                   <button
                     type="button"
-                    onClick={() => navigate(`/job-vacancies?type=${r.type}#p-${r.posting_id}`)}
+                    onClick={() => unsave(r.posting_id)}
                     className="btn btn-outline"
-                    style={{ padding: '.3rem .65rem', fontSize: '.75rem' }}
+                    style={{ padding: '.3rem .65rem', fontSize: '.75rem', color: '#991b1b' }}
                   >
-                    View <IconArrowRight size="sm" />
+                    Remove
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => unsave(r.posting_id)}
-                  className="btn btn-outline"
-                  style={{ padding: '.3rem .65rem', fontSize: '.75rem', color: '#991b1b' }}
-                >
-                  Remove
-                </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -207,7 +207,7 @@ export default function SiteContentAdminPage() {
             >
               <div style={{ fontWeight: 600, fontSize: '.9375rem' }}>{c.name}</div>
               <div className="muted-text" style={{ fontSize: '.75rem', marginTop: '.25rem' }}>
-                Chairman photo & message · last edited {formatWhen(row?.updated_at)}
+                About body, leadership trio & chairman message · last edited {formatWhen(row?.updated_at)}
               </div>
               {!row && (
                 <div style={{ marginTop: '.5rem', fontSize: '.7rem', color: 'var(--muted-foreground)', fontStyle: 'italic' }}>
@@ -922,23 +922,30 @@ function CommitteeMemberRow({ index, member, isFirst, isLast, onChange, onSelect
 
 function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, onSaved, showToast }) {
   const [form, setForm]     = useState({
+    about_md: '',
     chairman_name: chairmanName ?? '',
     chairman_photo: null,
     chairman_message: '',
+    convenor_name: '',
+    convenor_photo: null,
+    dy_convenor_name: '',
+    dy_convenor_photo: null,
     ...initial,
-    // Pre-fill name from DB role assignment only when no name has been saved yet
+    // Pre-fill chairman name from DB role assignment only when no name has been saved yet
     ...(initial.chairman_name ? {} : { chairman_name: chairmanName ?? '' }),
   });
   const [saving, setSaving] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
-  const [uploading, setUploading]   = useState(false);
+  const [previewingAbout, setPreviewingAbout] = useState(false);
+  const [previewingMessage, setPreviewingMessage] = useState(false);
+  // Track which photo field is currently uploading so buttons show state
+  // per-slot instead of a global "uploading" flag.
+  const [uploadingField, setUploadingField] = useState(null);
 
   function setField(k, v) { setForm((f) => ({ ...f, [k]: v })); }
 
-  async function onFile(e) {
-    const file = e.target.files?.[0];
+  async function uploadPhoto(field, file) {
     if (!file) return;
-    setUploading(true);
+    setUploadingField(field);
     try {
       const data_base64 = await new Promise((resolve, reject) => {
         const r = new FileReader();
@@ -950,12 +957,12 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
         method: 'POST',
         body: { name: file.name, mime_type: file.type, bucket: 'site', data_base64 },
       });
-      setField('chairman_photo', resp.url);
+      setField(field, resp.url);
       showToast?.('Photo uploaded', 'success');
     } catch (err) {
       showToast?.(err.message || 'Upload failed', 'error');
     } finally {
-      setUploading(false);
+      setUploadingField(null);
     }
   }
 
@@ -980,8 +987,8 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
     <Drawer
       open
       onClose={onClose}
-      title={`${name} — Chairman content`}
-      width={600}
+      title={`${name} — Committee content`}
+      width={640}
       footer={
         <>
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
@@ -992,59 +999,94 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
       }
     >
       <div className="col gap-4">
-        {/* Chairman name */}
-        <FormField label="Chairman name">
-          <input
-            className="input-base"
-            placeholder="e.g. CA. Swaroopa Wazalwar"
-            value={form.chairman_name ?? ''}
-            onChange={(e) => setField('chairman_name', e.target.value)}
-          />
-        </FormField>
-
-        {/* Chairman photo */}
-        <FormField label="Chairman photo" hint="Displayed as a circle beside the message">
-          <div className="col gap-2">
-            {form.chairman_photo && (
-              <img
-                src={form.chairman_photo}
-                alt=""
-                style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
-              />
-            )}
-            <div className="row gap-2">
-              <label className="btn btn-outline" style={{ padding: '.45rem .85rem', cursor: 'pointer' }}>
-                {uploading ? 'Uploading…' : form.chairman_photo ? 'Replace' : 'Upload photo'}
-                <input type="file" accept="image/*" onChange={onFile} disabled={uploading} style={{ display: 'none' }} />
-              </label>
-              {form.chairman_photo && (
-                <button
-                  type="button"
-                  className="btn btn-ghost"
-                  onClick={() => setField('chairman_photo', null)}
-                  style={{ padding: '.45rem .85rem', color: 'var(--destructive)' }}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
-        </FormField>
-
-        {/* Chairman message */}
+        {/* About the committee — long-form markdown body */}
         <div>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <span className="field-label">Chairman message</span>
+            <span className="field-label">About the committee</span>
             <button
               type="button"
               className="btn btn-ghost"
-              onClick={() => setPreviewing((p) => !p)}
+              onClick={() => setPreviewingAbout((p) => !p)}
               style={{ fontSize: '.75rem', padding: '.25rem .55rem' }}
             >
-              {previewing ? 'Edit' : 'Preview'}
+              {previewingAbout ? 'Edit' : 'Preview'}
             </button>
           </div>
-          {previewing ? (
+          {previewingAbout ? (
+            <div
+              className="muted-text"
+              style={{
+                border: '1px solid var(--border)', borderRadius: '.375rem',
+                padding: '.6rem .75rem', minHeight: '8rem', background: 'var(--muted)',
+              }}
+            >
+              {renderMarkdown(form.about_md) || <span style={{ fontStyle: 'italic' }}>Nothing to preview</span>}
+            </div>
+          ) : (
+            <textarea
+              className="input-base"
+              rows={10}
+              value={form.about_md ?? ''}
+              onChange={(e) => setField('about_md', e.target.value)}
+              placeholder="Long-form description shown on the committee detail page…"
+            />
+          )}
+          <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
+            Supports markdown — blank lines for new paragraphs, **bold**, *italic*, [links](url)
+          </div>
+        </div>
+
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+          <div className="tiny-eyebrow" style={{ marginBottom: '.75rem' }}>Committee leadership</div>
+
+          {/* Chairman */}
+          <LeadershipRow
+            label="Chairman"
+            nameValue={form.chairman_name ?? ''}
+            photoValue={form.chairman_photo}
+            uploading={uploadingField === 'chairman_photo'}
+            onName={(v) => setField('chairman_name', v)}
+            onPhoto={(f) => uploadPhoto('chairman_photo', f)}
+            onClearPhoto={() => setField('chairman_photo', null)}
+          />
+
+          {/* Convenor */}
+          <LeadershipRow
+            label="Convenor"
+            nameValue={form.convenor_name ?? ''}
+            photoValue={form.convenor_photo}
+            uploading={uploadingField === 'convenor_photo'}
+            onName={(v) => setField('convenor_name', v)}
+            onPhoto={(f) => uploadPhoto('convenor_photo', f)}
+            onClearPhoto={() => setField('convenor_photo', null)}
+          />
+
+          {/* Dy. Convenor */}
+          <LeadershipRow
+            label="Dy. Convenor"
+            nameValue={form.dy_convenor_name ?? ''}
+            photoValue={form.dy_convenor_photo}
+            uploading={uploadingField === 'dy_convenor_photo'}
+            onName={(v) => setField('dy_convenor_name', v)}
+            onPhoto={(f) => uploadPhoto('dy_convenor_photo', f)}
+            onClearPhoto={() => setField('dy_convenor_photo', null)}
+          />
+        </div>
+
+        {/* Chairman message (optional) */}
+        <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+          <div className="row" style={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <span className="field-label">Message from the Chairman (optional)</span>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => setPreviewingMessage((p) => !p)}
+              style={{ fontSize: '.75rem', padding: '.25rem .55rem' }}
+            >
+              {previewingMessage ? 'Edit' : 'Preview'}
+            </button>
+          </div>
+          {previewingMessage ? (
             <div
               className="muted-text"
               style={{
@@ -1060,15 +1102,72 @@ function CommitteeContentDrawer({ code, name, chairmanName, initial, onClose, on
               rows={5}
               value={form.chairman_message ?? ''}
               onChange={(e) => setField('chairman_message', e.target.value)}
-              placeholder="Write a message from the chairman…"
+              placeholder="Optional welcome / vision note shown inside the header panel"
             />
           )}
           <div className="muted-text" style={{ fontSize: '.7rem', marginTop: '.25rem' }}>
-            Supports **bold**, *italic*, [links](url)
+            Shown as a highlighted quote block beside the chairman's photo.
           </div>
         </div>
       </div>
     </Drawer>
+  );
+}
+
+// Compact row for editing one leadership role — label, name input,
+// photo upload button, remove-photo button. Reused for Chairman /
+// Convenor / Dy. Convenor so the drawer stays symmetric.
+function LeadershipRow({ label, nameValue, photoValue, uploading, onName, onPhoto, onClearPhoto }) {
+  return (
+    <div className="row gap-3" style={{ alignItems: 'center', marginBottom: '.75rem', flexWrap: 'wrap' }}>
+      <div style={{ width: 56, height: 56, flexShrink: 0 }}>
+        {photoValue ? (
+          <img
+            src={photoValue}
+            alt=""
+            style={{ width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
+          />
+        ) : (
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            border: '1px dashed var(--border)', background: 'var(--muted)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '.65rem', color: 'var(--muted-foreground)', textAlign: 'center', padding: '.25rem',
+          }}>No photo</div>
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div className="tiny-eyebrow" style={{ fontSize: '.65rem', marginBottom: '.25rem' }}>{label}</div>
+        <input
+          className="input-base"
+          placeholder={`${label} name (e.g. CA Someone)`}
+          value={nameValue}
+          onChange={(e) => onName(e.target.value)}
+        />
+      </div>
+      <div className="row gap-1" style={{ flexShrink: 0 }}>
+        <label className="btn btn-outline" style={{ padding: '.35rem .7rem', cursor: 'pointer', fontSize: '.8125rem' }}>
+          {uploading ? 'Uploading…' : photoValue ? 'Replace' : 'Upload'}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => onPhoto(e.target.files?.[0])}
+            disabled={uploading}
+            style={{ display: 'none' }}
+          />
+        </label>
+        {photoValue && (
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={onClearPhoto}
+            style={{ padding: '.35rem .55rem', color: 'var(--destructive)', fontSize: '.8125rem' }}
+          >
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

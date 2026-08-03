@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAdminList, adminFetch } from '../../hooks/useAdminList';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +6,13 @@ import { dialog } from '../../lib/dialog';
 import Button from '../../components/ui/Button';
 import { Shimmer } from '../../components/ui/Shimmer';
 import { IconCheckCircle, IconX } from '../../icons';
+
+const ROLE_FILTER_OPTIONS = [
+  { value: '',        label: 'All roles' },
+  { value: 'student', label: 'Students' },
+  { value: 'member',  label: 'Members' },
+  { value: 'employer', label: 'Employers' },
+];
 
 // Queue of self-signed-up users waiting for a branch admin to activate them.
 // Backed by GET /api/admin/users?status=pending_approval — Approve flips
@@ -22,11 +29,39 @@ export default function SignupApprovalsAdminPage() {
   const { showToast } = useAuth();
   const [busyId, setBusyId] = useState(null);
 
+  // Filter + pagination state. Role filter is the most useful lever
+  // here — WICASA typically wants to approve student sign-ups in a
+  // single sweep separate from member reviews.
+  const [role, setRole]   = useState('');
+  const [queryInput, setQueryInput] = useState('');
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const pageSize = 25;
+
+  // Debounce the search input so we don't refetch on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(queryInput.trim()); setPage(1); }, 250);
+    return () => clearTimeout(t);
+  }, [queryInput]);
+
   const { data, loading, refresh } = useAdminList('/api/admin/users', {
     status: 'pending_approval',
-    pageSize: 100,
+    primary_role: role,
+    q,
+    page,
+    pageSize,
   });
   const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const exportUrl = useMemo(() => {
+    const qs = new URLSearchParams();
+    qs.set('status', 'pending_approval');
+    if (role) qs.set('primary_role', role);
+    if (q)    qs.set('q', q);
+    return `/api/admin/users/export.csv?${qs.toString()}`;
+  }, [role, q]);
 
   async function approve(row) {
     const ok = await dialog.confirm({
@@ -74,7 +109,53 @@ export default function SignupApprovalsAdminPage() {
     <AdminLayout
       title="Sign-up approvals"
       subtitle="New accounts waiting to be activated"
+      actions={
+        <a
+          href={exportUrl}
+          className="btn btn-outline"
+          style={{ padding: '.5rem 1rem', textDecoration: 'none' }}
+          title="Download the filtered list as CSV"
+        >
+          ⬇ Export CSV
+        </a>
+      }
     >
+      {/* Filter + search row */}
+      <div style={{ display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '.75rem' }}>
+        <div style={{ display: 'flex', gap: '.3rem', flexWrap: 'wrap' }}>
+          {ROLE_FILTER_OPTIONS.map((opt) => {
+            const active = role === opt.value;
+            return (
+              <button
+                key={opt.value || 'all'}
+                type="button"
+                onClick={() => { setRole(opt.value); setPage(1); }}
+                style={{
+                  padding: '.3rem .75rem', borderRadius: 999,
+                  border: '1px solid ' + (active ? 'var(--primary)' : 'var(--border)'),
+                  background: active ? 'oklch(0.36 0.13 255 / 0.1)' : 'var(--card)',
+                  color: active ? 'var(--primary)' : 'var(--foreground)',
+                  fontSize: '.78rem', fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <input
+          type="search"
+          value={queryInput}
+          onChange={(e) => setQueryInput(e.target.value.slice(0, 120))}
+          placeholder="Search by name or email…"
+          className="input-base"
+          style={{ maxWidth: 320, fontSize: '.85rem' }}
+        />
+        <div className="muted-text" style={{ fontSize: '.75rem', marginLeft: 'auto' }}>
+          {loading ? 'Loading…' : `${total} pending`}
+        </div>
+      </div>
+
       <div className="sua-list">
         {loading && rows.length === 0 && (
           <div aria-hidden="true" style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
@@ -92,7 +173,9 @@ export default function SignupApprovalsAdminPage() {
 
         {!loading && rows.length === 0 && (
           <div className="sua-empty">
-            Nothing pending — every self-signed-up account has been reviewed.
+            {role || q
+              ? 'No pending sign-ups match these filters. Try clearing them.'
+              : 'Nothing pending — every self-signed-up account has been reviewed.'}
           </div>
         )}
 
@@ -160,6 +243,30 @@ export default function SignupApprovalsAdminPage() {
           );
         })}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center', justifyContent: 'center', marginTop: '.9rem', fontSize: '.8rem' }}>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="btn btn-outline"
+            style={{ padding: '.35rem .75rem', fontSize: '.75rem' }}
+          >
+            ← Previous
+          </button>
+          <span className="muted-text">Page {page} of {totalPages}</span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page >= totalPages}
+            className="btn btn-outline"
+            style={{ padding: '.35rem .75rem', fontSize: '.75rem' }}
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       <style>{`
         .sua-list { display: flex; flex-direction: column; gap: .5rem; }
