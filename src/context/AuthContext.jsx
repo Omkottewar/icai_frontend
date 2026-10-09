@@ -2,6 +2,7 @@
 import { toast as notify } from '../lib/notify';
 import { navigate } from '../hooks/useRoute';
 import { dialog } from '../lib/dialog';
+import { clearAll as clearApiCache } from '../lib/apiCache';
 
 const AuthContext = createContext(null);
 
@@ -184,6 +185,11 @@ export function AuthProvider({ children }) {
   const login = async ({ email, password }) => {
     try {
       const body = await postJson('/api/auth/login', { email, password });
+      // Drop any cached responses from a prior session in this tab before
+      // the new user's hooks start firing — otherwise User B briefly sees
+      // User A's pending payments / registrations until each entry's TTL
+      // elapses.
+      clearApiCache();
       await refresh();
       navigate(body.redirect ?? '/dashboard');
     } catch (e) {
@@ -252,6 +258,7 @@ export function AuthProvider({ children }) {
     }
     setUser(null);
     writeCachedUser(null);
+    clearApiCache();
     showToast('Signed out', 'info');
     navigate('/');
   };

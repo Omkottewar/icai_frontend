@@ -135,6 +135,20 @@ export async function cachedGet(path, qs, ttl = DEFAULT_TTL) {
   return p;
 }
 
+// Drop every cache entry and in-flight request. Called by AuthContext on
+// login / logout so responses fetched under one identity never leak to the
+// next session in the same tab — the CACHE Map is module-scoped and the
+// SPA never reloads between auth transitions, so without this a stale
+// `/api/events/my-pending-payments` from User A would still satisfy User
+// B's `cachedGet` for up to the entry's TTL.
+export function clearAll() {
+  const wiped = CACHE.size;
+  const inflightDropped = INFLIGHT.size;
+  CACHE.clear();
+  INFLIGHT.clear();
+  debug('clearAll', `wiped=${wiped}`, `inflight-dropped=${inflightDropped}`);
+}
+
 // Force a fresh fetch and replace the cache entry. Used by `refresh()`.
 export async function revalidate(path, qs, ttl = DEFAULT_TTL) {
   const url = buildUrl(path, qs);
