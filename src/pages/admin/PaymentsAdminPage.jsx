@@ -187,16 +187,25 @@ export default function PaymentsAdminPage() {
                 </td>
                 <td style={td}><StatusPill status={p.status} /></td>
                 <td style={td}>
-                  {p.upi_utr && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="UPI UTR">{p.upi_utr}</div>
+                  {p.sabpaisa_txn_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="SabPaisa txn ID">{p.sabpaisa_txn_id}</div>
                   )}
-                  {!p.upi_utr && p.razorpay_payment_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="Razorpay payment">{p.razorpay_payment_id}</div>
+                  {p.sabpaisa_payment_mode && (
+                    <div className="muted-text" style={{ fontSize: '.7rem' }}>via {p.sabpaisa_payment_mode}{p.sabpaisa_bank_name ? ` · ${p.sabpaisa_bank_name}` : ''}</div>
                   )}
-                  {!p.upi_utr && !p.razorpay_payment_id && p.razorpay_order_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Razorpay order">{p.razorpay_order_id}</div>
+                  {!p.sabpaisa_txn_id && p.client_txn_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Our client txn ID (SabPaisa not yet responded)">{p.client_txn_id}</div>
                   )}
-                  {!p.upi_utr && !p.razorpay_order_id && <span className="muted-text">—</span>}
+                  {!p.sabpaisa_txn_id && !p.client_txn_id && p.upi_utr && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="UPI UTR (historical)">{p.upi_utr}</div>
+                  )}
+                  {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && p.razorpay_payment_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="Razorpay payment (historical)">{p.razorpay_payment_id}</div>
+                  )}
+                  {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && !p.razorpay_payment_id && p.razorpay_order_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Razorpay order (historical)">{p.razorpay_order_id}</div>
+                  )}
+                  {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && !p.razorpay_order_id && <span className="muted-text">—</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
                   <button className="btn btn-ghost" style={btnSm} onClick={() => setDetail(p)}>Detail</button>
@@ -321,11 +330,27 @@ function DetailDrawer({ payment, onClose }) {
               <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '.5rem 1rem', fontSize: '.875rem' }}>
                 <span className="muted-text">Amount</span><strong>₹{(data.payment.amount_paise / 100).toLocaleString('en-IN')}</strong>
                 <span className="muted-text">Status</span><StatusPill status={data.payment.status} />
+                <span className="muted-text">Provider</span><span>{data.payment.provider || '—'}</span>
                 <span className="muted-text">Purpose</span><span>{data.payment.purpose}</span>
                 <span className="muted-text">Payer</span><span>{data.payment.payer_name || '—'} <span className="muted-text">· {data.payment.payer_email}</span></span>
                 <span className="muted-text">Ref</span><span>{data.payment.ref_type ? `${data.payment.ref_type} · ${data.payment.ref_id}` : '—'}</span>
-                <span className="muted-text">Razorpay order</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.razorpay_order_id || '—'}</span>
-                <span className="muted-text">Razorpay payment</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.razorpay_payment_id || '—'}</span>
+                {data.payment.provider === 'sabpaisa' && (
+                  <>
+                    <span className="muted-text">Client txn ID</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.client_txn_id || '—'}</span>
+                    <span className="muted-text">SabPaisa txn ID</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.sabpaisa_txn_id || '—'}</span>
+                    <span className="muted-text">Payment mode</span><span>{data.payment.sabpaisa_payment_mode || '—'}</span>
+                    <span className="muted-text">Bank</span><span>{data.payment.sabpaisa_bank_name || '—'}{data.payment.sabpaisa_bank_txn_id ? ` · ${data.payment.sabpaisa_bank_txn_id}` : ''}</span>
+                    <span className="muted-text">Last verified</span><span>{data.payment.last_verified_at ? formatDate(data.payment.last_verified_at) : '—'}</span>
+                    <span className="muted-text">Return / Webhook</span><span style={{ fontSize: '.75rem' }}>{data.payment.return_received_at ? '✓ return' : '— return'} · {data.payment.webhook_received_at ? '✓ webhook' : '— webhook'}</span>
+                  </>
+                )}
+                {data.payment.provider !== 'sabpaisa' && (
+                  <>
+                    <span className="muted-text">Razorpay order</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.razorpay_order_id || '—'}</span>
+                    <span className="muted-text">Razorpay payment</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.razorpay_payment_id || '—'}</span>
+                    <span className="muted-text">UPI UTR</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.upi_utr || '—'}</span>
+                  </>
+                )}
                 <span className="muted-text">Created</span><span>{formatDate(data.payment.created_at)}</span>
               </div>
             </div>

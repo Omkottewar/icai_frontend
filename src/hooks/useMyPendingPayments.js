@@ -2,13 +2,14 @@ import { useEffect, useState, useCallback } from 'react';
 import { cachedGet, invalidate, subscribe } from '../lib/apiCache';
 import { useAuth } from '../context/AuthContext';
 
-// Returns the caller's UPI payments still in flight — status is either
-// 'pending' (registration started, UTR not yet submitted) or
-// 'pending_verification' (UTR submitted, admin hasn't verified). Used by:
-//   • EventRow — swap the Register button for a "Payment under review" pill
+// Returns the caller's payments still in flight — status 'pending'
+// (SabPaisa hasn't confirmed yet) or 'pending_verification' (historical
+// UPI-manual rows still awaiting admin backfill approval, pre-migration-
+// 0100). Used by:
+//   • EventRow — swap the Register button for a "Payment in progress" pill
 //     so the user doesn't accidentally start a second payment for the same
 //     event.
-//   • DashboardPage — show a small "Awaiting verification" section so the
+//   • DashboardPage — show a small "Payments in progress" section so the
 //     user always knows the status at a glance.
 export function useMyPendingPayments() {
   const { user } = useAuth();

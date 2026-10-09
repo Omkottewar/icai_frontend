@@ -1,22 +1,22 @@
 import { useState, useCallback } from 'react';
 import { apiWrite } from '../lib/apiCache';
 
-// Orchestrates the two-step UPI QR registration flow:
+// Orchestrates the two-step SabPaisa registration flow:
 //
-//   startRegister({ slug, phone })
+//   startRegister({ slug, phone, attendee_user_ids })
 //     POST /api/events/:slug/register
 //       → paid=false → registration created immediately, done
-//       → paid=true  → returns { payment_id, upi_uri, amount_paise, ...}
-//                       so the modal can render the QR + UTR form
+//       → paid=true  → returns { payment_id, sabpaisa: { action, clientCode,
+//                       encData }, amount_paise, ... } so the modal can
+//                       auto-POST a form to SabPaisa's hosted checkout.
 //
-//   submitUtr({ slug, payment_id, utr, screenshot_file_id? })
-//     POST /api/events/:slug/submit-utr
-//     Flips payment status to 'pending_verification' — no registration
-//     row created yet, that happens on admin approve.
+// After the user pays on SabPaisa's page, SabPaisa redirects back to our
+// /api/payments/return endpoint which then 302s the browser to the SPA's
+// /payments/result page. Nothing to do in this hook post-redirect — the
+// result page handles status display and the "back to event" link.
 //
-// Compared to the old Razorpay flow, we no longer own an interactive
-// checkout — the user leaves the browser to pay in their UPI app. On
-// return they type the UTR into our form.
+// Compared to the UPI-manual flow we removed in migration 0100, there is
+// no `submitUtr` step anymore — SabPaisa confirms payment server-to-server.
 export function useEventRegistration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,10 +26,8 @@ export function useEventRegistration() {
     setError(null);
     try {
       // No cache invalidation here — paid /register does NOT create an
-      // event_registrations row (only admin approve does), so refetching
-      // /api/events would find no change. Worse, the invalidation broadcast
-      // would remount the modal in flight and blank the QR. Free /register
-      // is picked up naturally by the next useMyRegistrations refetch.
+      // event_registrations row (SabPaisa's callback does). Refetching the
+      // events listing would find no change.
       const resp = await apiWrite(`/api/events/${encodeURIComponent(slug)}/register`, {
         body: {
           phone,
@@ -45,24 +43,5 @@ export function useEventRegistration() {
     }
   }, []);
 
-  const submitUtr = useCallback(async ({ slug, payment_id, utr, screenshot_file_id }) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Same reasoning as startRegister — UTR submission flips payment to
-      // 'pending_verification' but does NOT create a registration yet,
-      // so no need to invalidate the events cache.
-      const resp = await apiWrite(`/api/events/${encodeURIComponent(slug)}/submit-utr`, {
-        body: { payment_id, utr, screenshot_file_id: screenshot_file_id || null },
-      });
-      return { ok: true, ...resp };
-    } catch (e) {
-      setError(e);
-      return { ok: false, error: e };
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  return { startRegister, submitUtr, loading, error };
+  return { startRegister, loading, error };
 }

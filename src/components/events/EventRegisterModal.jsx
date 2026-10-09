@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
-import QRCode from 'qrcode';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useEventRegistration } from '../../hooks/useEventRegistration';
 import { navigate } from '../../hooks/useRoute';
-import { IconX, IconCheckCircle, IconCalendar, IconMapPin, IconCopy } from '../../icons';
+import { IconX, IconCheckCircle, IconCalendar, IconMapPin } from '../../icons';
 import Button from '../ui/Button';
 
 function rupees(paise) {
@@ -21,28 +20,41 @@ function formatDateTime(starts_at) {
 
 // Two-step registration modal:
 //   Free events: single "Confirm" click.
-//   Paid events: fill phone → server returns UPI URI → render QR + amount →
-//     user pays in their UPI app → user pastes UTR + optional screenshot →
-//     server marks payment 'pending_verification' → admin approves off-band.
+//   Paid events: fill phone → server returns SabPaisa init payload →
+//     auto-submit an invisible form to SabPaisa's hosted checkout →
+//     SabPaisa redirects back to /payments/result → PaymentResultPage
+//     handles success/failure/pending display and the "back to event" link.
 export default function EventRegisterModal({ event, onClose, onRegistered }) {
   const { user, showToast } = useAuth();
-  const { startRegister, submitUtr, loading } = useEventRegistration();
+  const { startRegister, loading } = useEventRegistration();
 
   const [phone, setPhone] = useState(user?.phone ?? '');
-  const [step, setStep] = useState('form');  // 'form' | 'pay' | 'submitted'
-  const [payment, setPayment] = useState(null);  // response from /register when paid
+  const [step, setStep] = useState('form');  // 'form' | 'redirecting' | 'submitted'
+  const [sabpaisa, setSabpaisa] = useState(null);  // { action, clientCode, encData } from /register
   const [err, setErr] = useState(null);
-  // Group booking: attendees the booker wants to pay for. Each is
-  // { id, name, email }. Booker is always seat 1 and does NOT appear here.
   const [attendees, setAttendees] = useState([]);
+  const formRef = useRef(null);
 
   useEffect(() => { setPhone(user?.phone ?? ''); }, [user]);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !loading) onClose?.(); };
+    const onKey = (e) => { if (e.key === 'Escape' && !loading && step !== 'redirecting') onClose?.(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, loading]);
+  }, [onClose, loading, step]);
+
+  // When SabPaisa payload arrives, auto-submit the invisible form to
+  // SabPaisa's hosted checkout. Browser leaves the page — no further UI
+  // state in this modal after submit. If the user clicks back from
+  // SabPaisa, the modal will have unmounted; they'll land on /events.
+  useEffect(() => {
+    if (step !== 'redirecting') return;
+    if (!sabpaisa || !formRef.current) return;
+    // One tick so the "Redirecting..." paint lands before the browser
+    // navigates away — otherwise users see a blank modal flash.
+    const t = setTimeout(() => formRef.current?.submit(), 150);
+    return () => clearTimeout(t);
+  }, [step, sabpaisa]);
 
   const isPaid = Number(event?.fee_paise || 0) > 0;
   const capacityFull = event?.capacity != null && Number(event.registered_count || 0) >= Number(event.capacity);
@@ -75,21 +87,19 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
       return;
     }
 
-    // Paid event — show QR panel.
-    setPayment(result);
-    setStep('pay');
-  };
-
-  const handleUtrSubmitted = () => {
-    setStep('submitted');
-    onRegistered?.();
-    showToast?.('Payment details submitted — we\'ll email you once verified.', 'success');
+    // Paid event — kick off the SabPaisa redirect.
+    if (!result.sabpaisa?.action || !result.sabpaisa?.encData) {
+      setErr('Payment gateway not configured yet. Please contact the branch office.');
+      return;
+    }
+    setSabpaisa(result.sabpaisa);
+    setStep('redirecting');
   };
 
   return (
     <div
       className="modal-backdrop"
-      onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose?.(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !loading && step !== 'redirecting') onClose?.(); }}
     >
       <div
         role="dialog"
@@ -130,12 +140,13 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
           </div>
           <button
             type="button"
-            onClick={() => !loading && onClose?.()}
+            onClick={() => (!loading && step !== 'redirecting') && onClose?.()}
             aria-label="Close"
             style={{
-              background: 'transparent', border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
+              background: 'transparent', border: 'none',
+              cursor: (loading || step === 'redirecting') ? 'not-allowed' : 'pointer',
               padding: '.25rem', marginLeft: '.75rem', color: 'var(--muted-foreground)',
-              opacity: loading ? 0.4 : 1,
+              opacity: (loading || step === 'redirecting') ? 0.4 : 1,
             }}
           >
             <IconX size="sm" />
@@ -148,15 +159,8 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
             <SignInPrompt onClose={onClose} />
           ) : step === 'submitted' ? (
             <SuccessState isPaid={isPaid} onClose={onClose} />
-          ) : step === 'pay' && payment ? (
-            <QrPayPanel
-              payment={payment}
-              slug={event.slug}
-              loading={loading}
-              submitUtr={submitUtr}
-              onSubmitted={handleUtrSubmitted}
-              onCancel={() => setStep('form')}
-            />
+          ) : step === 'redirecting' && sabpaisa ? (
+            <RedirectingState sabpaisa={sabpaisa} formRef={formRef} />
           ) : capacityFull ? (
             <CapacityFullState onClose={onClose} />
           ) : (
@@ -234,7 +238,7 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
 
               {isPaid && (
                 <div className="muted-text" style={{ fontSize: '.7125rem', marginTop: '.6rem', textAlign: 'center' }}>
-                  You'll pay via UPI QR on the next step.
+                  You'll be redirected to SabPaisa's secure payment page. Card, UPI and netbanking accepted.
                 </div>
               )}
             </form>
@@ -245,182 +249,50 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
   );
 }
 
-// ─── QR payment + UTR submission panel ───────────────────────────────────
-function QrPayPanel({ payment, slug, loading, submitUtr, onSubmitted, onCancel }) {
-  const [utr, setUtr] = useState('');
-  const [err, setErr] = useState(null);
-  const [qrDataUrl, setQrDataUrl] = useState('');
-
-  // Render the UPI intent URI as a data-URL PNG, then render it via <img>.
-  // This is more robust than QRCode.toCanvas — the img keeps its src across
-  // re-renders even if the parent invalidates a cache. Async but resolves
-  // in tens of milliseconds so the visual lag is imperceptible.
-  useEffect(() => {
-    if (!payment?.upi_uri) { setQrDataUrl(''); return; }
-    let cancelled = false;
-    QRCode.toDataURL(payment.upi_uri, {
-      width: 240,
-      margin: 1,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#0b3d91', light: '#ffffff' },
-    })
-      .then((url) => { if (!cancelled) setQrDataUrl(url); })
-      .catch(() => { /* browser can't render — user still has UPI ID as text */ });
-    return () => { cancelled = true; };
-  }, [payment?.upi_uri]);
-
-  const copy = async (text, label) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setErr(null);
-    } catch {
-      // Fallthrough — user can select manually. No toast wired in this component.
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErr(null);
-    const cleaned = utr.replace(/\s+/g, '');
-    if (!/^[A-Za-z0-9]{8,30}$/.test(cleaned)) {
-      setErr('Enter the 12-digit UPI reference (UTR) from your payment app.');
-      return;
-    }
-    const r = await submitUtr({
-      slug,
-      payment_id: payment.payment_id,
-      utr: cleaned,
-    });
-    if (!r.ok) {
-      setErr(r.error?.message || 'Could not submit UTR. Please try again.');
-      return;
-    }
-    onSubmitted?.();
-  };
-
+// ─── Redirecting-to-SabPaisa panel ────────────────────────────────────────
+// Renders a message + an invisible <form> that auto-submits to SabPaisa's
+// hosted checkout via a useEffect in the parent. Using a POST form (not
+// window.location) because SabPaisa's init endpoint requires the three
+// fields in the request body, not the URL.
+function RedirectingState({ sabpaisa, formRef }) {
   return (
-    <div>
+    <div style={{ textAlign: 'center', padding: '1rem 0' }}>
       <div style={{
-        background: 'oklch(0.97 0.02 250)', border: '1px solid var(--border)',
-        borderRadius: '.5rem', padding: '1rem', marginBottom: '1rem',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.5rem',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: '3.5rem', height: '3.5rem', borderRadius: '999px',
+        background: 'oklch(0.95 0.05 240)', color: 'oklch(0.35 0.14 240)',
+        marginBottom: '.85rem',
       }}>
-        {qrDataUrl ? (
-          <img
-            src={qrDataUrl}
-            alt="UPI payment QR"
-            width={240}
-            height={240}
-            style={{ borderRadius: '.35rem', background: '#fff', display: 'block' }}
-          />
-        ) : (
-          <div style={{ width: 240, height: 240, background: '#fff', borderRadius: '.35rem' }} aria-label="Loading QR" />
-        )}
-        <div style={{ fontSize: '.75rem', color: 'var(--muted-foreground)' }}>
-          Scan with any UPI app (GPay, PhonePe, Paytm, BHIM…)
-        </div>
+        <Spinner />
       </div>
-
-      <div style={{
-        background: 'var(--muted)', borderRadius: '.5rem', padding: '.75rem 1rem', marginBottom: '.75rem',
-        display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: '.5rem', alignItems: 'center',
-        fontSize: '.85rem',
-      }}>
-        <span style={{ color: 'var(--muted-foreground)' }}>Amount</span>
-        <span style={{ fontWeight: 700 }}>
-          {rupees(payment.amount_paise)}
-          {payment.seat_count > 1 && (
-            <span className="muted-text" style={{ fontWeight: 400, marginLeft: '.4rem' }}>
-              ({payment.seat_count} seats × {rupees(payment.per_seat_paise)})
-            </span>
-          )}
-        </span>
-        <span />
-
-        {Array.isArray(payment.attendees) && payment.attendees.length > 0 && (
-          <>
-            <span style={{ color: 'var(--muted-foreground)', alignSelf: 'start', paddingTop: '.2rem' }}>Also booking for</span>
-            <span style={{ fontSize: '.8rem' }}>
-              {payment.attendees.map((a) => a.name).join(', ')}
-            </span>
-            <span />
-          </>
-        )}
-
-        <span style={{ color: 'var(--muted-foreground)' }}>Pay to</span>
-        <span style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', wordBreak: 'break-all' }}>
-          {payment.upi_id}
-        </span>
+      <h4 style={{ fontSize: '1.0625rem', fontWeight: 700, marginBottom: '.35rem' }}>
+        Redirecting to secure payment…
+      </h4>
+      <div className="muted-text" style={{ fontSize: '.875rem', marginBottom: '1.25rem' }}>
+        If you aren't redirected automatically, click the button below.
+      </div>
+      <form ref={formRef} action={sabpaisa.action} method="POST" style={{ display: 'inline-block' }}>
+        <input type="hidden" name="clientCode" value={sabpaisa.clientCode} />
+        <input type="hidden" name="encData"    value={sabpaisa.encData}    />
         <button
-          type="button"
-          onClick={() => copy(payment.upi_id, 'UPI ID')}
-          className="btn btn-ghost"
-          style={{ padding: '.2rem .5rem', fontSize: '.75rem' }}
-          aria-label="Copy UPI ID"
+          type="submit"
+          className="btn btn-primary"
+          style={{ padding: '.55rem 1.25rem', fontWeight: 600 }}
         >
-          <IconCopy size="sm" /> Copy
+          Continue to SabPaisa
         </button>
-      </div>
-
-      <p className="muted-text" style={{ fontSize: '.8rem', marginTop: 0, marginBottom: '1rem' }}>
-        After paying, enter the UTR (transaction reference) below. Your registration is confirmed once the branch verifies the payment (usually within 24 hours).
-      </p>
-
-      <form onSubmit={handleSubmit}>
-        <label style={{ display: 'block', marginBottom: '.75rem' }}>
-          <div style={{ fontSize: '.8125rem', fontWeight: 600, marginBottom: '.375rem' }}>
-            UTR / UPI transaction reference
-          </div>
-          <input
-            type="text"
-            value={utr}
-            onChange={(e) => setUtr(e.target.value)}
-            placeholder="e.g. 431223948712"
-            maxLength={30}
-            required
-            style={{
-              width: '100%', padding: '.55rem .75rem',
-              border: '1px solid var(--border)', borderRadius: '.375rem',
-              fontSize: '.9375rem', background: 'var(--background)', color: 'var(--foreground)',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-            }}
-          />
-          <div className="muted-text" style={{ fontSize: '.72rem', marginTop: '.25rem' }}>
-            Find it in your UPI app's transaction history — labelled "UPI Ref No" or "UTR".
-          </div>
-        </label>
-
-        {err && (
-          <div style={{
-            background: 'oklch(0.96 0.04 25)', color: 'oklch(0.35 0.18 25)',
-            border: '1px solid oklch(0.85 0.1 25)', padding: '.6rem .8rem',
-            borderRadius: '.375rem', fontSize: '.8125rem', marginBottom: '.875rem',
-          }}>
-            {err}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '.5rem' }}>
-          <button
-            type="button"
-            className="btn btn-ghost"
-            onClick={onCancel}
-            disabled={loading}
-            style={{ flex: 1 }}
-          >
-            Back
-          </button>
-          <Button
-            type="submit"
-            className="btn btn-primary"
-            loading={loading}
-            style={{ flex: 2, padding: '.6rem 1rem', fontWeight: 600 }}
-          >
-            {loading ? 'Submitting…' : 'I\'ve paid — submit UTR'}
-          </Button>
-        </div>
       </form>
     </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 44 44" aria-label="Loading">
+      <circle cx="22" cy="22" r="18" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="80 40" strokeLinecap="round">
+        <animateTransform attributeName="transform" type="rotate" from="0 22 22" to="360 22 22" dur="1s" repeatCount="indefinite" />
+      </circle>
+    </svg>
   );
 }
 
@@ -484,9 +356,7 @@ function SuccessState({ isPaid, onClose }) {
         {isPaid ? 'Payment submitted' : 'You\'re registered!'}
       </h4>
       <div className="muted-text" style={{ fontSize: '.875rem', marginBottom: '1.25rem' }}>
-        {isPaid
-          ? 'We\'ll verify your payment against the bank statement and email you the joining details — usually within 24 hours.'
-          : 'We\'ll send the joining details to your email.'}
+        We'll send the joining details to your email.
       </div>
       <button
         type="button"
@@ -512,8 +382,6 @@ function AttendeePicker({ attendees, onChange, disabled }) {
   const [searching, setSearching] = useState(false);
   const [open, setOpen] = useState(false);
 
-  // Debounced search — waits 250ms after typing stops before hitting the
-  // API so hammering the keyboard doesn't spawn a request per keystroke.
   useEffect(() => {
     const cleaned = q.trim();
     if (cleaned.length < 2) { setResults([]); return; }
@@ -547,7 +415,7 @@ function AttendeePicker({ attendees, onChange, disabled }) {
         Book seats for others (optional)
       </div>
       <div className="muted-text" style={{ fontSize: '.72rem', marginBottom: '.5rem' }}>
-        Search by name or email to add fellow members. Each additional seat is charged separately and the person will see the event on their own dashboard once your payment is verified.
+        Search by name or email to add fellow members. Each additional seat is charged separately and the person will see the event on their own dashboard once your payment is confirmed.
       </div>
 
       {attendees.length > 0 && (
@@ -608,7 +476,7 @@ function AttendeePicker({ attendees, onChange, disabled }) {
               <button
                 key={r.id}
                 type="button"
-                onMouseDown={(e) => e.preventDefault()}  /* keep focus so add() runs before blur */
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => add(r)}
                 style={{
                   display: 'block', width: '100%', textAlign: 'left',

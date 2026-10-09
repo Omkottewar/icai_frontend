@@ -10,10 +10,6 @@ import PushPermissionBanner from '../components/PushPermissionBanner';
 import CookieConsentBanner from '../components/CookieConsentBanner';
 import { ShimmerFullPageSplash, Shimmer, ShimmerLines } from '../components/ui/Shimmer';
 
-// Inner Suspense fallback used for the admin content region only — the
-// sidebar/topbar stay visible because they live in AdminShell above this
-// boundary. Lighter weight than ShimmerFullPageSplash since the user is
-// already inside the admin shell.
 function AdminContentShimmer() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }} aria-hidden="true">
@@ -138,6 +134,7 @@ const ResourceQuizPage    = lazy(() => import('../pages/ResourceQuizPage'));
 const ResourceSubmitPage  = lazy(() => import('../pages/ResourceSubmitPage'));
 const MyLibraryPage       = lazy(() => import('../pages/MyLibraryPage'));
 const MockTestsPage       = lazy(() => import('../pages/MockTestsPage'));
+const PaymentResultPage   = lazy(() => import('../pages/PaymentResultPage'));
 const MockTestAttemptPage = lazy(() => import('../pages/MockTestAttemptPage'));
 const MockTestQuestionsAdminPage = lazy(() => import('../pages/admin/MockTestQuestionsAdminPage'));
 
@@ -186,6 +183,9 @@ const ROUTES = {
   '/my-library': MyLibraryPage,
   '/resources/submit': ResourceSubmitPage,
   '/mock-tests': MockTestsPage,
+  // Landing page after SabPaisa redirects the browser back from its
+  // hosted checkout. Query carries ?status=&payment_id=&event_slug=.
+  '/payments/result': PaymentResultPage,
 };
 
 // Slug-based public routes. Resolved by prefix match in resolvePublicPage().

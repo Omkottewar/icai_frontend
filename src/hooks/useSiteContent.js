@@ -696,6 +696,16 @@ For pricing and to begin verification, contact the branch office (Contact page).
       },
     ],
   },
+  payment_result_screens: {
+    success_heading: 'Payment successful',
+    success_body:    "Thank you — we've received your payment. A confirmation email with your registration details is on its way.",
+    failed_heading:  'Payment failed',
+    failed_body:     'Your payment could not be completed. No amount has been charged. Please try again, or contact the branch office if your bank shows a successful debit.',
+    aborted_heading: 'Payment cancelled',
+    aborted_body:    "You cancelled the payment before it was completed. No amount has been charged. You can try again whenever you're ready.",
+    pending_heading: 'Payment is being confirmed',
+    pending_body:    'Your bank has not yet confirmed the payment outcome to us. This usually resolves within a minute — the page will update automatically. If it stays here for more than a few minutes, your bank may send the confirmation via email instead; contact the branch office if debited but still not confirmed.',
+  },
 };
 
 // Internal — fetch the bundle once per ~5 min. EventsPage, HomePage and
