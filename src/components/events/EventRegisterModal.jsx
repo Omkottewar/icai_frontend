@@ -272,8 +272,9 @@ function RedirectingState({ sabpaisa, formRef }) {
         If you aren't redirected automatically, click the button below.
       </div>
       <form ref={formRef} action={sabpaisa.action} method="POST" style={{ display: 'inline-block' }}>
-        <input type="hidden" name="clientCode" value={sabpaisa.clientCode} />
-        <input type="hidden" name="encData"    value={sabpaisa.encData}    />
+        <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
+        <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
+        <input type="hidden" name="encData"     value={sabpaisa.encData}     />
         <button
           type="submit"
           className="btn btn-primary"
