@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { ShimmerLines } from '../../components/ui/Shimmer';
@@ -117,6 +117,8 @@ export default function PaymentsAdminPage() {
       title="Payments"
       subtitle="UPI verifications up top — approve or reject each submitted UTR. Full history below."
     >
+      <SabPaisaTestPanel onCreated={() => load()} />
+
       <PendingVerificationSection
         rows={pending}
         busyId={pendingBusyId}
@@ -220,6 +222,152 @@ export default function PaymentsAdminPage() {
 
       {detail && <DetailDrawer payment={detail} onClose={() => setDetail(null)} />}
     </AdminLayout>
+  );
+}
+
+// ─── SabPaisa test launcher ──────────────────────────────────────────────
+// Admin-only "fire a dummy payment at SabPaisa" button so you can smoke-
+// test the integration without having to log out of admin, log in as a
+// member, pick a paid event, etc. Opens SabPaisa's hosted checkout in a
+// popup so your admin page stays loaded and you can watch the row flip to
+// 'success' in the Full history table below once the popup redirects to
+// /payments/result.
+function SabPaisaTestPanel({ onCreated }) {
+  const { showToast } = useAuth();
+  const [open, setOpen] = useState(false);
+  const [amountRupees, setAmountRupees] = useState('1');
+  const [description, setDescription] = useState('SabPaisa integration test');
+  const [busy, setBusy] = useState(false);
+  const formRef = useRef(null);
+  const [sabpaisa, setSabpaisa] = useState(null);
+
+  // When the backend returns the SabPaisa init payload, auto-submit the
+  // invisible form inside the popup target so the admin lands on
+  // SabPaisa's hosted checkout immediately.
+  useEffect(() => {
+    if (!sabpaisa || !formRef.current) return;
+    const t = setTimeout(() => formRef.current?.submit(), 50);
+    return () => clearTimeout(t);
+  }, [sabpaisa]);
+
+  async function launch() {
+    const rupees = Math.max(1, Math.min(100000, Number(amountRupees) || 1));
+    const amount_paise = Math.round(rupees * 100);
+    setBusy(true);
+    try {
+      const r = await fetch('/api/admin/payments/test', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ amount_paise, description }),
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed to create test payment');
+      setSabpaisa(j.sabpaisa);
+      onCreated?.();
+      showToast?.(`Test payment ₹${rupees} created. Redirecting to SabPaisa in a new tab…`, 'success');
+    } catch (e) {
+      showToast?.(e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section style={{
+      marginBottom: '1.5rem', padding: '1rem 1.25rem',
+      background: 'oklch(0.97 0.03 220)', border: '1px dashed oklch(0.75 0.1 220)',
+      borderRadius: '.5rem',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '.95rem', fontWeight: 700 }}>
+            SabPaisa test launcher <span style={{
+              background: 'oklch(0.9 0.1 65)', color: 'oklch(0.4 0.15 65)',
+              fontSize: '.65rem', padding: '.1rem .5rem', borderRadius: 999,
+              marginLeft: '.3rem', fontWeight: 700,
+            }}>DEV</span>
+          </h2>
+          <div className="muted-text" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
+            Fires a dummy payment at the configured SabPaisa URL. Row is tagged <code>metadata.is_test = true</code> and excluded from treasurer reports. Costs ₹1 by default — if these are live creds, you'll be charged for real.
+          </div>
+        </div>
+        {!open && (
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setOpen(true)}
+            style={{ padding: '.45rem 1rem', fontSize: '.85rem', fontWeight: 600 }}
+          >
+            Launch test payment
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div style={{ marginTop: '.9rem', display: 'flex', gap: '.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+          <label style={{ fontSize: '.78rem' }}>
+            <div style={{ fontWeight: 600, marginBottom: '.2rem' }}>Amount (₹)</div>
+            <input
+              type="number"
+              min="1"
+              max="100000"
+              step="1"
+              value={amountRupees}
+              onChange={(e) => setAmountRupees(e.target.value)}
+              disabled={busy}
+              style={{ width: '6rem', padding: '.4rem .5rem', border: '1px solid var(--border)', borderRadius: '.3rem' }}
+            />
+          </label>
+          <label style={{ fontSize: '.78rem', flex: '1 1 15rem' }}>
+            <div style={{ fontWeight: 600, marginBottom: '.2rem' }}>Note (saved in metadata)</div>
+            <input
+              type="text"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={200}
+              disabled={busy}
+              style={{ width: '100%', padding: '.4rem .5rem', border: '1px solid var(--border)', borderRadius: '.3rem' }}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={launch}
+            disabled={busy}
+            style={{ padding: '.45rem 1rem', fontSize: '.85rem', fontWeight: 600 }}
+          >
+            {busy ? 'Creating…' : 'Launch →'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => setOpen(false)}
+            disabled={busy}
+            style={{ padding: '.45rem .8rem', fontSize: '.85rem' }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Hidden form posting to SabPaisa — targets _blank so the admin
+          page stays loaded and the popup takes the SabPaisa flow. */}
+      {sabpaisa && (
+        <form
+          ref={formRef}
+          action={sabpaisa.action}
+          method="POST"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'none' }}
+        >
+          <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
+          <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
+          <input type="hidden" name="encData"     value={sabpaisa.encData}     />
+        </form>
+      )}
+    </section>
   );
 }
 
