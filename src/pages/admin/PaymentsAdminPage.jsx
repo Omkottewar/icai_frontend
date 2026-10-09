@@ -210,6 +210,9 @@ export default function PaymentsAdminPage() {
                   {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && !p.razorpay_order_id && <span className="muted-text">—</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                  {(p.status === 'pending' || p.status === 'created') && p.provider === 'sabpaisa' && p.client_txn_id && (
+                    <ReverifyButton paymentId={p.id} onDone={() => load()} />
+                  )}
                   <button className="btn btn-ghost" style={btnSm} onClick={() => setDetail(p)}>Detail</button>
                 </td>
               </tr>
@@ -535,6 +538,53 @@ function DetailDrawer({ payment, onClose }) {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Re-verify button ─────────────────────────────────────────────────────
+// Appears next to Detail on every pending SabPaisa row. Calls the admin
+// re-verify endpoint which re-runs SabPaisa's server-to-server verify
+// and, if SabPaisa confirms success, flips the row to success and fires
+// the normal fulfilment path. Use case: the webhook hasn't arrived yet
+// (push URL not registered) OR an earlier bug left the row stuck.
+function ReverifyButton({ paymentId, onDone }) {
+  const { showToast } = useAuth();
+  const [busy, setBusy] = useState(false);
+
+  async function go() {
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/admin/payments/${paymentId}/reverify`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Re-verify failed');
+      if (j.outcome === 'success') {
+        showToast?.('Verified — payment now Success. Row refreshing.', 'success');
+      } else if (j.outcome === 'failed' || j.outcome === 'aborted') {
+        showToast?.(`SabPaisa says ${j.outcome}${j.reason ? `: ${j.reason}` : ''}`, 'warn');
+      } else {
+        showToast?.('SabPaisa still has this as pending — try again in a minute.', 'info');
+      }
+      await onDone?.();
+    } catch (e) {
+      showToast?.(e.message, 'error');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <button
+      className="btn btn-ghost"
+      style={{ fontSize: '.72rem', padding: '.2rem .5rem', marginRight: '.3rem' }}
+      onClick={go}
+      disabled={busy}
+      title="Re-run SabPaisa server-to-server verify. If SabPaisa confirms success, flips this row and creates the event registration."
+    >
+      {busy ? 'Verifying…' : 'Re-verify'}
+    </button>
   );
 }
 
