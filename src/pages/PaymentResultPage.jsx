@@ -46,6 +46,7 @@ export default function PaymentResultPage() {
   const [status, setStatus] = useState(initialStatus);
   const [payment, setPayment] = useState(null);
   const [event, setEvent] = useState(null);
+  const [posting, setPosting] = useState(null);
   const [attempts, setAttempts] = useState(0);
 
   // Fetch /status once on mount, then poll while pending.
@@ -64,6 +65,7 @@ export default function PaymentResultPage() {
         // Otherwise keep current status; row might still be 'pending'.
         setPayment(j.payment || null);
         setEvent(j.event || null);
+        setPosting(j.posting || null);
       } catch { /* swallow */ }
     };
 
@@ -139,9 +141,18 @@ export default function PaymentResultPage() {
           )}
 
           <div style={{ marginTop: '1.5rem', display: 'flex', gap: '.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            {isSuccess && (
+            {isSuccess && payment?.purpose === 'job_posting' ? (
+              <button onClick={() => navigate('/employer/postings')} className="btn btn-primary" style={{ padding: '.5rem 1.25rem' }}>
+                {posting?.title ? `View my posting — "${posting.title}"` : 'View my postings'}
+              </button>
+            ) : isSuccess && (
               <button onClick={() => navigate('/dashboard')} className="btn btn-primary" style={{ padding: '.5rem 1.25rem' }}>
                 View my dashboard
+              </button>
+            )}
+            {(key === 'failed' || key === 'aborted') && payment?.purpose === 'job_posting' && (
+              <button onClick={() => navigate('/employer/postings')} className="btn btn-primary" style={{ padding: '.5rem 1.25rem' }}>
+                Retry payment on this posting
               </button>
             )}
             {(key === 'failed' || key === 'aborted') && eventSlug && (
@@ -149,9 +160,15 @@ export default function PaymentResultPage() {
                 Try again
               </button>
             )}
-            <button onClick={() => navigate('/events')} className="btn btn-outline" style={{ padding: '.5rem 1.25rem' }}>
-              {event?.title ? `Back to ${event.title}` : 'Back to events'}
-            </button>
+            {payment?.purpose === 'job_posting' ? (
+              <button onClick={() => navigate('/employer/postings')} className="btn btn-outline" style={{ padding: '.5rem 1.25rem' }}>
+                Back to postings
+              </button>
+            ) : (
+              <button onClick={() => navigate('/events')} className="btn btn-outline" style={{ padding: '.5rem 1.25rem' }}>
+                {event?.title ? `Back to ${event.title}` : 'Back to events'}
+              </button>
+            )}
           </div>
         </div>
       </section>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +6,16 @@ import { IconArrowRight, IconX } from '../../icons';
 import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 import Button from '../../components/ui/Button';
 import { invalidate } from '../../lib/apiCache';
+
+// Posting fees — mirror backend/server/lib/jobPostingFees.ts. Kept here
+// (not fetched) because the form needs to show the fee before submit so
+// the employer knows what they'll be charged. If the backend fees ever
+// change, update both files together.
+const POSTING_FEE_RUPEES = {
+  job:         1000,
+  articleship:  500,
+  assignment:  1000,
+};
 
 // Location is not on the form — every branch posting defaults to "Nagpur"
 // on the server (this is a Nagpur branch portal). If the employer needs to
@@ -53,6 +63,19 @@ export default function EmployerPostingFormPage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [categories, setCategories] = useState([]);
+  // SabPaisa redirect payload returned by POST /api/employer/postings.
+  // When set, an invisible form auto-POSTs to SabPaisa's hosted checkout.
+  const [sabpaisa, setSabpaisa] = useState(null);
+  const sabpaisaFormRef = useRef(null);
+
+  // Auto-submit the SabPaisa form the moment the payload lands. Delay
+  // 150ms so the "Redirecting…" paint has time to show before the browser
+  // navigates away.
+  useEffect(() => {
+    if (!sabpaisa || !sabpaisaFormRef.current) return;
+    const t = setTimeout(() => sabpaisaFormRef.current?.submit(), 150);
+    return () => clearTimeout(t);
+  }, [sabpaisa]);
 
   useEffect(() => {
     fetch('/api/employer/postings/_meta/lookups', { credentials: 'include' })
@@ -113,12 +136,21 @@ export default function EmployerPostingFormPage() {
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? 'Save failed');
+
       // Bust the postings-list cache so EmployerPostingsPage shows the
       // new/edited row on the very next mount instead of after its 30s TTL.
       invalidate('/api/employer/postings');
-      // Also bust the employer dashboard cache so the "Active postings"
-      // count on EmployerDashboardPage reflects the new row.
       invalidate('/api/employer/me');
+
+      if (isNew && j.payment?.sabpaisa?.action) {
+        // New posting goes to SabPaisa for the posting-fee payment. The
+        // posting is already saved in 'pending_payment' state server-side;
+        // on return it flips to 'active' + fires alerts to subscribers.
+        showToast?.('Posting saved. Redirecting to secure payment…', 'info');
+        setSabpaisa(j.payment.sabpaisa);
+        return;  // don't navigate away — the auto-submit effect takes over
+      }
+
       showToast?.(isNew ? 'Posting created' : 'Posting saved', 'success');
       navigate('/employer/postings');
     } catch (e) {
@@ -128,10 +160,12 @@ export default function EmployerPostingFormPage() {
     }
   };
 
+  const feeRupees = POSTING_FEE_RUPEES[form.type] ?? 0;
+
   return (
     <EmployerLayout
       title={isNew ? 'New posting' : 'Edit posting'}
-      subtitle={isNew ? 'Auto-published once saved' : ''}
+      subtitle={isNew ? `Goes live after SabPaisa confirms the ₹${feeRupees.toLocaleString('en-IN')} posting fee` : ''}
       actions={
         <button type="button" className="btn btn-ghost" onClick={() => navigate('/employer/postings')}>
           Cancel
@@ -244,14 +278,49 @@ export default function EmployerPostingFormPage() {
             </p>
           </div>
 
+          {isNew && (
+            <div style={{
+              background: 'oklch(0.97 0.03 220)', border: '1px dashed oklch(0.75 0.1 220)',
+              borderRadius: '.5rem', padding: '.75rem 1rem',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: '.85rem',
+            }}>
+              <div>
+                <div style={{ fontWeight: 600 }}>Posting fee</div>
+                <div className="muted-text" style={{ fontSize: '.75rem' }}>
+                  Paid once per posting. Secure payment via SabPaisa — card, UPI, netbanking.
+                </div>
+              </div>
+              <div style={{ fontSize: '1.125rem', fontWeight: 700 }}>
+                ₹{feeRupees.toLocaleString('en-IN')}
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.5rem' }}>
             <button type="button" className="btn btn-ghost" onClick={() => navigate('/employer/postings')}>Cancel</button>
-            <Button type="submit" className="btn btn-primary" loading={saving}>
-              {saving ? 'Saving…' : (
-                <>{isNew ? 'Publish' : 'Save'} <IconArrowRight size="sm" /></>
+            <Button type="submit" className="btn btn-primary" loading={saving || !!sabpaisa}>
+              {sabpaisa ? 'Redirecting to SabPaisa…' : saving ? 'Saving…' : (
+                <>{isNew ? `Continue to pay ₹${feeRupees.toLocaleString('en-IN')}` : 'Save'} <IconArrowRight size="sm" /></>
               )}
             </Button>
           </div>
+        </form>
+      )}
+
+      {/* Invisible SabPaisa redirect form. Rendered only after the backend
+          returns the init payload; auto-submits via the useEffect above
+          so the browser navigates to SabPaisa's hosted checkout. */}
+      {sabpaisa && (
+        <form
+          ref={sabpaisaFormRef}
+          action={sabpaisa.action}
+          method="POST"
+          style={{ display: 'none' }}
+        >
+          <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
+          <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
+          <input type="hidden" name="encData"     value={sabpaisa.encData}     />
         </form>
       )}
     </EmployerLayout>

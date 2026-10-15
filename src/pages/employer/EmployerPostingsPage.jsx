@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +30,37 @@ export default function EmployerPostingsPage() {
   const [err, setErr] = useState('');
   const [applicantsPosting, setApplicantsPosting] = useState(null);
   const [counts, setCounts] = useState({});
+  // Retry-pay state: when the employer clicks "Pay now" on a pending row,
+  // we POST /postings/:id/pay to get a fresh SabPaisa redirect payload,
+  // then auto-submit a hidden form to SabPaisa (same pattern as the form
+  // page's first-payment flow).
+  const [payingId, setPayingId] = useState(null);
+  const [sabpaisa, setSabpaisa] = useState(null);
+  const sabpaisaFormRef = useRef(null);
+
+  useEffect(() => {
+    if (!sabpaisa || !sabpaisaFormRef.current) return;
+    const t = setTimeout(() => sabpaisaFormRef.current?.submit(), 150);
+    return () => clearTimeout(t);
+  }, [sabpaisa]);
+
+  const payNow = async (id) => {
+    setPayingId(id);
+    try {
+      const r = await fetch(`/api/employer/postings/${id}/pay`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.error ?? 'Could not start payment');
+      if (!j.sabpaisa?.action) throw new Error('Payment gateway not configured');
+      showToast?.('Redirecting to secure payment…', 'info');
+      setSabpaisa(j.sabpaisa);
+    } catch (e) {
+      showToast?.(e.message, 'error');
+      setPayingId(null);
+    }
+  };
 
   // `force` switches to revalidate() to bypass the cache, so post-mutation
   // reloads (close / delete) always fetch fresh data.
@@ -178,6 +209,16 @@ export default function EmployerPostingsPage() {
                       </button>
                     </td>
                     <td style={{ padding: '.75rem', textAlign: 'right' }}>
+                      {p.status === 'pending_payment' && (
+                        <Button
+                          className="btn btn-primary"
+                          onClick={() => payNow(p.id)}
+                          loading={payingId === p.id || (sabpaisa && payingId === p.id)}
+                          style={{ marginRight: '.3rem', padding: '.3rem .7rem', fontSize: '.78rem' }}
+                        >
+                          Pay now
+                        </Button>
+                      )}
                       <button className="btn btn-ghost" onClick={() => navigate(`/employer/postings/${p.id}/edit`)}>Edit</button>
                       {p.status === 'active' && (
                         <Button className="btn btn-ghost" onClick={() => close(p.id)}>Close</Button>
@@ -197,6 +238,22 @@ export default function EmployerPostingsPage() {
           posting={applicantsPosting}
           onClose={() => setApplicantsPosting(null)}
         />
+      )}
+
+      {/* Invisible SabPaisa redirect form for retry-pay. Rendered only
+          after /postings/:id/pay returns a payload; auto-submits via the
+          useEffect above so the browser navigates to the hosted checkout. */}
+      {sabpaisa && (
+        <form
+          ref={sabpaisaFormRef}
+          action={sabpaisa.action}
+          method="POST"
+          style={{ display: 'none' }}
+        >
+          <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
+          <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
+          <input type="hidden" name="encData"     value={sabpaisa.encData}     />
+        </form>
       )}
     </EmployerLayout>
   );
