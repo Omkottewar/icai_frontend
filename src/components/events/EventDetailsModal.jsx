@@ -123,6 +123,12 @@ export default function EventDetailsModal({
               }}
             />
           ) : (
+            // Poster-style banners (vertical collages of speaker photos) were
+            // being cropped by object-fit: cover with a fixed height — users
+            // only saw a middle slice. Switched to `contain` with a neutral
+            // background and `max-height` so the full poster renders at its
+            // natural aspect ratio, letterboxed on the sides for tall images
+            // and sized down for wide ones.
             <img
               src={event.bannerUrl || fallbackBanner(event)}
               alt={event.title}
@@ -130,23 +136,15 @@ export default function EventDetailsModal({
               onError={(ev) => { ev.currentTarget.src = fallbackBanner(event); }}
               style={{
                 width: '100%',
-                height: 'clamp(140px, 28vw, 220px)',
-                objectFit: 'cover',
+                height: 'auto',
+                maxHeight: 'clamp(240px, 50vh, 480px)',
+                objectFit: 'contain',
                 display: 'block',
+                background: 'var(--muted, #f1f5f9)',
                 borderTopLeftRadius: '.85rem',
                 borderTopRightRadius: '.85rem',
               }}
             />
-          )}
-          {/* Gradient overlay only on images — would obscure video controls. */}
-          {!isVideoUrl(event.bannerUrl) && (
-            <div style={{
-              position: 'absolute', inset: 0,
-              background: 'linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,.55) 100%)',
-              borderTopLeftRadius: '.85rem',
-              borderTopRightRadius: '.85rem',
-              pointerEvents: 'none',
-            }} />
           )}
           <button
             type="button"
@@ -163,51 +161,29 @@ export default function EventDetailsModal({
           >
             <IconX size="sm" />
           </button>
-          {/* Title overlay only works on images — on a <video> it would
-              cover the play/scrubber controls. For videos the title is
-              rendered below the banner instead. */}
-          {!isVideoUrl(event.bannerUrl) && (
-          <div style={{
-            position: 'absolute', left: '1.25rem', right: '1.25rem', bottom: '.85rem',
-            color: 'white',
-          }}>
-            <div style={{
-              display: 'inline-block', padding: '.15rem .55rem', borderRadius: 999,
-              background: 'rgba(255,255,255,.18)', backdropFilter: 'blur(4px)',
-              fontSize: '.68rem', fontWeight: 700, letterSpacing: '.04em',
-              textTransform: 'uppercase', marginBottom: '.4rem',
-            }}>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
+          {/* Title block always rendered below the banner now that posters
+              use object-fit: contain (full image visible). Previously images
+              had an in-banner overlay with a darkening gradient; that overlay
+              obscured content on poster-style banners (speaker photos at
+              the bottom were half-hidden under the title). Rendering the
+              title below is the same pattern used for video banners. */}
+          <div style={{ marginBottom: '1rem' }}>
+            <div className="tiny-eyebrow" style={{ marginBottom: '.3rem' }}>
               {event.committee || 'Event'}
             </div>
             <h2 id="event-details-title" style={{
               margin: 0, fontSize: 'clamp(1.125rem, 3.5vw, 1.5rem)',
               fontWeight: 700, lineHeight: 1.2, letterSpacing: '-.01em',
-              textShadow: '0 2px 8px rgba(0,0,0,.4)',
+              color: 'var(--foreground)',
             }}>
               {event.title}
             </h2>
           </div>
-          )}
-        </div>
 
-        {/* Body */}
-        <div style={{ padding: '1.25rem 1.5rem 1.5rem' }}>
-          {/* Title block shown outside the banner for video uploads, so the
-              video controls aren't obscured. */}
-          {isVideoUrl(event.bannerUrl) && (
-            <div style={{ marginBottom: '1rem' }}>
-              <div className="tiny-eyebrow" style={{ marginBottom: '.3rem' }}>
-                {event.committee || 'Event'}
-              </div>
-              <h2 id="event-details-title" style={{
-                margin: 0, fontSize: 'clamp(1.125rem, 3.5vw, 1.5rem)',
-                fontWeight: 700, lineHeight: 1.2, letterSpacing: '-.01em',
-                color: 'var(--foreground)',
-              }}>
-                {event.title}
-              </h2>
-            </div>
-          )}
 
           {/* Quick facts row */}
           <div style={{

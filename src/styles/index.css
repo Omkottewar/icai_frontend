@@ -547,7 +547,8 @@ a:focus-visible,
 .event-acc-img {
   width: 100%;
   aspect-ratio: 3 / 2;
-  object-fit: cover;
+  object-fit: contain;
+  background: var(--muted, #f1f5f9);
   border-radius: .625rem;
   display: block;
 }

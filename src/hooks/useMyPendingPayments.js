@@ -20,7 +20,10 @@ export function useMyPendingPayments() {
     if (!user) { setData({ rows: [] }); return; }
     setLoading(true);
     try {
-      const j = await cachedGet('/api/events/my-pending-payments', null, 60_000);
+      // 15s TTL (down from 60s): the server-side filter now auto-hides
+      // abandoned pending rows after 15 min, so we want the UI to pick up
+      // that change promptly without the user having to hard-refresh.
+      const j = await cachedGet('/api/events/my-pending-payments', null, 15_000);
       setData(j);
     } catch {
       setData({ rows: [] });
