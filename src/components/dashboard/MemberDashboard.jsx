@@ -334,7 +334,7 @@ function MembershipIdentityCard({ user, profile, pendingBadge, onEdit }) {
       <div className="md-identity-actions">
         {pendingBadge}
         <a href="/events" className="btn btn-outline">Browse events</a>
-        <a href="/praygyaan" className="btn btn-primary"><IconBot size="sm" /> Ask PrayGyaan</a>
+        <a href="/pragyaan" className="btn btn-primary"><IconBot size="sm" /> Ask Pragyaan</a>
       </div>
     </div>
   );

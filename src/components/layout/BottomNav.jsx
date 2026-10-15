@@ -27,7 +27,7 @@ const SHEET_ITEMS = [
   { to: '/students',            Icon: IconGraduationCap,   label: 'Students' },
   { to: '/resources',           Icon: IconBookOpen,        label: 'Resources & papers' },
   { to: '/announcements',       Icon: IconBell,            label: 'Announcements' },
-  { to: '/praygyaan',           Icon: IconBot,             label: 'Ask PrayGyaan AI' },
+  { to: '/pragyaan',            Icon: IconBot,             label: 'Ask Pragyaan AI' },
   { to: '/job-vacancies',       Icon: IconBriefcase,       label: 'Job vacancies' },
   { to: '/mock-tests',          Icon: IconGraduationCap,   label: 'Mock tests' },
   { to: '/book-room',           Icon: IconCalendar,        label: 'Book a room' },

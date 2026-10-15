@@ -214,7 +214,7 @@ export default function HomePage() {
             </form> */}
             <div className="row gap-3" style={{ marginTop: '1.25rem', flexWrap: 'wrap' }}>
               <a href="/events" className="btn btn-primary">{heroText.cta_events_label} <IconArrowRight size="sm" /></a>
-              <a href="/praygyaan" className="btn btn-outline"><IconBot size="sm" /> {heroText.cta_ai_label}</a>
+              <a href="/pragyaan" className="btn btn-outline"><IconBot size="sm" /> {heroText.cta_ai_label}</a>
               {!user && <a href="/signup" className="btn btn-outline">{heroText.cta_signup_label} <IconArrowRight size="sm" /></a>}
             </div>
           </div>

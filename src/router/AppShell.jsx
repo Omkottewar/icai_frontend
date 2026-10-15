@@ -152,6 +152,10 @@ const ROUTES = {
   '/students': StudentsPage,
   '/resources': ResourcesPage,
   '/contact': ContactPage,
+  '/pragyaan': PrayGyaanPage,
+  // Legacy alias from before the spelling fix. Keep so bookmarks and any
+  // external links continue to resolve. Can be removed after a release cycle
+  // or two once we're confident nothing external still points here.
   '/praygyaan': PrayGyaanPage,
   '/benevolent-fund': BenevolentFundPage,
   '/ca2-vision': CA2VisionPage,

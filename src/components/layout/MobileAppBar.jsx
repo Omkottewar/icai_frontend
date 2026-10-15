@@ -23,7 +23,8 @@ const TITLE_BY_PATH = {
   '/students':          'Students',
   '/resources':         'Resources',
   '/contact':           'Contact',
-  '/praygyaan':         'Pragyaan AI',
+  '/pragyaan':          'Pragyaan AI',
+  '/praygyaan':         'Pragyaan AI',   // legacy alias — see AppShell routes
   '/dashboard':         'Dashboard',
   '/announcements':     'Announcements',
   '/members-directory': 'Members Directory',

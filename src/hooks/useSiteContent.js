@@ -55,7 +55,7 @@ export const SITE_CONTENT_DEFAULTS = {
     title_highlight: '(WIRC)',
     title_suffix: 'Nagpur Branch (WIRC)',
     cta_events_label: 'Upcoming Events',
-    cta_ai_label: 'Ask PrayGyaan AI',
+    cta_ai_label: 'Ask Pragyaan AI',
     cta_signup_label: 'Create account',
   },
   home_leadership_extras: {

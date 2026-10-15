@@ -59,7 +59,7 @@ export default function AuthSidePanel({ mode }) {
           {[
             'Self-service for members, students & employers',
             'Curated branch events with online registration',
-            'PrayGyaan AI assistant — built into every page',
+            'Pragyaan AI assistant — built into every page',
           ].map((t, i) => (
             <div key={i} className="row gap-3" style={{ fontSize: '.875rem', opacity: .95 }}>
               <span style={{
