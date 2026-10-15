@@ -266,7 +266,7 @@ export default function DashboardPage() {
                 { Icon: IconBriefcase, t: 'Update firm details',    to: 'https://eservices.icai.org/',   external: true },
                 { Icon: IconHandshake, t: 'Contribute to CABF',     to: '/benevolent-fund' },
               ] : [
-                { Icon: IconBookOpen,  t: 'Take a mock test',       to: '/mock-tests' },
+                { Icon: IconBookOpen,  t: 'Take a mock test',       to: '/mock-tests', discontinued: true },
                 { Icon: IconBriefcase, t: 'Articleship vacancies',  to: '/job-vacancies?type=articleship' },
                 { Icon: IconHandshake, t: 'Request a mentor',       to: '/students#actions' },
                 { Icon: IconBookOpen,  t: 'Study material',         to: '/resources' },
@@ -275,9 +275,23 @@ export default function DashboardPage() {
                   ? { href: a.to, target: '_blank', rel: 'noopener noreferrer' }
                   : { href: a.to };
                 return (
-                  <a key={a.t} {...linkProps} className="row gap-2" style={{ padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)' }}>
-                    <a.Icon size="sm" /> {a.t}{a.external && <span aria-hidden style={{ opacity: .6 }}>↗</span>}
-                    <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
+                  <a
+                    key={a.t}
+                    {...linkProps}
+                    className="row gap-2"
+                    title={a.discontinued ? 'This feature is no longer available' : undefined}
+                    style={{
+                      padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem',
+                      border: '1px solid var(--border)',
+                      opacity: a.discontinued ? 0.6 : undefined,
+                    }}
+                  >
+                    <a.Icon size="sm" />
+                    <span style={{ textDecoration: a.discontinued ? 'line-through' : undefined }}>{a.t}</span>
+                    {a.external && <span aria-hidden style={{ opacity: .6 }}>↗</span>}
+                    {a.discontinued
+                      ? <span style={{ marginLeft: 'auto', fontSize: '.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>No longer available</span>
+                      : <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />}
                   </a>
                 );
               })}
@@ -460,7 +474,7 @@ function StudentTabbedBody({ data, user, logout }) {
             <h3 style={{ fontSize: '1.125rem', fontWeight: 600 }}>Quick actions</h3>
             <div style={{ marginTop: '.75rem', display: 'grid', gap: '.625rem', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
               {[
-                { Icon: IconBookOpen,  t: 'Take a mock test',      to: '/mock-tests' },
+                { Icon: IconBookOpen,  t: 'Take a mock test',      to: '/mock-tests', discontinued: true },
                 { Icon: IconBriefcase, t: 'Articleship preferences', onClick: () => setModal('articleship') },
                 { Icon: IconHandshake, t: 'Request a mentor',      onClick: () => setModal('mentorship') },
                 { Icon: IconBookOpen,  t: 'Study material',        to: '/resources' },
@@ -468,15 +482,24 @@ function StudentTabbedBody({ data, user, logout }) {
               ].map((a) => {
                 const common = (
                   <>
-                    <a.Icon size="sm" /> {a.t}
-                    <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />
+                    <a.Icon size="sm" />
+                    <span style={{ textDecoration: a.discontinued ? 'line-through' : undefined }}>{a.t}</span>
+                    {a.discontinued
+                      ? <span style={{ marginLeft: 'auto', fontSize: '.7rem', color: 'var(--muted-foreground)', fontWeight: 600 }}>No longer available</span>
+                      : <IconArrowRight size="sm" style={{ marginLeft: 'auto', color: 'var(--muted-foreground)' }} />}
                   </>
                 );
-                const style = { padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem', border: '1px solid var(--border)', background: 'transparent', color: 'inherit', font: 'inherit', textAlign: 'left', width: '100%', cursor: 'pointer' };
+                const style = {
+                  padding: '.625rem .75rem', borderRadius: '.375rem', fontSize: '.8125rem',
+                  border: '1px solid var(--border)', background: 'transparent', color: 'inherit',
+                  font: 'inherit', textAlign: 'left', width: '100%', cursor: 'pointer',
+                  opacity: a.discontinued ? 0.6 : undefined,
+                };
+                const title = a.discontinued ? 'This feature is no longer available' : undefined;
                 if (a.onClick) {
-                  return <button key={a.t} type="button" onClick={a.onClick} className="row gap-2" style={style}>{common}</button>;
+                  return <button key={a.t} type="button" onClick={a.onClick} className="row gap-2" style={style} title={title}>{common}</button>;
                 }
-                return <a key={a.t} href={a.to} className="row gap-2" style={style}>{common}</a>;
+                return <a key={a.t} href={a.to} className="row gap-2" style={style} title={title}>{common}</a>;
               })}
             </div>
           </div>

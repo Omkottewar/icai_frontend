@@ -29,7 +29,7 @@ const SHEET_ITEMS = [
   { to: '/announcements',       Icon: IconBell,            label: 'Announcements' },
   { to: '/pragyaan',            Icon: IconBot,             label: 'Ask Pragyaan AI' },
   { to: '/job-vacancies',       Icon: IconBriefcase,       label: 'Job vacancies' },
-  { to: '/mock-tests',          Icon: IconGraduationCap,   label: 'Mock tests' },
+  { to: '/mock-tests',          Icon: IconGraduationCap,   label: 'Mock tests', discontinued: true },
   { to: '/book-room',           Icon: IconCalendar,        label: 'Book a room' },
   { to: '/gallery',             Icon: IconBookOpen,        label: 'Photo gallery' },
   { to: '/student-suggestions', Icon: IconMessageSquare,   label: 'Student suggestions' },
@@ -133,10 +133,34 @@ function BottomSheet({ onClose, authed, onLogout }) {
         <h2 className="bottom-sheet-title">More</h2>
 
         <div className="bottom-sheet-grid">
-          {items.map(({ to, Icon, label }) => (
-            <a key={to} href={to} className="bottom-sheet-item" onClick={onClose}>
+          {items.map(({ to, Icon, label, discontinued }) => (
+            <a
+              key={to}
+              href={to}
+              className="bottom-sheet-item"
+              onClick={onClose}
+              style={discontinued ? { opacity: 0.55 } : undefined}
+              aria-label={discontinued ? `${label} (no longer available)` : undefined}
+            >
               <span className="bottom-sheet-item-icon" aria-hidden="true"><Icon /></span>
-              <span className="bottom-sheet-item-label">{label}</span>
+              <span
+                className="bottom-sheet-item-label"
+                style={discontinued ? { textDecoration: 'line-through' } : undefined}
+              >
+                {label}
+              </span>
+              {discontinued && (
+                <span
+                  className="badge"
+                  style={{
+                    marginTop: '.25rem', fontSize: '.65rem', padding: '.1rem .4rem',
+                    background: 'var(--muted)', color: 'var(--muted-foreground)',
+                    borderRadius: 999, fontWeight: 600,
+                  }}
+                >
+                  No longer available
+                </span>
+              )}
             </a>
           ))}
         </div>

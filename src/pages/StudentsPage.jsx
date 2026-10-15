@@ -18,7 +18,7 @@ import RequestMentorshipModal from '../components/student/RequestMentorshipModal
 // still follows the plain `<a href>` path so admin-blanked cards silently
 // drop out.
 const CARD_FRAMES = [
-  { Icon: IconGraduationCap, href: '/mock-tests',                        comingSoon: false },
+  { Icon: IconGraduationCap, href: '/mock-tests',                        comingSoon: false, discontinued: true },
   { Icon: IconBriefcase,     action: 'articleship',                       comingSoon: false },
   { Icon: IconUsers,         href: '/career-counselling',                 comingSoon: true  },
   { Icon: IconBookOpen,      href: '/resources',                          comingSoon: false },
@@ -84,8 +84,23 @@ export default function StudentsPage() {
 
         {/* Quick access row */}
         <div className="row gap-3" style={{ marginBottom: '2.5rem', flexWrap: 'wrap' }}>
-          <a href="/mock-tests" className="btn btn-primary" style={{ gap: '.5rem' }}>
+          <a
+            href="/mock-tests"
+            className="btn btn-outline"
+            style={{ gap: '.5rem', textDecoration: 'line-through', opacity: 0.65 }}
+            title="This feature is no longer available"
+          >
             <IconGraduationCap size="sm" /> {quickAccess.mock_tests_label}
+            <span
+              className="badge"
+              style={{
+                marginLeft: '.5rem', fontSize: '.65rem', padding: '.1rem .4rem',
+                background: 'var(--muted)', color: 'var(--muted-foreground)',
+                borderRadius: 999, textDecoration: 'none', fontWeight: 600,
+              }}
+            >
+              No longer available
+            </span>
           </a>
           <button type="button" className="btn btn-outline" style={{ gap: '.5rem' }} onClick={() => openAction('articleship')}>
             <IconBriefcase size="sm" /> {quickAccess.articleship_label}
@@ -113,17 +128,21 @@ export default function StudentsPage() {
               <>
                 <div className="row gap-2" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div className="icon-tile green"><frame.Icon size="lg" /></div>
-                  {frame.comingSoon && (
+                  {frame.discontinued ? (
+                    <span className="badge" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)', fontSize: '.7rem', padding: '.2rem .55rem', borderRadius: 999 }}>
+                      No longer available
+                    </span>
+                  ) : frame.comingSoon && (
                     <span className="badge" style={{ background: 'var(--muted)', color: 'var(--muted-foreground)', fontSize: '.7rem', padding: '.2rem .55rem', borderRadius: 999 }}>
                       Coming soon
                     </span>
                   )}
                 </div>
-                <h3 style={{ marginTop: '.75rem', fontWeight: 600 }}>{title}</h3>
+                <h3 style={{ marginTop: '.75rem', fontWeight: 600, textDecoration: frame.discontinued ? 'line-through' : undefined, color: frame.discontinued ? 'var(--muted-foreground)' : undefined }}>{title}</h3>
                 <p className="muted-text" style={{ marginTop: '.25rem', fontSize: '.875rem' }}>{desc}</p>
-                <div className="row gap-1" style={{ marginTop: '.75rem', fontSize: '.8125rem', color: 'var(--primary)', fontWeight: 600 }}>
-                  {frame.comingSoon ? 'Ask the branch' : 'Open'}
-                  <IconArrowRight size="sm" />
+                <div className="row gap-1" style={{ marginTop: '.75rem', fontSize: '.8125rem', color: frame.discontinued ? 'var(--muted-foreground)' : 'var(--primary)', fontWeight: 600 }}>
+                  {frame.discontinued ? 'Not available' : frame.comingSoon ? 'Ask the branch' : 'Open'}
+                  {!frame.discontinued && <IconArrowRight size="sm" />}
                 </div>
               </>
             );

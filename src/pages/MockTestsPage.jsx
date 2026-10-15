@@ -123,7 +123,35 @@ export default function MockTestsPage() {
     <>
       <PageHeader title={header.title} subtitle={header.subtitle} />
 
-      <section className="container" style={{ padding: '1.5rem 1rem 3rem' }}>
+      <section className="container" style={{ padding: '1.5rem 1rem 0' }}>
+        {/* Discontinuation banner — the mock-tests feature was built but is no
+            longer offered to members/students. We keep the page reachable so
+            bookmarks and legacy links don't 404, but surface this notice
+            prominently so visitors understand immediately. */}
+        <div
+          role="status"
+          style={{
+            background: 'var(--muted)',
+            border: '1px solid var(--border)',
+            borderRadius: '.5rem',
+            padding: '1rem 1.25rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            gap: '.75rem',
+            alignItems: 'flex-start',
+          }}
+        >
+          <IconX size="sm" style={{ marginTop: '.125rem', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: '.25rem' }}>Mock Tests have been discontinued</div>
+            <div className="muted-text" style={{ fontSize: '.875rem' }}>
+              This feature is no longer available on the ICAI Nagpur portal. For current mock-test resources, please check the WICASA announcements or contact the branch at <a href="mailto:nagpur@icai.org">nagpur@icai.org</a>.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="container" style={{ padding: '0 1rem 3rem' }}>
         {/* Filter row */}
         <div className="row gap-2" style={{ marginBottom: '1rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ fontSize: '.8rem', fontWeight: 600 }}>{header.level_label}</label>
