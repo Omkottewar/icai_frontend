@@ -39,5 +39,8 @@ export function useMyPendingPayments() {
 
   const rows = data?.rows ?? [];
   const eventIds = new Set(rows.map((r) => r.event_id));
-  return { rows, eventIds, loading, refresh };
+  // event_id → full pending row, so EventRow can grab payment_id + status
+  // without re-scanning the array on every render.
+  const byEventId = new Map(rows.map((r) => [r.event_id, r]));
+  return { rows, eventIds, byEventId, loading, refresh };
 }

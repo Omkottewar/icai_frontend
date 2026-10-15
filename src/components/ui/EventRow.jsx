@@ -48,13 +48,32 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
   const [showDetails, setShowDetails] = useState(false);
   const mode = getMode(e.venue);
   const { eventIds, refresh: refreshMyRegistrations } = useMyRegistrations();
-  const { eventIds: pendingPaymentEventIds, refresh: refreshPendingPayments } = useMyPendingPayments();
+  const { eventIds: pendingPaymentEventIds, byEventId: pendingPaymentByEventId, refresh: refreshPendingPayments } = useMyPendingPayments();
   const isRegistered = e.id && eventIds.has(e.id);
   // User has a payment for this event that's either awaiting UTR submission
   // ('pending') or awaiting admin verification ('pending_verification'). In
   // both cases we hide the Register button and show a "Payment under review"
   // pill instead, so they can't accidentally start a duplicate payment.
   const hasPendingPayment = e.id && pendingPaymentEventIds.has(e.id);
+  const pendingPayment = e.id ? pendingPaymentByEventId.get(e.id) : null;
+  // 'pending' = SabPaisa flow mid-flight; user may have hit Back without
+  // paying. Show a Cancel link so they can clear it immediately. For
+  // 'pending_verification' (legacy UPI manual queue) only admins can cancel.
+  const canAbandon = pendingPayment?.status === 'pending';
+
+  async function abandonPendingPayment() {
+    if (!pendingPayment) return;
+    if (!window.confirm('Cancel this payment? You can register again if you change your mind.')) return;
+    try {
+      const res = await fetch(`/api/events/my-pending-payments/${pendingPayment.payment_id}/abandon`, {
+        method: 'POST', credentials: 'include',
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await refreshPendingPayments();
+    } catch (err) {
+      window.alert(`Could not cancel: ${err.message || err}`);
+    }
+  }
 
   // Capacity awareness — drives the seats-left meta and the waitlist UX.
   const cap = Number(e.capacity ?? 0);
@@ -234,18 +253,35 @@ export default function EventRow({ event: e, href = '/events', detailed = false 
                         </button>
                       </>
                     ) : hasPendingPayment ? (
-                      <span
-                        className="badge"
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '.35rem',
-                          padding: '.45rem 1rem', borderRadius: '999px',
-                          background: '#fef3c7', color: '#92400e',
-                          fontWeight: 600, fontSize: '.8125rem',
-                        }}
-                        title="We're verifying your payment against the bank statement. You'll get an email once it's confirmed — usually within 24 hours."
-                      >
-                        Payment under review
-                      </span>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.5rem' }}>
+                        <span
+                          className="badge"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '.35rem',
+                            padding: '.45rem 1rem', borderRadius: '999px',
+                            background: '#fef3c7', color: '#92400e',
+                            fontWeight: 600, fontSize: '.8125rem',
+                          }}
+                          title={canAbandon
+                            ? "You started a payment but didn't finish. If you did pay, we'll confirm within a few minutes."
+                            : "We're verifying your payment against the bank statement. You'll get an email once it's confirmed — usually within 24 hours."}
+                        >
+                          {canAbandon ? 'Payment in progress' : 'Payment under review'}
+                        </span>
+                        {canAbandon && (
+                          <button
+                            type="button"
+                            onClick={(ev) => { ev.stopPropagation(); abandonPendingPayment(); }}
+                            style={{
+                              background: 'none', border: 'none', padding: 0,
+                              color: '#64748b', fontSize: '.8125rem', textDecoration: 'underline',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
                     ) : (
                       <button
                         type="button"
