@@ -515,26 +515,31 @@ function StatTile({ Icon, label, value, sub, tone = 'primary' }) {
 
 // ─── My upcoming events ─────────────────────────────────────────────────
 function UpcomingEventsCard({ rows, onCancelled }) {
-  const [busy, setBusy] = useState(null); // slug currently being cancelled
+  const [busy, setBusy] = useState(null); // slug currently submitting a request
 
-  async function cancel(slug, title) {
-    const ok = await dialog.confirm({
-      title: 'Cancel registration?',
-      message: `Cancel your registration for "${title}"?`,
-      confirmText: 'Cancel registration',
-      cancelText: 'Keep it',
-      danger: true,
+  async function requestCancellation(slug, title) {
+    const reason = await dialog.prompt({
+      title: 'Request cancellation?',
+      message: `Please tell the branch why you need to cancel your registration for "${title}". An admin will review your request and let you know by email.`,
+      placeholder: 'e.g. urgent client assignment, personal emergency, rescheduling conflict…',
+      confirmText: 'Submit request',
+      cancelText: 'Keep registration',
+      multiline: true,
+      required: true,
+      requiredMessage: 'Please share a short reason (at least 5 characters).',
     });
-    if (!ok) return;
+    if (!reason) return;
     setBusy(slug);
     try {
-      const r = await fetch(`/api/events/${slug}/cancel`, {
+      const r = await fetch(`/api/events/${slug}/request-cancellation`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Failed to cancel');
+      if (!r.ok) throw new Error(j.error || 'Failed to submit cancellation request');
+      toast.success("Cancellation request submitted. The branch will respond by email.");
       onCancelled?.(slug);
     } catch (e) {
       toast.error(e.message);
@@ -559,7 +564,18 @@ function UpcomingEventsCard({ rows, onCancelled }) {
         <ul className="md-list" style={{ listStyle: 'none', padding: 0, margin: '.75rem 0 0' }}>
           {rows.map((e) => {
             const palette = REGISTRATION_STYLES[e.status] ?? REGISTRATION_STYLES.registered;
-            const canCancel = e.status === 'registered' || e.status === 'waitlisted';
+            const isCancellable = e.status === 'registered' || e.status === 'waitlisted';
+            // A pending cancellation request means the user already clicked
+            // "Request cancellation" and the admin hasn't ruled yet. Suppress
+            // the button and show a muted "Cancellation requested" badge.
+            const pendingCancellation = Boolean(
+              e.cancellation_requested_at && !e.cancellation_decided_at,
+            );
+            // Admin rejected a prior request — the member may file a fresh
+            // one. Show a small note so they understand why the button is
+            // active again.
+            const lastRequestRejected = e.cancellation_decision === 'rejected';
+            const canRequestCancellation = isCancellable && !pendingCancellation;
             return (
               <li key={e.id} className="md-row">
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -606,14 +622,30 @@ function UpcomingEventsCard({ rows, onCancelled }) {
                   >
                     <IconCalendar size="sm" /> Calendar
                   </a>
-                  {canCancel && (
+                  {pendingCancellation && (
+                    <span
+                      className="badge"
+                      style={{
+                        padding: '.25rem .55rem', fontSize: '.7rem',
+                        background: 'oklch(0.95 0.03 70)', color: 'oklch(0.42 0.14 70)',
+                        borderRadius: 999, fontWeight: 600,
+                      }}
+                      title="You've asked the branch to cancel this registration. They'll email you with the decision."
+                    >
+                      Cancellation requested
+                    </span>
+                  )}
+                  {canRequestCancellation && (
                     <Button
                       className="btn btn-ghost"
                       style={{ padding: '.25rem .5rem', fontSize: '.75rem', color: '#dc2626' }}
                       loading={busy === e.slug}
-                      onClick={() => cancel(e.slug, e.title)}
+                      onClick={() => requestCancellation(e.slug, e.title)}
+                      title={lastRequestRejected
+                        ? `Your previous cancellation request was declined${e.cancellation_reject_reason ? ` — "${e.cancellation_reject_reason}"` : ''}. You can file a fresh request.`
+                        : 'Submit a cancellation request for admin review'}
                     >
-                      {busy === e.slug ? 'Cancelling…' : 'Cancel'}
+                      {busy === e.slug ? 'Submitting…' : 'Request cancellation'}
                     </Button>
                   )}
                 </div>

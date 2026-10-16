@@ -65,6 +65,7 @@ const ADMIN_LOADERS = {
   '/admin':                     () => import('../pages/admin/AdminDashboardPage'),
   '/admin/events':              () => import('../pages/admin/EventsAdminPage'),
   '/admin/registrations':       () => import('../pages/admin/EventRegistrationsAdminPage'),
+  '/admin/cancellation-requests': () => import('../pages/admin/CancellationRequestsAdminPage'),
   '/admin/users':               () => import('../pages/admin/UsersAdminPage'),
   '/admin/signup-approvals':    () => import('../pages/admin/SignupApprovalsAdminPage'),
   '/admin/committees':          () => import('../pages/admin/CommitteesAdminPage'),

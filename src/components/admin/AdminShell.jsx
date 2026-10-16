@@ -51,8 +51,9 @@ const NAV_GROUPS = [
   {
     label: 'Programmes',
     items: [
-      { to: '/admin/events',        label: 'Events',        Icon: IconCalendar,     roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
-      { to: '/admin/registrations', label: 'Registrations', Icon: IconCheckCircle,  roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_TREASURER, ROLE_WICASA] },
+      { to: '/admin/events',                 label: 'Events',                 Icon: IconCalendar,     roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_WICASA] },
+      { to: '/admin/registrations',          label: 'Registrations',          Icon: IconCheckCircle,  roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE, ROLE_TREASURER, ROLE_WICASA] },
+      { to: '/admin/cancellation-requests',  label: 'Cancellation requests',  Icon: IconMessageSquare, roles: [ROLE_CHAIRMAN, ROLE_COMMITTEE] },
     ],
   },
   {

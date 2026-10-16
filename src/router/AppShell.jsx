@@ -85,6 +85,7 @@ const AdminShell                 = lazy(() => import('../components/admin/AdminS
 const AdminDashboardPage         = lazy(() => import('../pages/admin/AdminDashboardPage'));
 const EventsAdminPage            = lazy(() => import('../pages/admin/EventsAdminPage'));
 const EventRegistrationsAdminPage = lazy(() => import('../pages/admin/EventRegistrationsAdminPage'));
+const CancellationRequestsAdminPage = lazy(() => import('../pages/admin/CancellationRequestsAdminPage'));
 const UsersAdminPage             = lazy(() => import('../pages/admin/UsersAdminPage'));
 const SignupApprovalsAdminPage   = lazy(() => import('../pages/admin/SignupApprovalsAdminPage'));
 const CommitteesAdminPage        = lazy(() => import('../pages/admin/CommitteesAdminPage'));
@@ -215,6 +216,7 @@ const ADMIN_ROUTES = {
   '/admin': AdminDashboardPage,
   '/admin/events': EventsAdminPage,
   '/admin/registrations': EventRegistrationsAdminPage,
+  '/admin/cancellation-requests': CancellationRequestsAdminPage,
   '/admin/users': UsersAdminPage,
   '/admin/signup-approvals': SignupApprovalsAdminPage,
   '/admin/approvals': ApprovalsAdminPage,
