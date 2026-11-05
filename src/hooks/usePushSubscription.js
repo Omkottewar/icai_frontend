@@ -131,7 +131,7 @@ export function usePushSubscription({ enabled = true } = {}) {
       if (!reg.active) {
         throw new Error(
           'Service worker is still installing. Please reload the page and try again. ' +
-          '(If this keeps happening, fully close the tab, clear site data for icainagpur.in, then reopen.)'
+          '(If this keeps happening, fully close the tab, clear site data for nagpur.icai.org, then reopen.)'
         );
       }
 

@@ -7,14 +7,14 @@ import { IconCheckCircle, IconX } from '../icons';
 
 // GET /payments/result?status=success|failed|aborted|pending&payment_id=...
 //
-// Landing page after SabPaisa redirects the user back to the SPA via our
-// /api/payments/return handler. The URL query carries the server's
-// verified outcome, but we re-fetch /api/payments/:id/status so the UI
-// reflects the latest row state (webhook may have arrived between
-// redirect and this page's mount).
+// Landing page after Razorpay Checkout closes and the browser handler
+// forwards the user here (via openRazorpayCheckout → navigate). The URL
+// query carries the handler's view of the outcome, but we re-fetch
+// /api/payments/:id/status so the UI reflects the latest row state
+// (webhook may have arrived between modal close and this page's mount).
 //
 // Pending status polls every 3 seconds for up to 60s — long enough that
-// SabPaisa's webhook almost always resolves the row before the user has
+// Razorpay's webhook almost always resolves the row before the user has
 // to refresh manually.
 
 const STATUS_COPY_FALLBACK = {
@@ -131,11 +131,8 @@ export default function PaymentResultPage() {
               display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center',
             }}>
               <span>Amount: <strong>{amount}</strong></span>
-              {payment.sabpaisa_txn_id && (
-                <span>Txn ID: <code style={{ fontSize: '.72rem' }}>{payment.sabpaisa_txn_id}</code></span>
-              )}
-              {payment.sabpaisa_payment_mode && (
-                <span>Mode: {payment.sabpaisa_payment_mode}</span>
+              {payment.razorpay_payment_id && (
+                <span>Txn ID: <code style={{ fontSize: '.72rem' }}>{payment.razorpay_payment_id}</code></span>
               )}
             </div>
           )}

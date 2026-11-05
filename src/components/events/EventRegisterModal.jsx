@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useEventRegistration } from '../../hooks/useEventRegistration';
 import { navigate } from '../../hooks/useRoute';
 import { IconX, IconCheckCircle, IconCalendar, IconMapPin } from '../../icons';
 import Button from '../ui/Button';
+import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 
 function rupees(paise) {
   return `₹${(Number(paise) / 100).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
@@ -20,41 +21,27 @@ function formatDateTime(starts_at) {
 
 // Two-step registration modal:
 //   Free events: single "Confirm" click.
-//   Paid events: fill phone → server returns SabPaisa init payload →
-//     auto-submit an invisible form to SabPaisa's hosted checkout →
-//     SabPaisa redirects back to /payments/result → PaymentResultPage
-//     handles success/failure/pending display and the "back to event" link.
+//   Paid events: fill phone → server creates a Razorpay Order and returns
+//     the checkout payload → we load Razorpay Checkout.js and open the
+//     in-page modal → on success the handler POSTs razorpay_order_id +
+//     payment_id + signature to /api/payments/verify → verified row flips
+//     to success and the SPA navigates to /payments/result.
 export default function EventRegisterModal({ event, onClose, onRegistered }) {
   const { user, showToast } = useAuth();
   const { startRegister, loading } = useEventRegistration();
 
   const [phone, setPhone] = useState(user?.phone ?? '');
-  const [step, setStep] = useState('form');  // 'form' | 'redirecting' | 'submitted'
-  const [sabpaisa, setSabpaisa] = useState(null);  // { action, clientCode, encData } from /register
+  const [step, setStep] = useState('form');  // 'form' | 'processing' | 'submitted'
   const [err, setErr] = useState(null);
   const [attendees, setAttendees] = useState([]);
-  const formRef = useRef(null);
 
   useEffect(() => { setPhone(user?.phone ?? ''); }, [user]);
 
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape' && !loading && step !== 'redirecting') onClose?.(); };
+    const onKey = (e) => { if (e.key === 'Escape' && !loading && step !== 'processing') onClose?.(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, loading, step]);
-
-  // When SabPaisa payload arrives, auto-submit the invisible form to
-  // SabPaisa's hosted checkout. Browser leaves the page — no further UI
-  // state in this modal after submit. If the user clicks back from
-  // SabPaisa, the modal will have unmounted; they'll land on /events.
-  useEffect(() => {
-    if (step !== 'redirecting') return;
-    if (!sabpaisa || !formRef.current) return;
-    // One tick so the "Redirecting..." paint lands before the browser
-    // navigates away — otherwise users see a blank modal flash.
-    const t = setTimeout(() => formRef.current?.submit(), 150);
-    return () => clearTimeout(t);
-  }, [step, sabpaisa]);
 
   const isPaid = Number(event?.fee_paise || 0) > 0;
   const capacityFull = event?.capacity != null && Number(event.registered_count || 0) >= Number(event.capacity);
@@ -87,19 +74,41 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
       return;
     }
 
-    // Paid event — kick off the SabPaisa redirect.
-    if (!result.sabpaisa?.action || !result.sabpaisa?.encData) {
+    // Paid event — open the Razorpay Checkout modal. openRazorpayCheckout
+    // handles script-tag injection + verify POST + navigation.
+    if (!result.razorpay?.order_id || !result.razorpay?.key_id) {
       setErr('Payment gateway not configured yet. Please contact the branch office.');
       return;
     }
-    setSabpaisa(result.sabpaisa);
-    setStep('redirecting');
+
+    setStep('processing');
+    try {
+      await openRazorpayCheckout({
+        razorpay:   result.razorpay,
+        payment_id: result.payment_id,
+        name:       'ICAI Nagpur Branch',
+        description: event.title,
+        onCancel:   () => {
+          // User closed the modal. Keep the modal open on the form step so
+          // they can retry; the stale `pending` row self-hides after 15 min.
+          setStep('form');
+          setErr('Payment was cancelled. You can try again when ready.');
+        },
+      });
+      // openRazorpayCheckout navigates to /payments/result on success, so
+      // we won't reach here normally. If we do (navigation blocked, SPA
+      // intercept quirk), fall back to the submitted screen.
+      setStep('submitted');
+    } catch (err) {
+      setStep('form');
+      setErr(err?.message || 'Payment failed. Please try again or contact the branch office.');
+    }
   };
 
   return (
     <div
       className="modal-backdrop"
-      onClick={(e) => { if (e.target === e.currentTarget && !loading && step !== 'redirecting') onClose?.(); }}
+      onClick={(e) => { if (e.target === e.currentTarget && !loading && step !== 'processing') onClose?.(); }}
     >
       <div
         role="dialog"
@@ -140,13 +149,13 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
           </div>
           <button
             type="button"
-            onClick={() => (!loading && step !== 'redirecting') && onClose?.()}
+            onClick={() => (!loading && step !== 'processing') && onClose?.()}
             aria-label="Close"
             style={{
               background: 'transparent', border: 'none',
-              cursor: (loading || step === 'redirecting') ? 'not-allowed' : 'pointer',
+              cursor: (loading || step === 'processing') ? 'not-allowed' : 'pointer',
               padding: '.25rem', marginLeft: '.75rem', color: 'var(--muted-foreground)',
-              opacity: (loading || step === 'redirecting') ? 0.4 : 1,
+              opacity: (loading || step === 'processing') ? 0.4 : 1,
             }}
           >
             <IconX size="sm" />
@@ -159,8 +168,8 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
             <SignInPrompt onClose={onClose} />
           ) : step === 'submitted' ? (
             <SuccessState isPaid={isPaid} onClose={onClose} />
-          ) : step === 'redirecting' && sabpaisa ? (
-            <RedirectingState sabpaisa={sabpaisa} formRef={formRef} />
+          ) : step === 'processing' ? (
+            <ProcessingState />
           ) : capacityFull ? (
             <CapacityFullState onClose={onClose} />
           ) : (
@@ -238,7 +247,7 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
 
               {isPaid && (
                 <div className="muted-text" style={{ fontSize: '.7125rem', marginTop: '.6rem', textAlign: 'center' }}>
-                  You'll be redirected to SabPaisa's secure payment page. Card, UPI and netbanking accepted.
+                  You'll see Razorpay's secure payment window. Cards, UPI, netbanking and wallets are accepted.
                 </div>
               )}
             </form>
@@ -249,12 +258,11 @@ export default function EventRegisterModal({ event, onClose, onRegistered }) {
   );
 }
 
-// ─── Redirecting-to-SabPaisa panel ────────────────────────────────────────
-// Renders a message + an invisible <form> that auto-submits to SabPaisa's
-// hosted checkout via a useEffect in the parent. Using a POST form (not
-// window.location) because SabPaisa's init endpoint requires the three
-// fields in the request body, not the URL.
-function RedirectingState({ sabpaisa, formRef }) {
+// ─── Processing-payment panel ────────────────────────────────────────────
+// Shown while the Razorpay Checkout modal is open on top of us. Razorpay
+// owns the UI during this time; we just hold a placeholder so closing our
+// backdrop doesn't tear down the handler state.
+function ProcessingState() {
   return (
     <div style={{ textAlign: 'center', padding: '1rem 0' }}>
       <div style={{
@@ -266,23 +274,11 @@ function RedirectingState({ sabpaisa, formRef }) {
         <Spinner />
       </div>
       <h4 style={{ fontSize: '1.0625rem', fontWeight: 700, marginBottom: '.35rem' }}>
-        Redirecting to secure payment…
+        Opening secure payment window…
       </h4>
-      <div className="muted-text" style={{ fontSize: '.875rem', marginBottom: '1.25rem' }}>
-        If you aren't redirected automatically, click the button below.
+      <div className="muted-text" style={{ fontSize: '.875rem' }}>
+        Complete your payment in the Razorpay window. We'll confirm as soon as it goes through.
       </div>
-      <form ref={formRef} action={sabpaisa.action} method="POST" style={{ display: 'inline-block' }}>
-        <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
-        <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
-        <input type="hidden" name="encData"     value={sabpaisa.encData}     />
-        <button
-          type="submit"
-          className="btn btn-primary"
-          style={{ padding: '.55rem 1.25rem', fontWeight: 600 }}
-        >
-          Continue to SabPaisa
-        </button>
-      </form>
     </div>
   );
 }

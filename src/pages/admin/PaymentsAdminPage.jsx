@@ -1,19 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import { useAuth } from '../../context/AuthContext';
 import { ShimmerLines } from '../../components/ui/Shimmer';
 import { IconX } from '../../icons';
 import { dialog } from '../../lib/dialog';
+import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 
 // ─── /admin/payments ───────────────────────────────────────────────────────
 // Two surfaces on one page:
-//   1. Pending UPI verifications — action queue at the top. Every row is a
-//      user waiting for the branch to confirm their UTR against the bank
-//      statement. Approve → creates the event registration + fires the
-//      confirmation email. Reject → notifies the user with a reason.
-//   2. All payments — historical listing with filters, unchanged.
-// Razorpay refs still surface in the history for old rows; new rows show
-// UPI UTR instead.
+//   1. Pending UPI verifications — action queue at the top. Legacy rows
+//      from the pre-Razorpay UPI-manual era, still awaiting admin to
+//      confirm the UTR against the bank statement. Approve → creates the
+//      event registration + fires the confirmation email. Reject →
+//      notifies the user with a reason.
+//   2. All payments — historical listing with filters. New rows show
+//      Razorpay order + payment ids; legacy rows show UPI UTR.
 
 const STATUSES = ['', 'success', 'failed', 'created', 'pending', 'pending_verification', 'refunded', 'partially_refunded'];
 const PURPOSES = ['', 'event_registration', 'cop_renewal', 'firm_registration', 'job_posting',
@@ -117,7 +118,7 @@ export default function PaymentsAdminPage() {
       title="Payments"
       subtitle="UPI verifications up top — approve or reject each submitted UTR. Full history below."
     >
-      <SabPaisaTestPanel onCreated={() => load()} />
+      <RazorpayTestPanel onCreated={() => load()} />
 
       <PendingVerificationSection
         rows={pending}
@@ -144,7 +145,7 @@ export default function PaymentsAdminPage() {
           onChange={(e) => { setPage(1); setFilters({ ...filters, purpose: e.target.value }); }}>
           {PURPOSES.map((p) => <option key={p} value={p}>{p ? p : 'All purposes'}</option>)}
         </select>
-        <input className="input-base" placeholder="Search by UTR or payment id…" style={{ flex: 1, minWidth: 220 }}
+        <input className="input-base" placeholder="Search by order/payment id or UTR…" style={{ flex: 1, minWidth: 220 }}
           value={filters.q} onChange={(e) => setFilters({ ...filters, q: e.target.value })}
           onKeyDown={(e) => { if (e.key === 'Enter') { setPage(1); load(); } }} />
       </div>
@@ -189,28 +190,19 @@ export default function PaymentsAdminPage() {
                 </td>
                 <td style={td}><StatusPill status={p.status} /></td>
                 <td style={td}>
-                  {p.sabpaisa_txn_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="SabPaisa txn ID">{p.sabpaisa_txn_id}</div>
+                  {p.razorpay_payment_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="Razorpay payment id">{p.razorpay_payment_id}</div>
                   )}
-                  {p.sabpaisa_payment_mode && (
-                    <div className="muted-text" style={{ fontSize: '.7rem' }}>via {p.sabpaisa_payment_mode}{p.sabpaisa_bank_name ? ` · ${p.sabpaisa_bank_name}` : ''}</div>
+                  {!p.razorpay_payment_id && p.razorpay_order_id && (
+                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Razorpay order id (payment not yet captured)">{p.razorpay_order_id}</div>
                   )}
-                  {!p.sabpaisa_txn_id && p.client_txn_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Our client txn ID (SabPaisa not yet responded)">{p.client_txn_id}</div>
-                  )}
-                  {!p.sabpaisa_txn_id && !p.client_txn_id && p.upi_utr && (
+                  {!p.razorpay_payment_id && !p.razorpay_order_id && p.upi_utr && (
                     <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="UPI UTR (historical)">{p.upi_utr}</div>
                   )}
-                  {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && p.razorpay_payment_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} title="Razorpay payment (historical)">{p.razorpay_payment_id}</div>
-                  )}
-                  {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && !p.razorpay_payment_id && p.razorpay_order_id && (
-                    <div style={{ fontFamily: 'monospace', fontSize: '.75rem' }} className="muted-text" title="Razorpay order (historical)">{p.razorpay_order_id}</div>
-                  )}
-                  {!p.sabpaisa_txn_id && !p.client_txn_id && !p.upi_utr && !p.razorpay_order_id && <span className="muted-text">—</span>}
+                  {!p.razorpay_payment_id && !p.razorpay_order_id && !p.upi_utr && <span className="muted-text">—</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
-                  {(p.status === 'pending' || p.status === 'created') && p.provider === 'sabpaisa' && p.client_txn_id && (
+                  {(p.status === 'pending' || p.status === 'created') && p.provider === 'razorpay' && p.razorpay_order_id && (
                     <ReverifyButton paymentId={p.id} onDone={() => load()} />
                   )}
                   <button className="btn btn-ghost" style={btnSm} onClick={() => setDetail(p)}>Detail</button>
@@ -228,30 +220,18 @@ export default function PaymentsAdminPage() {
   );
 }
 
-// ─── SabPaisa test launcher ──────────────────────────────────────────────
-// Admin-only "fire a dummy payment at SabPaisa" button so you can smoke-
+// ─── Razorpay test launcher ──────────────────────────────────────────────
+// Admin-only "fire a dummy payment at Razorpay" button so you can smoke-
 // test the integration without having to log out of admin, log in as a
-// member, pick a paid event, etc. Opens SabPaisa's hosted checkout in a
-// popup so your admin page stays loaded and you can watch the row flip to
-// 'success' in the Full history table below once the popup redirects to
-// /payments/result.
-function SabPaisaTestPanel({ onCreated }) {
+// member, pick a paid event, etc. Opens Razorpay Checkout right here in
+// the admin page; on verify-success the row flips to 'success' in the
+// Full history table below.
+function RazorpayTestPanel({ onCreated }) {
   const { showToast } = useAuth();
   const [open, setOpen] = useState(false);
   const [amountRupees, setAmountRupees] = useState('1');
-  const [description, setDescription] = useState('SabPaisa integration test');
+  const [description, setDescription] = useState('Razorpay integration test');
   const [busy, setBusy] = useState(false);
-  const formRef = useRef(null);
-  const [sabpaisa, setSabpaisa] = useState(null);
-
-  // When the backend returns the SabPaisa init payload, auto-submit the
-  // invisible form inside the popup target so the admin lands on
-  // SabPaisa's hosted checkout immediately.
-  useEffect(() => {
-    if (!sabpaisa || !formRef.current) return;
-    const t = setTimeout(() => formRef.current?.submit(), 50);
-    return () => clearTimeout(t);
-  }, [sabpaisa]);
 
   async function launch() {
     const rupees = Math.max(1, Math.min(100000, Number(amountRupees) || 1));
@@ -266,9 +246,17 @@ function SabPaisaTestPanel({ onCreated }) {
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'Failed to create test payment');
-      setSabpaisa(j.sabpaisa);
       onCreated?.();
-      showToast?.(`Test payment ₹${rupees} created. Redirecting to SabPaisa in a new tab…`, 'success');
+      showToast?.(`Test payment ₹${rupees} created. Opening Razorpay…`, 'success');
+      await openRazorpayCheckout({
+        razorpay:    j.razorpay,
+        payment_id:  j.payment_id,
+        name:        'ICAI Nagpur Branch — Admin Test',
+        description,
+        onCancel: () => {
+          showToast?.('Test payment cancelled.', 'info');
+        },
+      });
     } catch (e) {
       showToast?.(e.message, 'error');
     } finally {
@@ -285,14 +273,14 @@ function SabPaisaTestPanel({ onCreated }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '.95rem', fontWeight: 700 }}>
-            SabPaisa test launcher <span style={{
+            Razorpay test launcher <span style={{
               background: 'oklch(0.9 0.1 65)', color: 'oklch(0.4 0.15 65)',
               fontSize: '.65rem', padding: '.1rem .5rem', borderRadius: 999,
               marginLeft: '.3rem', fontWeight: 700,
             }}>DEV</span>
           </h2>
           <div className="muted-text" style={{ fontSize: '.78rem', marginTop: '.2rem' }}>
-            Fires a dummy payment at the configured SabPaisa URL. Row is tagged <code>metadata.is_test = true</code> and excluded from treasurer reports. Costs ₹1 by default — if these are live creds, you'll be charged for real.
+            Fires a dummy payment through Razorpay Checkout. Row is tagged <code>metadata.is_test = true</code> and excluded from treasurer reports. Costs ₹1 by default — if these are live keys, you'll be charged for real.
           </div>
         </div>
         {!open && (
@@ -340,7 +328,7 @@ function SabPaisaTestPanel({ onCreated }) {
             disabled={busy}
             style={{ padding: '.45rem 1rem', fontSize: '.85rem', fontWeight: 600 }}
           >
-            {busy ? 'Creating…' : 'Launch →'}
+            {busy ? 'Opening…' : 'Launch →'}
           </button>
           <button
             type="button"
@@ -352,23 +340,6 @@ function SabPaisaTestPanel({ onCreated }) {
             Cancel
           </button>
         </div>
-      )}
-
-      {/* Hidden form posting to SabPaisa — targets _blank so the admin
-          page stays loaded and the popup takes the SabPaisa flow. */}
-      {sabpaisa && (
-        <form
-          ref={formRef}
-          action={sabpaisa.action}
-          method="POST"
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ display: 'none' }}
-        >
-          <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
-          <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
-          <input type="hidden" name="encData"     value={sabpaisa.encData}     />
-        </form>
       )}
     </section>
   );
@@ -485,20 +456,15 @@ function DetailDrawer({ payment, onClose }) {
                 <span className="muted-text">Purpose</span><span>{data.payment.purpose}</span>
                 <span className="muted-text">Payer</span><span>{data.payment.payer_name || '—'} <span className="muted-text">· {data.payment.payer_email}</span></span>
                 <span className="muted-text">Ref</span><span>{data.payment.ref_type ? `${data.payment.ref_type} · ${data.payment.ref_id}` : '—'}</span>
-                {data.payment.provider === 'sabpaisa' && (
-                  <>
-                    <span className="muted-text">Client txn ID</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.client_txn_id || '—'}</span>
-                    <span className="muted-text">SabPaisa txn ID</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.sabpaisa_txn_id || '—'}</span>
-                    <span className="muted-text">Payment mode</span><span>{data.payment.sabpaisa_payment_mode || '—'}</span>
-                    <span className="muted-text">Bank</span><span>{data.payment.sabpaisa_bank_name || '—'}{data.payment.sabpaisa_bank_txn_id ? ` · ${data.payment.sabpaisa_bank_txn_id}` : ''}</span>
-                    <span className="muted-text">Last verified</span><span>{data.payment.last_verified_at ? formatDate(data.payment.last_verified_at) : '—'}</span>
-                    <span className="muted-text">Return / Webhook</span><span style={{ fontSize: '.75rem' }}>{data.payment.return_received_at ? '✓ return' : '— return'} · {data.payment.webhook_received_at ? '✓ webhook' : '— webhook'}</span>
-                  </>
-                )}
-                {data.payment.provider !== 'sabpaisa' && (
+                {data.payment.provider === 'razorpay' && (
                   <>
                     <span className="muted-text">Razorpay order</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.razorpay_order_id || '—'}</span>
                     <span className="muted-text">Razorpay payment</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.razorpay_payment_id || '—'}</span>
+                    <span className="muted-text">Signature</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem', wordBreak: 'break-all' }}>{data.payment.razorpay_signature ? '✓ verified' : '— not verified yet'}</span>
+                  </>
+                )}
+                {data.payment.provider !== 'razorpay' && (
+                  <>
                     <span className="muted-text">UPI UTR</span><span style={{ fontFamily: 'monospace', fontSize: '.75rem' }}>{data.payment.upi_utr || '—'}</span>
                   </>
                 )}
@@ -542,11 +508,11 @@ function DetailDrawer({ payment, onClose }) {
 }
 
 // ─── Re-verify button ─────────────────────────────────────────────────────
-// Appears next to Detail on every pending SabPaisa row. Calls the admin
-// re-verify endpoint which re-runs SabPaisa's server-to-server verify
-// and, if SabPaisa confirms success, flips the row to success and fires
-// the normal fulfilment path. Use case: the webhook hasn't arrived yet
-// (push URL not registered) OR an earlier bug left the row stuck.
+// Appears next to Detail on every pending Razorpay row. Calls the admin
+// re-verify endpoint which polls Razorpay's Orders API and, if Razorpay
+// shows a captured payment, flips the row to success and fires the
+// normal fulfilment path. Use case: the webhook hasn't arrived yet
+// (webhook URL not registered) OR an earlier bug left the row stuck.
 function ReverifyButton({ paymentId, onDone }) {
   const { showToast } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -563,9 +529,9 @@ function ReverifyButton({ paymentId, onDone }) {
       if (j.outcome === 'success') {
         showToast?.('Verified — payment now Success. Row refreshing.', 'success');
       } else if (j.outcome === 'failed' || j.outcome === 'aborted') {
-        showToast?.(`SabPaisa says ${j.outcome}${j.reason ? `: ${j.reason}` : ''}`, 'warn');
+        showToast?.(`Razorpay says ${j.outcome}${j.reason ? `: ${j.reason}` : ''}`, 'warn');
       } else {
-        showToast?.('SabPaisa still has this as pending — try again in a minute.', 'info');
+        showToast?.('Razorpay still has this as pending — try again in a minute.', 'info');
       }
       await onDone?.();
     } catch (e) {
@@ -581,7 +547,7 @@ function ReverifyButton({ paymentId, onDone }) {
       style={{ fontSize: '.72rem', padding: '.2rem .5rem', marginRight: '.3rem' }}
       onClick={go}
       disabled={busy}
-      title="Re-run SabPaisa server-to-server verify. If SabPaisa confirms success, flips this row and creates the event registration."
+      title="Re-poll Razorpay for this order's payment status. If Razorpay confirms a captured payment, flips this row and creates the event registration."
     >
       {busy ? 'Verifying…' : 'Re-verify'}
     </button>

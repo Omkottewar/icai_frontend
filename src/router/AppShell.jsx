@@ -188,8 +188,8 @@ const ROUTES = {
   '/my-library': MyLibraryPage,
   '/resources/submit': ResourceSubmitPage,
   '/mock-tests': MockTestsPage,
-  // Landing page after SabPaisa redirects the browser back from its
-  // hosted checkout. Query carries ?status=&payment_id=&event_slug=.
+  // Landing page after Razorpay Checkout closes. Query carries
+  // ?status=&payment_id=&event_slug=.
   '/payments/result': PaymentResultPage,
 };
 

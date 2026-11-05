@@ -1,0 +1,15 @@
+# Cloudflare Pages routing rules — translated 1:1 from vercel.json.
+#
+# Format: <source> <destination> <status>
+#   • 200 = proxy (URL stays the same in the browser; Cloudflare's edge
+#           fetches from the destination and streams the response back).
+#   • :splat = everything matched by the trailing /*
+#
+# ─── /api/* → Fly backend (same as Vercel's rewrite) ───
+/api/*       https://icai.fly.dev/api/:splat       200
+
+# ─── /uploads/* → Fly-served file bucket ───
+/uploads/*   https://icai.fly.dev/uploads/:splat   200
+
+# ─── SPA fallback — anything else serves index.html so React Router can take over ───
+/*           /index.html                           200

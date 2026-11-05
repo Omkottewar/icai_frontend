@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
@@ -8,6 +8,7 @@ import { dialog } from '../../lib/dialog';
 import Button from '../../components/ui/Button';
 import { cachedGet, revalidate, invalidate } from '../../lib/apiCache';
 import PostingApplicantsPanel from '../../components/employer/PostingApplicantsPanel';
+import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 
 const STATUS_BADGE = {
   draft:           { bg: '#f1f5f9', fg: '#475569', label: 'Draft'   },
@@ -31,33 +32,37 @@ export default function EmployerPostingsPage() {
   const [applicantsPosting, setApplicantsPosting] = useState(null);
   const [counts, setCounts] = useState({});
   // Retry-pay state: when the employer clicks "Pay now" on a pending row,
-  // we POST /postings/:id/pay to get a fresh SabPaisa redirect payload,
-  // then auto-submit a hidden form to SabPaisa (same pattern as the form
-  // page's first-payment flow).
+  // we POST /postings/:id/pay to get a fresh Razorpay Order payload, then
+  // open Razorpay Checkout immediately (same pattern as the form page's
+  // first-payment flow).
   const [payingId, setPayingId] = useState(null);
-  const [sabpaisa, setSabpaisa] = useState(null);
-  const sabpaisaFormRef = useRef(null);
 
-  useEffect(() => {
-    if (!sabpaisa || !sabpaisaFormRef.current) return;
-    const t = setTimeout(() => sabpaisaFormRef.current?.submit(), 150);
-    return () => clearTimeout(t);
-  }, [sabpaisa]);
-
-  const payNow = async (id) => {
-    setPayingId(id);
+  const payNow = async (posting) => {
+    setPayingId(posting.id);
     try {
-      const r = await fetch(`/api/employer/postings/${id}/pay`, {
+      const r = await fetch(`/api/employer/postings/${posting.id}/pay`, {
         method: 'POST', credentials: 'include',
         headers: { 'content-type': 'application/json' },
       });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error ?? 'Could not start payment');
-      if (!j.sabpaisa?.action) throw new Error('Payment gateway not configured');
-      showToast?.('Redirecting to secure payment…', 'info');
-      setSabpaisa(j.sabpaisa);
+      if (!j.razorpay?.order_id) throw new Error('Payment gateway not configured');
+      showToast?.('Opening secure payment window…', 'info');
+      await openRazorpayCheckout({
+        razorpay:    j.razorpay,
+        payment_id:  j.payment_id,
+        name:        'ICAI Nagpur Branch',
+        description: `Posting fee — ${posting.title}`,
+        onCancel: () => {
+          setPayingId(null);
+          showToast?.('Payment cancelled. You can retry anytime.', 'info');
+        },
+      });
+      // openRazorpayCheckout handles navigation to /payments/result on
+      // success, so we usually don't reach here.
     } catch (e) {
       showToast?.(e.message, 'error');
+    } finally {
       setPayingId(null);
     }
   };
@@ -212,8 +217,8 @@ export default function EmployerPostingsPage() {
                       {p.status === 'pending_payment' && (
                         <Button
                           className="btn btn-primary"
-                          onClick={() => payNow(p.id)}
-                          loading={payingId === p.id || (sabpaisa && payingId === p.id)}
+                          onClick={() => payNow(p)}
+                          loading={payingId === p.id}
                           style={{ marginRight: '.3rem', padding: '.3rem .7rem', fontSize: '.78rem' }}
                         >
                           Pay now
@@ -238,22 +243,6 @@ export default function EmployerPostingsPage() {
           posting={applicantsPosting}
           onClose={() => setApplicantsPosting(null)}
         />
-      )}
-
-      {/* Invisible SabPaisa redirect form for retry-pay. Rendered only
-          after /postings/:id/pay returns a payload; auto-submits via the
-          useEffect above so the browser navigates to the hosted checkout. */}
-      {sabpaisa && (
-        <form
-          ref={sabpaisaFormRef}
-          action={sabpaisa.action}
-          method="POST"
-          style={{ display: 'none' }}
-        >
-          <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
-          <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
-          <input type="hidden" name="encData"     value={sabpaisa.encData}     />
-        </form>
       )}
     </EmployerLayout>
   );

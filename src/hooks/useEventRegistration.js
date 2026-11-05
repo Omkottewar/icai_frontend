@@ -1,22 +1,19 @@
 import { useState, useCallback } from 'react';
 import { apiWrite } from '../lib/apiCache';
 
-// Orchestrates the two-step SabPaisa registration flow:
+// Orchestrates the two-step Razorpay registration flow:
 //
 //   startRegister({ slug, phone, attendee_user_ids })
 //     POST /api/events/:slug/register
 //       → paid=false → registration created immediately, done
-//       → paid=true  → returns { payment_id, sabpaisa: { action, clientCode,
-//                       encData }, amount_paise, ... } so the modal can
-//                       auto-POST a form to SabPaisa's hosted checkout.
+//       → paid=true  → returns { payment_id, razorpay: { key_id, order_id,
+//                       amount_paise, currency, prefill }, amount_paise,
+//                       ... } so the modal can open Razorpay Checkout.
 //
-// After the user pays on SabPaisa's page, SabPaisa redirects back to our
-// /api/payments/return endpoint which then 302s the browser to the SPA's
-// /payments/result page. Nothing to do in this hook post-redirect — the
-// result page handles status display and the "back to event" link.
-//
-// Compared to the UPI-manual flow we removed in migration 0100, there is
-// no `submitUtr` step anymore — SabPaisa confirms payment server-to-server.
+// After the user pays in the Razorpay modal, the handler POSTs the
+// signature to /api/payments/verify, we confirm server-side, and the
+// SPA navigates to /payments/result for the status page. Nothing to do
+// in this hook post-payment.
 export function useEventRegistration() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -26,7 +23,7 @@ export function useEventRegistration() {
     setError(null);
     try {
       // No cache invalidation here — paid /register does NOT create an
-      // event_registrations row (SabPaisa's callback does). Refetching the
+      // event_registrations row (razorpay/confirm.ts does). Refetching the
       // events listing would find no change.
       const resp = await apiWrite(`/api/events/${encodeURIComponent(slug)}/register`, {
         body: {

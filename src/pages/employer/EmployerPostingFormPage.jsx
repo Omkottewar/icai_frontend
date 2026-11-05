@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import EmployerLayout from '../../components/employer/EmployerLayout';
 import { useRoute, navigate } from '../../hooks/useRoute';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +6,7 @@ import { IconArrowRight, IconX } from '../../icons';
 import { ShimmerDrawerBody } from '../../components/ui/Shimmer';
 import Button from '../../components/ui/Button';
 import { invalidate } from '../../lib/apiCache';
+import { openRazorpayCheckout } from '../../lib/razorpayCheckout';
 
 // Posting fees — mirror backend/server/lib/jobPostingFees.ts. Kept here
 // (not fetched) because the form needs to show the fee before submit so
@@ -61,21 +62,9 @@ export default function EmployerPostingFormPage() {
   const [form, setForm] = useState(EMPTY);
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [err, setErr] = useState('');
   const [categories, setCategories] = useState([]);
-  // SabPaisa redirect payload returned by POST /api/employer/postings.
-  // When set, an invisible form auto-POSTs to SabPaisa's hosted checkout.
-  const [sabpaisa, setSabpaisa] = useState(null);
-  const sabpaisaFormRef = useRef(null);
-
-  // Auto-submit the SabPaisa form the moment the payload lands. Delay
-  // 150ms so the "Redirecting…" paint has time to show before the browser
-  // navigates away.
-  useEffect(() => {
-    if (!sabpaisa || !sabpaisaFormRef.current) return;
-    const t = setTimeout(() => sabpaisaFormRef.current?.submit(), 150);
-    return () => clearTimeout(t);
-  }, [sabpaisa]);
 
   useEffect(() => {
     fetch('/api/employer/postings/_meta/lookups', { credentials: 'include' })
@@ -142,13 +131,32 @@ export default function EmployerPostingFormPage() {
       invalidate('/api/employer/postings');
       invalidate('/api/employer/me');
 
-      if (isNew && j.payment?.sabpaisa?.action) {
-        // New posting goes to SabPaisa for the posting-fee payment. The
+      if (isNew && j.payment?.razorpay?.order_id) {
+        // New posting goes to Razorpay for the posting-fee payment. The
         // posting is already saved in 'pending_payment' state server-side;
-        // on return it flips to 'active' + fires alerts to subscribers.
-        showToast?.('Posting saved. Redirecting to secure payment…', 'info');
-        setSabpaisa(j.payment.sabpaisa);
-        return;  // don't navigate away — the auto-submit effect takes over
+        // on verify success it flips to 'active' + fires alerts to
+        // subscribers (see razorpay/confirm.ts).
+        showToast?.('Posting saved. Opening secure payment window…', 'info');
+        setPaying(true);
+        try {
+          await openRazorpayCheckout({
+            razorpay:    j.payment.razorpay,
+            payment_id:  j.payment.payment_id,
+            name:        'ICAI Nagpur Branch',
+            description: `Posting fee — ${j.item?.title ?? 'Job posting'}`,
+            onCancel: () => {
+              setPaying(false);
+              showToast?.('Payment cancelled. You can retry from "My postings".', 'info');
+              navigate('/employer/postings');
+            },
+          });
+          // openRazorpayCheckout handles navigation to /payments/result.
+        } catch (payErr) {
+          setPaying(false);
+          showToast?.(payErr?.message || 'Payment failed. Retry from "My postings".', 'error');
+          navigate('/employer/postings');
+        }
+        return;
       }
 
       showToast?.(isNew ? 'Posting created' : 'Posting saved', 'success');
@@ -165,7 +173,7 @@ export default function EmployerPostingFormPage() {
   return (
     <EmployerLayout
       title={isNew ? 'New posting' : 'Edit posting'}
-      subtitle={isNew ? `Goes live after SabPaisa confirms the ₹${feeRupees.toLocaleString('en-IN')} posting fee` : ''}
+      subtitle={isNew ? `Goes live after Razorpay confirms the ₹${feeRupees.toLocaleString('en-IN')} posting fee` : ''}
       actions={
         <button type="button" className="btn btn-ghost" onClick={() => navigate('/employer/postings')}>
           Cancel
@@ -288,7 +296,7 @@ export default function EmployerPostingFormPage() {
               <div>
                 <div style={{ fontWeight: 600 }}>Posting fee</div>
                 <div className="muted-text" style={{ fontSize: '.75rem' }}>
-                  Paid once per posting. Secure payment via SabPaisa — card, UPI, netbanking.
+                  Paid once per posting. Secure payment via Razorpay — cards, UPI, netbanking, wallets.
                 </div>
               </div>
               <div style={{ fontSize: '1.125rem', fontWeight: 700 }}>
@@ -299,28 +307,12 @@ export default function EmployerPostingFormPage() {
 
           <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end', marginTop: '.5rem' }}>
             <button type="button" className="btn btn-ghost" onClick={() => navigate('/employer/postings')}>Cancel</button>
-            <Button type="submit" className="btn btn-primary" loading={saving || !!sabpaisa}>
-              {sabpaisa ? 'Redirecting to SabPaisa…' : saving ? 'Saving…' : (
+            <Button type="submit" className="btn btn-primary" loading={saving || paying}>
+              {paying ? 'Opening Razorpay…' : saving ? 'Saving…' : (
                 <>{isNew ? `Continue to pay ₹${feeRupees.toLocaleString('en-IN')}` : 'Save'} <IconArrowRight size="sm" /></>
               )}
             </Button>
           </div>
-        </form>
-      )}
-
-      {/* Invisible SabPaisa redirect form. Rendered only after the backend
-          returns the init payload; auto-submits via the useEffect above
-          so the browser navigates to SabPaisa's hosted checkout. */}
-      {sabpaisa && (
-        <form
-          ref={sabpaisaFormRef}
-          action={sabpaisa.action}
-          method="POST"
-          style={{ display: 'none' }}
-        >
-          <input type="hidden" name="clientCode"  value={sabpaisa.clientCode}  />
-          <input type="hidden" name="clientTxnId" value={sabpaisa.clientTxnId} />
-          <input type="hidden" name="encData"     value={sabpaisa.encData}     />
         </form>
       )}
     </EmployerLayout>

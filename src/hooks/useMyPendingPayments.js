@@ -3,9 +3,8 @@ import { cachedGet, invalidate, subscribe } from '../lib/apiCache';
 import { useAuth } from '../context/AuthContext';
 
 // Returns the caller's payments still in flight — status 'pending'
-// (SabPaisa hasn't confirmed yet) or 'pending_verification' (historical
-// UPI-manual rows still awaiting admin backfill approval, pre-migration-
-// 0100). Used by:
+// (Razorpay hasn't confirmed yet) or 'pending_verification' (historical
+// UPI-manual rows still awaiting admin backfill approval). Used by:
 //   • EventRow — swap the Register button for a "Payment in progress" pill
 //     so the user doesn't accidentally start a second payment for the same
 //     event.
