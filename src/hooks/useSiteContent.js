@@ -9,7 +9,7 @@ import { cachedGet, subscribe } from '../lib/apiCache';
 // here too — otherwise the page renders an empty card on first load.
 export const SITE_CONTENT_DEFAULTS = {
   chairman_message: {
-    photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/c4c18c20-7ee6-40a9-b6b3-83bb8a217261.webp',
+    photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/c4c18c20-7ee6-40a9-b6b3-83bb8a217261.webp',
     quote: 'Our branch remains committed to fostering a culture of integrity, lifelong learning and service — for our members, our students and the public we serve.',
     name: 'CA. Swaroopa Wazalwar',
     role_line: 'Chairperson, Nagpur Branch · 2026-27',
@@ -31,7 +31,7 @@ export const SITE_CONTENT_DEFAULTS = {
     body: 'The official portal of the Nagpur Branch of WIRC of ICAI — supporting over 4,000 members and 8,500+ students through education, regulation, workshops, industrial visits, sports festivals and continuous professional development.',
   },
   home_branch_premises: {
-    image_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/739ee5a8-8831-4843-aa8d-6dae1fa00ba9.webp',
+    image_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/739ee5a8-8831-4843-aa8d-6dae1fa00ba9.webp',
     body: 'A purpose-built two-storey facility housing the Branch office, a 100-seat seminar hall, a digital library, reading room, itt lab, conferance hall and a dedicated student wing.',
     stats: [
       {
@@ -65,16 +65,16 @@ export const SITE_CONTENT_DEFAULTS = {
     since_year:         '1978',
   },
   home_leadership_carousel: {
-    slide_1_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/a8ee4858-1d29-44a1-a56a-9705eb691c20.webp',
+    slide_1_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/a8ee4858-1d29-44a1-a56a-9705eb691c20.webp',
     slide_1_caption: '',
     slide_1_alt: '',
-    slide_2_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/ba347927-78c2-4320-94e0-c7f664b9fcda.webp',
+    slide_2_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/ba347927-78c2-4320-94e0-c7f664b9fcda.webp',
     slide_2_caption: '',
     slide_2_alt: '',
-    slide_3_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/084764d7-90a5-4f3e-a9bd-a80d475dd7bc.webp',
+    slide_3_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/084764d7-90a5-4f3e-a9bd-a80d475dd7bc.webp',
     slide_3_caption: '',
     slide_3_alt: '',
-    slide_4_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/3e015f3a-c34c-4dad-8c90-61189394b22c.webp',
+    slide_4_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/3e015f3a-c34c-4dad-8c90-61189394b22c.webp',
     slide_4_caption: '',
     slide_4_alt: '',
   },
@@ -561,7 +561,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Swaroopa Wazalwar',
         user_id: '8b044603-c0e6-4435-9f85-f9f091aa3508',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/fd26e683-cdea-4b90-b9ed-900c4b234a5e.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/fd26e683-cdea-4b90-b9ed-900c4b234a5e.webp',
         designation: 'Chairperson',
         committee_roles: [
           {
@@ -577,7 +577,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Deepak Jethwani',
         user_id: '175eb83c-ed47-4ab7-b342-f9e25556b26a',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/7ddbc6d4-ccb8-4ae1-8d06-553606e82783.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/7ddbc6d4-ccb8-4ae1-8d06-553606e82783.webp',
         designation: 'Vice Chairperson',
         committee_roles: [
           {
@@ -593,7 +593,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Trupti Bhattad',
         user_id: '91988735-e4e8-4914-a6b6-d42f41bd90c9',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/f46b5244-f0d5-4161-bb4b-68ef80a901a9.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/f46b5244-f0d5-4161-bb4b-68ef80a901a9.webp',
         designation: 'Secretary',
         committee_roles: [
           {
@@ -609,7 +609,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Vinod Vijay Agrawal',
         user_id: 'd35031d5-16ff-4e13-b4c6-65dffa62cc2d',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/ce2d2dc5-b6a9-4fdc-9649-840159f7dc9c.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/ce2d2dc5-b6a9-4fdc-9649-840159f7dc9c.webp',
         designation: 'Treasurer',
         committee_roles: [
           {
@@ -625,7 +625,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Dinesh Rathi',
         user_id: '0b95613e-4e61-4433-b696-ae760464b1a3',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/ddc7c867-1d72-4ae2-a064-37e7134f482e.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/ddc7c867-1d72-4ae2-a064-37e7134f482e.webp',
         designation: 'Managing Committee Member',
         committee_roles: [
           {
@@ -637,7 +637,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Ankush Kesharwani',
         user_id: '419c9d0a-507a-40e4-bb44-d7ac2c13114c',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/f44f20f4-9acb-4997-ae66-2d295c6ce1af.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/f44f20f4-9acb-4997-ae66-2d295c6ce1af.webp',
         designation: 'Managing Committee Member',
         committee_roles: [
           {
@@ -649,7 +649,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Ashish Agarwal',
         user_id: 'b7db44b9-af11-4bdb-bc7e-b50769e1abac',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/f8f57a09-8fa4-43d7-a4ad-a95a4dc06cef.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/f8f57a09-8fa4-43d7-a4ad-a95a4dc06cef.webp',
         designation: 'Managing Committee Member',
         committee_roles: [
           {
@@ -661,7 +661,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Pranavkumar Limaja',
         user_id: 'dfb4f24e-388b-4f05-8fb7-86fcfd0c2052',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/4214d6bb-5a0d-4ef8-b333-135e7fc3e49d.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/4214d6bb-5a0d-4ef8-b333-135e7fc3e49d.webp',
         designation: 'Managing Committee Member',
         committee_roles: [
           {
@@ -673,7 +673,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Jiten Saglani',
         user_id: 'b2714c15-e84b-4e1e-8152-bbb88d923682',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/10392d2b-2365-428a-a484-9aaae4188f5a.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/10392d2b-2365-428a-a484-9aaae4188f5a.webp',
         designation: 'Managing Committee Member',
         committee_roles: [
           {
@@ -685,7 +685,7 @@ For pricing and to begin verification, contact the branch office (Contact page).
       {
         name: 'CA Pratik Palan',
         user_id: '728c14ba-0dc8-4ddb-9bc6-7103d2100f70',
-        photo_url: 'https://ohpjavugvpqjbloxzluf.supabase.co/storage/v1/object/public/public-content/site/31cbb806-af1f-4765-9267-1fd85dced41b.webp',
+        photo_url: 'https://mbejqncvxqascdjqacag.supabase.co/storage/v1/object/public/public-content/site/31cbb806-af1f-4765-9267-1fd85dced41b.webp',
         designation: 'Managing Committee Member',
         committee_roles: [
           {
